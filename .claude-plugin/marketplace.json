@@ -1,45 +1,35 @@
 {
-  "name": "airsstack",
+  "name": "claudestacks",
   "owner": {
     "name": "rstlix0x0",
     "email": "rstlix.dev@gmail.com"
   },
-  "description": "airsstack — modular AI development methodology for Claude Code: execution agents, a spec-driven workflow, and per-language guideline plugins.",
+  "description": "claudestacks — modular AI development methodology for Claude Code: execution agents, a spec-driven workflow, and per-language guideline plugins.",
   "plugins": [
     {
-      "name": "airsstack",
-      "source": "./plugins/airsstack",
+      "name": "claudestacks",
+      "source": "./plugins/claudestacks",
       "description": "Execution engine: a TDD coder, a merged code+spec reviewer, and a read-only explorer, plus an orchestration driver, process guidelines, project-local memory, and a concise response mode (inspired by the caveman plugin, github.com/juliusbrussee/caveman)."
     },
     {
-      "name": "airsstack-sdd",
-      "source": "./plugins/airsstack-sdd",
-      "description": "Spec-driven development workflow: brainstorm an idea into a spec, write a one-objective implementation plan, and execute it with review checkpoints. Adapted from the superpowers plugin (superpowers@claude-plugins-official) with airsstack-specific adjustments."
+      "name": "claudestacks-sdd",
+      "source": "./plugins/claudestacks-sdd",
+      "description": "Spec-driven development workflow: brainstorm an idea into a spec, write a one-objective implementation plan, and execute it with review checkpoints. Adapted from the superpowers plugin (superpowers@claude-plugins-official) with claudestacks-specific adjustments."
     },
     {
-      "name": "airsstack-guideline-rust",
-      "source": "./plugins/airsstack-guideline-rust",
+      "name": "claudestacks-guideline-rust",
+      "source": "./plugins/claudestacks-guideline-rust",
       "description": "Rust engineering guidelines and Definition-of-Done, delivered as a lazily-loaded skill."
     },
     {
-      "name": "airsstack-journal",
-      "source": "./plugins/airsstack-journal",
+      "name": "claudestacks-journal",
+      "source": "./plugins/claudestacks-journal",
       "description": "Transparent, note-based experiential memory for the development agent: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index."
     },
     {
-      "name": "airsstack-plugin-dev",
-      "source": "./plugins/airsstack-plugin-dev",
-      "description": "Plugin-development toolkit for the airsstack suite: a PostToolUse cache-sync hook that mirrors edited plugin files into the fixed-version install cache, removing the manual cp / reinstall dance during plugin development."
-    },
-    {
-      "name": "airsstack-cmux",
-      "source": "./plugins/airsstack-cmux",
+      "name": "claudestacks-cmux",
+      "source": "./plugins/claudestacks-cmux",
       "description": "Native cmux terminal control: four lazily-loaded skills (control, workspace, browser, config) that drive the cmux CLI for terminal, pane/workspace, browser, and config automation."
-    },
-    {
-      "name": "airsstack-okf",
-      "source": "./plugins/airsstack-okf",
-      "description": "Open Knowledge Format (OKF) v0.1 producer+consumer toolkit: bundle provisioning, concept authoring and batch enrichment, progressive-disclosure recall, and a deterministic conformance lint."
     }
   ]
 }

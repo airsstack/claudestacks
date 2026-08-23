@@ -1,0 +1,18 @@
+{
+  "name": "claudestacks-guideline-rust",
+  "version": "0.1.3",
+  "description": "Rust engineering guidelines and Definition-of-Done, delivered as a lazily-loaded skill.",
+  "author": {
+    "name": "rstlix0x0",
+    "email": "rstlix.dev@gmail.com"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/airsstack/claudestacks",
+  "repository": "https://github.com/airsstack/claudestacks",
+  "keywords": [
+    "rust",
+    "guidelines",
+    "definition-of-done",
+    "code-quality"
+  ]
+}

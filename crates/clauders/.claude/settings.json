@@ -5,16 +5,14 @@
   },
   "disableWorkflows": true,
   "enabledPlugins": {
-    "airsstack@airsstack": true,
-    "airsstack-sdd@airsstack": true,
-    "airsstack-guideline-rust@airsstack": true,
-    "airsstack-journal@airsstack": true,
-    "airsstack-plugin-dev@airsstack": true,
-    "airsstack-cmux@airsstack": true,
-    "airsstack-okf@airsstack": true
+    "claudestacks@claudestacks": true,
+    "claudestacks-sdd@claudestacks": true,
+    "claudestacks-guideline-rust@claudestacks": true,
+    "claudestacks-journal@claudestacks": true,
+    "claudestacks-cmux@claudestacks": true
   },
   "extraKnownMarketplaces": {
-    "airsstack": {
+    "claudestacks": {
       "source": {
         "source": "directory",
         "path": "../.."

@@ -7,7 +7,7 @@ is specific to this crate.
 
 ## Commands
 
-The Definition of Done is owned by the `airsstack-guideline-rust` skill; while working inside this
+The Definition of Done is owned by the `claudestacks-guideline-rust` skill; while working inside this
 crate, run it scoped with `-p clauders` instead of `--workspace`:
 
 ```bash
@@ -174,5 +174,5 @@ current state, so record it, rank it by how likely a caller is to hit it, and st
 intention, an owner, an estimate, or an ordering.
 
 The same rule governs source comments: `references/doc-comment-discipline.md` in the
-`airsstack-guideline-rust` skill bans internal planning paths, phase identifiers, workflow vocabulary,
+`claudestacks-guideline-rust` skill bans internal planning paths, phase identifiers, workflow vocabulary,
 and AI/agent names from rustdoc and `//` comments. This is that rule extended to `docs/`.

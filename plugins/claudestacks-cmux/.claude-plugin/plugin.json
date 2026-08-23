@@ -1,0 +1,19 @@
+{
+  "name": "claudestacks-cmux",
+  "version": "0.1.1",
+  "description": "Native cmux terminal control for Claude Code: four lazily-loaded skills (control, workspace, browser, config) that drive the cmux CLI, grounded on cmux 0.64.17.",
+  "author": {
+    "name": "rstlix0x0",
+    "email": "rstlix.dev@gmail.com"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/airsstack/claudestacks",
+  "repository": "https://github.com/airsstack/claudestacks",
+  "keywords": [
+    "cmux",
+    "terminal",
+    "automation",
+    "browser",
+    "skills"
+  ]
+}

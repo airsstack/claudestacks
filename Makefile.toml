@@ -7,7 +7,7 @@
 #   cargo make --list-all-steps
 #
 # The five gate steps mirror the canonical command set in the
-# `airsstack-guideline-rust` plugin one-for-one. Change them there first; this
+# `claudestacks-guideline-rust` plugin one-for-one. Change them there first; this
 # file follows. CI runs `cargo make dod`, so the pipeline and a local run are
 # the same command.
 #

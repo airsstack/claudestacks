@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 
-pub use airs_transport::TransportError;
+pub use crate::transport::TransportError;
 
 use crate::types::{OrganizationId, RequestId};
 use http::StatusCode;

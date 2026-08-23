@@ -56,8 +56,7 @@ pub mod prelude;
 pub mod retry;
 #[cfg(test)]
 mod test_support;
-#[doc(inline)]
-pub use airs_transport as transport;
+pub mod transport;
 pub mod types;
 pub(crate) mod wire_helpers;
 

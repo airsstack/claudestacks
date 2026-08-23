@@ -1,0 +1,87 @@
+[workspace]
+resolver = "3"
+members  = ["crates/clauders", "crates/claudevs", "crates/claudevs-cli"]
+
+[workspace.package]
+edition       = "2024"
+rust-version  = "1.94"
+license       = "Apache-2.0"
+repository    = "https://github.com/airsstack/claudestacks"
+authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
+publish       = false
+
+[workspace.dependencies]
+# Async runtime — core (tokio-only stance)
+tokio              = { version = "1.52.3", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "io-util"] }
+tokio-util         = { version = "0.7.19", default-features = false }
+# HTTP types + bodies + streams
+http               = "1.4.1"
+bytes              = "1.11.1"
+futures-core       = "0.3.32"
+futures-util       = { version = "0.3.32", default-features = false, features = ["std"] }
+pin-project-lite   = "0.2.17"
+# HTTP backend for the embedded transport module (crates/clauders/src/transport/)
+reqwest            = { version = "0.13.4", default-features = false, features = ["rustls", "stream", "http2"] }
+# SSE parsing
+eventsource-stream = "0.2.3"
+# Serialization
+serde              = { version = "1.0.228", features = ["derive"] }
+serde_json         = "1.0.150"
+# Errors + tracing + traits
+thiserror          = "2.0.18"
+tracing            = "0.1.44"
+async-trait        = "0.1.89"
+# URL handling + secret protection
+url                = "2.5.8"
+secrecy            = "0.10.3"
+# Embeddable Lua 5.4 runtime, developed in its own repository
+# (https://github.com/airsstack/airsl) and consumed here from crates.io. `claudevs`
+# builds its scripted-case harness on it and re-exports `airsl::mlua` rather than
+# declaring `mlua` itself, so the two can never resolve to different copies of the
+# Lua interpreter. Building it compiles Lua from C sources, so a C compiler is
+# required to build this workspace.
+airsl              = "0.1.3"
+# CLI argument parsing (claudevs-cli)
+clap               = { version = "4", features = ["derive"] }
+regex              = "1"
+walkdir            = "2.5"
+# Temp files and dirs. Dev-only for clauders; a runtime dependency of `claudevs`,
+# which builds fixture plugin trees under it.
+tempfile           = "3.23.0"
+# Dev-only (member crates reference these in [dev-dependencies])
+mockall            = "0.14.0"
+wiremock           = "0.6.5"
+insta              = "1.47.2"
+trybuild           = "1"
+base64             = "0.22.1"
+ratatui            = "0.29.0"
+# YAML front-end for claudevs cases. serde_yaml is archived; serde_yml is
+# self-described deprecated; serde_yaml_ng is the maintained fork.
+serde_yaml_ng      = "0.10"
+# claudevs.toml (declared native test suites).
+toml               = "1.1"
+# Internal workspace members — path for local builds, version for publish-readiness.
+# (clauders has no entry: nothing else depends on it.)
+claudevs           = { version = "0.1.0", path = "crates/claudevs" }
+
+[workspace.lints.rust]
+unsafe_code        = "forbid"
+missing_docs       = "warn"
+unreachable_pub    = "warn"
+unused_must_use    = "deny"
+
+[workspace.lints.clippy]
+pedantic           = { level = "warn", priority = -1 }
+nursery            = { level = "warn", priority = -1 }
+unwrap_used        = "deny"
+expect_used        = "warn"
+panic              = "deny"
+todo               = "warn"
+dbg_macro          = "deny"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+
+[profile.release]
+lto                = "thin"
+codegen-units      = 1
+strip              = "symbols"

@@ -6,7 +6,7 @@ six plugins are built in.
 ## Install
 
 Every hook in this plugin runs on the `airsl` binary; install it first with
-`cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli`, then:
+`cargo install airsl-cli --locked`, then:
 
 ```
 /plugin marketplace add rstlix0x0/airsstack

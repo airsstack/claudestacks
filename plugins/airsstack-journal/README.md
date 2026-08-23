@@ -13,7 +13,7 @@ depends on the `airsstack` plugin.
 ## Install
 
 Every hook and skill script in this plugin runs on the `airsl` binary; install it first with
-`cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli`, then:
+`cargo install airsl-cli --locked`, then:
 
 ```
 /plugin marketplace add rstlix0x0/airsstack
@@ -53,7 +53,7 @@ convention) is documented in `references/note-schema.md`.
 airsl test --allow-read /tmp --allow-write /tmp plugins/airsstack-journal/scripts
 ```
 
-Every script in this plugin runs on [`airsl`](../../crates/airsl), the embedded
+Every script in this plugin runs on [`airsl`](https://github.com/airsstack/airsl), the embedded
 Lua runtime, under `--policy confined`: the authority each one needs is named on
 its own command line, so what a script may read, write, or run is visible in the
 invocation rather than buried in the script.

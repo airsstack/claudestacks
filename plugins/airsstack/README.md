@@ -53,9 +53,9 @@ The session hooks **nudge only** — you (the model) keep the selection and dura
 
 The `UserPromptSubmit` hook — like every other airsl-backed hook in the suite (`enforce.lua`,
 `rearm.lua`, SDD layout provisioning, the journal orientation card) — runs on
-[`airsl`](../../crates/airsl), the embedded Lua runtime, and its launcher exits silently when the
-`airsl` binary is not installed, so that hook's own effect disappears with no error at the point it
-fires. That per-hook silence is no longer the whole story: `hooks/preflight.sh` runs on every
+[`airsl`](https://github.com/airsstack/airsl), the embedded Lua runtime, and its launcher exits
+silently when the `airsl` binary is not installed, so that hook's own effect disappears with no
+error at the point it fires. That per-hook silence is no longer the whole story: `hooks/preflight.sh` runs on every
 `SessionStart` (startup, resume, and clear) precisely to break it. It re-resolves `airsl` the same
 way the other hook wrappers do and, if that resolution fails, prints a `STATUS:` / `Disabled:` /
 `FIX:` block plus the install command — so a machine without it still gets one signal per session
@@ -65,11 +65,13 @@ journal orientation card); `rearm.lua` and the two `airsstack-plugin-dev` hooks 
 without `airsl` and are left off deliberately, because naming every hook would bury the ones that
 change what a session does.
 
-Install `airsl` with `cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli`,
-or run `plugins/airsstack/scripts/install-airsl.sh` from the repo root (`scripts/install-airsl.sh`
-from inside this directory) for the same thing in one command — it also detects an
-already-installed binary and reports its location. If `airsl` is installed but a hook still can't
-find it, its directory is likely off the hook's PATH — set `AIRSL_BIN` to the binary's full path.
+Install `airsl` with `cargo install airsl-cli --locked`, or run
+`plugins/airsstack/scripts/install-airsl.sh` from the repo root (`scripts/install-airsl.sh` from
+inside this directory) for the same thing plus a report of where the binary landed and whether that
+directory is on PATH. Re-running either upgrades an existing install: the command is deliberately
+unpinned, and `cargo install` rebuilds only when the published version differs from the installed
+one. If `airsl` is installed but a hook still can't find it, its directory is likely off the hook's
+PATH — set `AIRSL_BIN` to the binary's full path.
 
 ## Project snapshots
 

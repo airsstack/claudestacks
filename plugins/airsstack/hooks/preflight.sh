@@ -44,7 +44,7 @@ if [ -z "$AIRSL" ]; then
   if [ -n "$DIR" ]; then
     echo "  sh \"$DIR/../scripts/install-airsl.sh\""
   else
-    echo '  cargo install --git https://github.com/rstlix0x0/airsstack --locked airsl-cli'
+    echo '  cargo install airsl-cli --locked'
   fi
 fi
 

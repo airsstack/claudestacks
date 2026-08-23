@@ -1,0 +1,346 @@
+#
+# cargo-make task graph for the claudestacks workspace.
+#
+#   cargo make            # the full Definition-of-Done gate
+#   cargo make fmt        # rewrite formatting (the only task that mutates the tree)
+#   cargo make clippy     # a single gate step
+#   cargo make --list-all-steps
+#
+# The five gate steps mirror the canonical command set in the
+# `airsstack-guideline-rust` plugin one-for-one. Change them there first; this
+# file follows. CI runs `cargo make dod`, so the pipeline and a local run are
+# the same command.
+#
+# Install: cargo install --locked cargo-make
+#
+
+[config]
+# Every gate command already carries `--workspace`, so the task must run exactly
+# once from the workspace root. Without this, cargo-make re-runs each task once
+# per member crate — five redundant full-workspace builds.
+default_to_workspace = false
+# No implicit task graph. The gate is only what is written below, and a
+# built-in `build`/`test`/`ci-flow` inherited from cargo-make's core set would
+# run cargo commands nobody in this repo chose.
+skip_core_tasks = true
+min_version = "0.37.0"
+
+[env]
+CARGO_TERM_COLOR = "always"
+
+# `--all-features` below is carried for forward-safety: no crate in this
+# workspace declares Cargo `[features]`, so today it equals the default build.
+# It stays in every command so the gate stays correct the day a feature is added.
+
+# ---------------------------------------------------------------------------
+# The gate
+# ---------------------------------------------------------------------------
+
+[tasks.default]
+alias = "dod"
+
+[tasks.dod]
+category = "Gate"
+description = "Definition of Done — every step must exit 0 with zero warnings"
+dependencies = ["fmt-check", "clippy", "doc", "test", "test-doc"]
+
+[tasks.fmt-check]
+category = "Gate"
+description = "Assert formatting without rewriting anything"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+
+[tasks.clippy]
+category = "Gate"
+description = "Lint every target, warnings are errors"
+# `--all-targets` covers tests, examples and benches — a lint living only in
+# test code passes silently without it. `-D warnings` also promotes plain rustc
+# warnings, which is why the gate has no separate `cargo build` step.
+command = "cargo"
+args = [
+  "clippy",
+  "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--",
+  "-D",
+  "warnings",
+]
+
+[tasks.doc]
+category = "Gate"
+description = "Build rustdoc with warnings promoted to errors"
+# Plain `cargo doc` prints rustdoc warnings and still exits 0; RUSTDOCFLAGS is
+# the only thing that makes this step a gate rather than a report.
+command = "cargo"
+args = ["doc", "--workspace", "--all-features", "--no-deps"]
+
+[tasks.doc.env]
+RUSTDOCFLAGS = "-D warnings"
+
+[tasks.test]
+category = "Gate"
+description = "Unit, integration, example and bench targets"
+command = "cargo"
+args = ["test", "--workspace", "--all-targets", "--all-features"]
+
+[tasks.test-doc]
+category = "Gate"
+description = "Doctests — excluded by --all-targets, so they need their own run"
+command = "cargo"
+args = ["test", "--workspace", "--all-features", "--doc"]
+
+# ---------------------------------------------------------------------------
+# Supply chain
+# ---------------------------------------------------------------------------
+
+[tasks.deny]
+category = "Supply chain"
+description = "cargo-deny: security advisories, licenses, duplicate versions, sources"
+# Deliberately not a dependency of `dod`. The Definition of Done is the five
+# commands the guideline skill owns; adding a sixth here would make this file
+# disagree with its source of truth. This check also answers to a moving
+# advisory database rather than to the working tree, so it can fail on a commit
+# that changed nothing.
+command = "cargo"
+args = ["deny", "check"]
+
+# ---------------------------------------------------------------------------
+# The plugin suite
+# ---------------------------------------------------------------------------
+
+[tasks.plugins]
+category = "Plugin suite"
+description = "Every check over the Lua plugin scripts"
+# Deliberately not a dependency of `dod`, for the same reason `deny` is not: the
+# Definition of Done is the five commands the guideline skill owns, and a sixth
+# here would make this file disagree with its source of truth. It also needs the
+# `airsl` binary installed rather than only the workspace built, which is a
+# different prerequisite from every gate step.
+dependencies = ["plugins-check", "plugins-test"]
+
+[tasks.plugins-check]
+category = "Plugin suite"
+description = "Compile every Lua file, including the ones no test loads"
+# Runs before the tests because it is cheaper and its failures are more
+# fundamental: `airsl test` only compiles what a test file loads, and a hook's
+# entry point is loaded by nothing. Before this existed, a missing `end` in the
+# enforcement dispatcher left the suite at 244 passing and the hook exiting 0 —
+# silent at both ends.
+#
+# No policy and no grants: nothing is executed, so there is no authority to grant.
+script_runner = "@shell"
+script = '''
+set -e
+if ! command -v airsl >/dev/null 2>&1; then
+    echo "airsl is not installed: cargo make install-airsl" >&2
+    exit 1
+fi
+set -x
+airsl check plugins
+'''
+
+[tasks.plugins-test]
+category = "Plugin suite"
+description = "airsl test over the Lua plugin scripts"
+# The grants are what the scripts actually need to run their own tests: read
+# anywhere (a test builds fixtures under the system temp directory and reads
+# repository files), write only under that temp directory, and `git` as the one
+# program they may run.
+script_runner = "@shell"
+script = '''
+set -e
+if ! command -v airsl >/dev/null 2>&1; then
+    echo "airsl is not installed: cargo make install-airsl" >&2
+    exit 1
+fi
+set -x
+airsl test --policy confined \
+  --allow-read / \
+  --allow-write "${TMPDIR:-/tmp}" \
+  --allow-exec git \
+  plugins
+'''
+
+[tasks.claudevs-check]
+category = "Plugin suite"
+description = "claudevs check over the fixture plugin corpus, both directions"
+# Not a dependency of `dod` for the same reason `plugins` is not: the gate is
+# the five commands the guideline skill owns. This lane asserts the checkers
+# still report — a corpus of only-passing fixtures would go green the day they
+# stopped. `claude` is absent on the runner, so the validate stage skips and
+# the deterministic stages carry the gate, which is the documented degradation.
+#
+# `claude plugin validate --strict` on this machine (claude 2.1.237) passes all
+# four fixtures except bad-matcher-plugin, which it rejects with exit 1
+# ("hooks.PreToolUseX: Invalid key in record"). That means locally the validate
+# stage catches bad-matcher-plugin and stops the pipeline before wiring ever
+# runs — the matcher checker itself is never exercised on this machine. On the
+# CI runner, where `claude` is absent, validate reports itself skipped and the
+# deterministic matcher checker is what produces the same exit 1. Same exit
+# code, different stage; do not read a local pass as proof the matcher checker
+# works — only the CI run does that.
+#
+# `root` is deliberately relative: `claudevs check` resolves `plugin_dir` to
+# an absolute path once, up front, and uses that single value for both the
+# spawned delegate's argv and its cwd (crates/claudevs/src/validate.rs), so a
+# relative path here is no longer doubled. Keeping it relative means that on
+# a machine that has `claude`, this lane also exercises the delegate's path
+# handling, so that defect cannot come back unnoticed.
+script_runner = "@shell"
+script = '''
+set -e
+root="crates/claudevs/tests/fixtures"
+
+# `cargo run -q -p claudevs-cli --` in place of a hardcoded `target/debug/claudevs`
+# path: cargo resolves the target directory itself, so the lane still works under
+# CARGO_TARGET_DIR or a --target-dir override. `-q` suppresses cargo's own build
+# output, so the captured output below is exactly what `claudevs check` printed.
+#
+# `_run` captures output and exit code and asserts the exit code, but is
+# private (leading underscore, never called from the fixture list below) so
+# that the stage assertion always runs in the same breath as the capture —
+# there is no exposed "run" step whose output an assertion could read stale
+# after a previous fixture, because there is no way to call one without the
+# other.
+_run() {
+    plugin="$1"; want_exit="$2"
+    set +e
+    out="$(cargo run -q -p claudevs-cli -- check "$root/$plugin" 2>&1)"
+    got=$?
+    set -e
+    if [ "$got" != "$want_exit" ]; then
+        echo "claudevs check $plugin: expected exit $want_exit, got $got" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+}
+
+# Asserting exit codes alone cannot tell which stage produced them: a
+# regression that fails the wiring check for the wrong reason, or that moves a
+# failure from wiring to validate, keeps exit 1 and this lane would stay
+# green. So beyond the exit code, assert which stage line `claudevs check`
+# printed.
+
+# `claudevs check` indents every top-level stage line by two spaces (`  ok
+# validate`, `  FAIL  wiring`), so the assertions below match on that exact
+# prefix rather than column zero.
+#
+# Each fixture calls exactly one of the three functions below, and each one
+# runs `_run` itself before reading `$out`/`$got` — the two can no longer be
+# invoked separately, so there is no way to assert against a previous
+# fixture's stale output.
+expect_no_fail() {
+    plugin="$1"; want_exit="$2"
+    _run "$plugin" "$want_exit"
+    if echo "$out" | grep -q "^  FAIL  "; then
+        echo "claudevs check $plugin: expected every stage to pass, but a stage reported FAIL:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    # The absence check above cannot tell "every stage passed" from "no stage
+    # line was printed at all" — a silently-broken binary that exits 0 with no
+    # output would sail through it. `wiring` is the positive anchor because it
+    # runs on every machine regardless of whether the `claude` binary is
+    # installed (unlike `validate`, which skips when `claude` is absent), so
+    # asserting its exact line pins that a stage was actually produced without
+    # reintroducing any machine dependence.
+    if ! echo "$out" | grep -q "^  ok    wiring\$"; then
+        echo "claudevs check $plugin: expected \"ok    wiring\" among the stage lines, got:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "ok  $plugin (exit $got, no stage failed)"
+}
+
+expect_stage_fail() {
+    plugin="$1"; want_exit="$2"; stage="$3"
+    _run "$plugin" "$want_exit"
+    if ! echo "$out" | grep -q "^  FAIL  $stage\$"; then
+        echo "claudevs check $plugin: expected \"FAIL  $stage\", got:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "ok  $plugin (FAIL $stage)"
+}
+
+# bad-matcher-plugin is the one fixture whose failing stage depends on the
+# machine, per the comment above: `claude` present (this machine) catches it at
+# validate before wiring ever runs; `claude` absent (CI) means the
+# deterministic wiring matcher checker catches the same defect instead. Accept
+# either stage here rather than asserting one, so this lane is not
+# machine-dependent while every other assertion still pins an exact stage.
+expect_stage_fail_either() {
+    plugin="$1"; want_exit="$2"; stage_pattern="$3"; label="$4"
+    _run "$plugin" "$want_exit"
+    if ! echo "$out" | grep -Eq "^  FAIL  ($stage_pattern)\$"; then
+        echo "claudevs check $plugin: expected FAIL at $label, got:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "ok  $plugin (FAIL $label)"
+}
+
+expect_no_fail minimal-plugin 0
+expect_no_fail dead-script-plugin 0
+expect_stage_fail escape-plugin 1 wiring
+expect_stage_fail_either bad-matcher-plugin 1 "validate|wiring" "validate or wiring"
+'''
+
+[tasks.install-airsl]
+category = "Plugin suite"
+description = "Install the airsl binary the plugin hooks and tests need"
+# From crates.io: `airsl` and `airsl-cli` live in https://github.com/airsstack/airsl
+# and are no longer members of this workspace.
+#
+# Deliberately unpinned. The runtime is still moving, and pinning a version here
+# would mean a fix published upstream reaches this suite only when someone
+# remembers to edit this line. `--locked` is a different axis: it builds whichever
+# airsl-cli cargo selects against that release's own Cargo.lock, so the vendored
+# Lua C sources (`lua-src`) cannot drift underneath the plugin scripts between two
+# installs of the same version.
+command = "cargo"
+args = ["install", "airsl-cli", "--locked", "--force"]
+
+# ---------------------------------------------------------------------------
+# Development helpers
+# ---------------------------------------------------------------------------
+
+[tasks.fmt]
+category = "Development"
+description = "Rewrite formatting in place"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.clippy-fix]
+category = "Development"
+description = "Apply the clippy suggestions that are machine-applicable"
+command = "cargo"
+args = [
+  "clippy",
+  "--workspace",
+  "--all-targets",
+  "--all-features",
+  "--fix",
+  "--allow-dirty",
+]
+
+[tasks.dod-crate]
+category = "Development"
+description = "The gate scoped to one crate: cargo make dod-crate clauders"
+# While developing a single-crate change, `-p <crate>` replaces `--workspace`.
+# Cross-crate changes and pre-release runs use the unscoped `dod`.
+script_runner = "@shell"
+script = '''
+crate="${1}"
+if [ -z "${crate}" ]; then
+    echo "usage: cargo make dod-crate <crate-name>" >&2
+    exit 1
+fi
+set -x
+cargo fmt -p "${crate}" -- --check
+cargo clippy -p "${crate}" --all-targets --all-features -- -D warnings
+RUSTDOCFLAGS="-D warnings" cargo doc -p "${crate}" --all-features --no-deps
+cargo test -p "${crate}" --all-targets --all-features
+cargo test -p "${crate}" --all-features --doc
+'''

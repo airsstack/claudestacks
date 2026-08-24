@@ -39,6 +39,7 @@ Agents are leaves — they never spawn other agents. Chaining lives in `orchestr
 | `concise` | Verbosity-reduction mode (lite / full / ultra). Clean professional terseness that persists across the session. See [Attribution](#attribution). |
 | `snapshot-load` | Reads the project-local snapshot(s) and reports the rehydrated state. No-arg loads the current branch's latest; an explicit topic does a branch-agnostic topic search. |
 | `snapshot-save` | Captures a conversation snapshot (session summary + key snippets) into the project-local snapshot store, with a durability gate so thin sessions write nothing. No-arg captures the whole session; an explicit topic focuses the capture and tags it. |
+| `statusline` | Installs, inspects, or removes the Lua status line for Claude Code — a two-line render of path, git branch, context meter, output tokens, model, and rate limits. Gates on the `airsl` binary, refuses to overwrite a `statusLine` it does not own, and backs up `settings.json`. |
 
 ## Hooks
 

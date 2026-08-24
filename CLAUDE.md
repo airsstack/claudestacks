@@ -72,10 +72,12 @@ tooling that tests Claude Code plugins, and the AI methodology that drives both.
 - `crates/claudevs-cli` — the `claudevs` binary.
 
 `clauders::transport` is a module of the SDK crate (`crates/clauders/src/transport/`), not a
-dependency. It was vendored from the `airs-transport` crate when the SDK moved to this repository;
-that crate stays in `rstlix0x0/airsstack`, where it still serves `openrouter-rs`. The two copies are
-independent and free to diverge; that divergence is the accepted price of the split, and reconciling
-them only matters if the mixed-routing thesis ever returns.
+dependency. It was vendored from the `airs-transport` crate when the SDK moved to this repository.
+`openrouter-rs` vendored the same crate the same way when it moved to
+[`airsstack/openrouter-rs`](https://github.com/airsstack/openrouter-rs), and `rstlix0x0/airsstack` —
+where both the SDK and `airs-transport` originated — has been deleted, so there is no upstream copy
+left. The two vendored copies are independent and free to diverge; that divergence is the accepted
+price of the split, and reconciling them only matters if the mixed-routing thesis ever returns.
 
 `airsl` (the embeddable Lua 5.4 runtime the plugin suite runs on) and `airsl-cli` (the `airsl`
 binary) live in [`airsstack/airsl`](https://github.com/airsstack/airsl) and arrive from crates.io —

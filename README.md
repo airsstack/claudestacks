@@ -2,9 +2,10 @@
 
 The Claude-Code half of the author's personal AI technology stack: a Claude SDK written in Rust, an
 engine for testing Claude Code plugins deterministically, and the Claude Code plugin suite that
-packages the development methodology the other two are built with. It was migrated out of
-[`rstlix0x0/airsstack`](https://github.com/rstlix0x0/airsstack) with its history preserved, so
-everything here has the commits that produced it.
+packages the development methodology the other two are built with. It was migrated out of the
+`rstlix0x0/airsstack` monorepo with its history preserved, so everything here has the commits that
+produced it. That monorepo has since been deleted; this repository holds the only copy of the
+history it carried.
 
 ## Rust crates
 
@@ -26,9 +27,10 @@ A Cargo workspace under `crates/` — `resolver = "3"`, Edition 2024 — with th
 - **`claudevs-cli`** — the `claudevs` binary.
 
 `clauders` carries its HTTP transport in-tree as the `clauders::transport` module
-(`crates/clauders/src/transport/`) rather than depending on the `airs-transport` crate — that crate
-stays in `rstlix0x0/airsstack` where `openrouter-rs` still uses it, and vendoring lets the two copies
-diverge freely instead of coupling two repos over one dependency.
+(`crates/clauders/src/transport/`) rather than depending on the `airs-transport` crate. So does
+[`airsstack/openrouter-rs`](https://github.com/airsstack/openrouter-rs), which vendored the same
+crate when it moved to its own repository. Vendoring lets the two copies diverge freely instead of
+coupling two repositories over one dependency.
 
 ## The plugin suite
 

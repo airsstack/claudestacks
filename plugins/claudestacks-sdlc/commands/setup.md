@@ -1,5 +1,6 @@
 ---
 description: Provision the committed .claudestacks/sdlc/ chain root (prds/, rfcs/, REVIEW.md). Idempotent, never overwrites.
+disable-model-invocation: true
 ---
 
 Provision the claudestacks-sdlc artifact chain in the current repository.

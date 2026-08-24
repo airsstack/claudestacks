@@ -1,5 +1,6 @@
 ---
 description: Provision the claudestacks-journal vault and force a full rebuild of its derived recall index. Idempotent.
+disable-model-invocation: true
 ---
 
 # journal-setup

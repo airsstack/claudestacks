@@ -1,0 +1,116 @@
+name: Lua plugin suite
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugins/**"
+      # No `crates/airsl*` entries: the runtime moved to its own repository
+      # (https://github.com/airsstack/airsl) and arrives from crates.io. A change
+      # to it can still alter what every script here does without touching one
+      # .lua file — turning on `literal_separator` in the glob module did exactly
+      # that — but nothing in this repository changes when it is published, so no
+      # paths filter can catch it. The suite installs the latest airsl-cli on every
+      # run, so such a break surfaces on the next push, attributed to whatever
+      # unrelated change happened to trigger it.
+      # The workflow and its cargo-make tasks are the gate itself: a change to
+      # either must re-run to prove the new gate still works.
+      - ".github/workflows/lua.yml"
+      - "Makefile.toml"
+  pull_request:
+    paths:
+      - "plugins/**"
+      - ".github/workflows/lua.yml"
+      - "Makefile.toml"
+  workflow_dispatch:
+
+# A new push to the same ref supersedes whatever is still running for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Incremental artifacts are dead weight in a fresh runner and only bloat the cache.
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+  # `cargo install` from crates.io builds in a temporary target directory it then
+  # discards, so without this the cache below would save nothing for either job and
+  # mlua's vendored Lua would be compiled from C on every run of both. A *relative*
+  # path is what redirects it (cargo-install(1), DESCRIPTION), and it resolves
+  # against the workspace root, which is where rust-cache looks.
+  CARGO_TARGET_DIR: target
+
+jobs:
+  plugins-check:
+    name: airsl check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      # Own shared-key, not ci.yml's: airsl-cli's dependency graph barely
+      # overlaps with this workspace (no tokio, reqwest, mockall, wiremock,
+      # insta, trybuild — the crates that make dod's/claudevs-check's cache
+      # heavy), so joining that cache would only add restore/save cost here for
+      # no reuse. This key lets `plugins-check` prime the airsl-cli build for
+      # `plugins-test` instead — see CARGO_TARGET_DIR above, without which
+      # there would be nothing to prime it with.
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: airsl
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      - name: Install the airsl binary
+        run: cargo make install-airsl
+
+      # Compiles every Lua file, including the drivers no test loads — the
+      # check `airsl test` cannot give, since it only compiles what a test
+      # file actually requires.
+      - name: cargo make plugins-check
+        run: cargo make plugins-check
+
+  plugins-test:
+    name: airsl test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      # Same shared cache slot as `plugins-check` — see the comment there.
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: airsl
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      - name: Install the airsl binary
+        run: cargo make install-airsl
+
+      # Runs the assertions under plugins/.
+      - name: cargo make plugins-test
+        run: cargo make plugins-test

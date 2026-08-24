@@ -18,7 +18,7 @@ cargo test  -p clauders --all-targets --all-features
 cargo test  -p clauders --all-features --doc
 ```
 
-Use the `--workspace` form before a release or when the change reaches `airs-transport`.
+Use the `--workspace` form before a release or when the change reaches `src/transport/`.
 
 Narrower runs while iterating:
 
@@ -58,7 +58,7 @@ Three parity pillars, three module trees, no coupling between them:
 
 | Pillar | Module | Talks to | State |
 |---|---|---|---|
-| Messages API | `src/messages/`, `src/models/` | Anthropic HTTP API via `airs-transport` | implemented |
+| Messages API | `src/messages/`, `src/models/` | Anthropic HTTP API via `crate::transport` | implemented |
 | Agent SDK | `src/agent/` | the `claude` binary as a subprocess | implemented |
 | Managed Agents | — | `/v1/agents`, `/v1/sessions`, … | not started |
 
@@ -112,7 +112,7 @@ use`, no implementation.
 ## Testing setup
 
 - **Unit tests** are colocated `#[cfg(test)] mod tests` in each `src/*.rs` (the unit-test mandate).
-- **`src/test_support.rs`** — `mockall` fake of the `airs_transport::Transport` contract, `cfg(test)`
+- **`src/test_support.rs`** — `mockall` fake of the `crate::transport::Transport` contract, `cfg(test)`
   only. Consumer-owned, not feature-gated; the crate declares no Cargo features.
 - **`tests/messages_*.rs`, `tests/models.rs`, `tests/transport_reqwest.rs`** — `wiremock` against a
   local HTTP server.

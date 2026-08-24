@@ -1,0 +1,18 @@
+{
+  "name": "claudestacks-sdlc",
+  "version": "0.1.0",
+  "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops and a deterministic status board. Implements Anthropic's AI-native SDLC playbook.",
+  "author": {
+    "name": "rstlix0x0",
+    "email": "rstlix.dev@gmail.com"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/airsstack/claudestacks",
+  "repository": "https://github.com/airsstack/claudestacks",
+  "keywords": [
+    "sdlc",
+    "spec-driven-development",
+    "planning",
+    "workflow"
+  ]
+}

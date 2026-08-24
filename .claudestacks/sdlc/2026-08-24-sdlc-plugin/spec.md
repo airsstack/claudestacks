@@ -342,7 +342,9 @@ NEXT derivation (states only, no judgment): intent draft → "approve or drop";
 intent approved, no spec, no skip → "design"; intent approved with
 `spec: skipped` and no plans → "plan"; spec draft → "approve spec"; spec
 approved, no plans → "plan"; plan approved with `depends-on` all `done` →
-"execute NN"; plan executing → shown as such; all plans done → chain complete
+"execute NN"; plan approved with any `depends-on` not yet `done` →
+"wait (dependencies pending)"; plan executing → shown as such; all plans done
+→ chain complete
 (dropped/done chains are listed under a collapsed `DONE/DROPPED` tail section,
 count only, unless a verbose flag in the command's dialogue asks for them).
 Triage-sourced intents are tagged `(triage)`.

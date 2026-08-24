@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-25
 depends-on: []
 ---
@@ -252,3 +252,96 @@ Verification used throughout: `claude plugin validate plugins/claudestacks-sdlc 
 - `claude plugin validate plugins/claudestacks-sdlc --strict` passes.
 - `python3 -m json.tool` accepts the manifest.
 - Both references read as complete against spec §§2 and 6 with no placeholders.
+
+---
+
+## Review findings
+
+Reviewed 2026-08-25 by `claudestacks:reviewer` over all seven delivered files, then
+re-verified after fixes. Verdict: 5 of 6 task contracts passed on the first pass;
+Task 2b failed with two rule deviations. All gates re-run independently by the
+reviewer, not taken from the coders' receipts.
+
+Gate results (final): `python3 -m json.tool` OK · `claude plugin validate
+plugins/claudestacks-sdlc --strict` passed (exit 0) · `cargo make plugins` 247
+passed, 0 failed (16 files) · `grep -rniE 'TBD|TODO|to be determined|FIXME'` clean.
+The Lua suite is unaffected by this plan, confirmed empirically rather than assumed —
+`find plugins/claudestacks-sdlc -name '*.lua'` returns 0 and `plugins-check` output
+names `claudestacks-sdlc` nowhere.
+
+**Important — fixed.**
+
+1. `references/templates.md` — the spec template claimed `## N. Non-goals` is "always
+   the final numbered section". The exemplar it was round-tripped against contradicts
+   this: `spec.md` has `## 10. Non-goals` followed by `## 11. Attribution`. A skill
+   obeying the template would have reordered or refused a spec shaped like this
+   chain's own. Clause deleted.
+2. `references/templates.md` — `**Content authority:**` was rendered as a mandatory
+   header field, but the convention is 3-of-4 (present in plans 01, 02, 03; plan 04
+   carries `**Reference inventory:**` instead). The field is genuine and stays; the
+   unmarked rendering was the defect. Now marked optional.
+
+**Nit — fixed.**
+
+3. `references/artifact-chain.md` §5 pointed at §9 for the `⤷ inputs:` annotation,
+   but §9 never stated the rule — so the status *fallback* tier, which runs out of §9
+   alone, would have silently dropped a line the spec's own sample board shows. Rule
+   added to §9.
+5. The two references disagreed on provenance keys: `artifact-chain.md` makes
+   `derived-from-*` legal on specs and plans, but neither template mentioned them.
+   Both templates now point at `artifact-chain.md` §6.
+6. `templates.md` held a second copy of frontmatter key semantics it declares it does
+   not own. Comments shortened to pointers.
+7. `README.md` — the "Gates on:" label on three skill bullets described the state the
+   skill *writes*, not the state it requires. Relabelled `Writes:` consistently.
+A–C. Follow-up pass: provenance note extended to the plan template and to
+   `artifact-chain.md` §9's annotation rule; `depends-on`'s inline prose reduced to
+   the same pointer form as its siblings; `*(optional)*` moved inside the bracket so
+   the marker is guidance rather than text a skill copies through.
+
+**Nit — accepted as-is, not fixed.**
+
+8. `README.md` documents `/claudestacks-sdlc:status` and six skills that do not ship
+   until plans 02 and 03. Required by this plan's Task 5 contract; harmless while the
+   chain is unreleased.
+9. The README renders the pipeline by skill name (`intent → design → plan →
+   execute`), the manifest by artifact name (`intent → spec → plan → execute`). Both
+   are plan-verbatim and the manifest string matches spec §9's marketplace text.
+10. `commands/setup.md`'s `.gitkeep` condition ("if the directory has no committed
+    content") is harder to evaluate than "if `.gitkeep` is missing". Verbatim from
+    Task 4, so changing it here would itself be the deviation. Flagged for whoever
+    tunes the command later.
+
+**Escalated to the user — resolved by spec amendment.**
+
+4. Spec §5.1's NEXT-derivation rules have no case for an `approved` plan whose
+   `depends-on` is unsatisfied, and `artifact-chain.md` reproduces that gap
+   faithfully. Plan 02 has already filled it unilaterally:
+   `plans/02-status-board.md:535` returns `"wait (dependencies pending)"` with a test
+   asserting it at `:425`. So `status.lua` will contradict both the spec and the
+   shipped reference on a case this very chain hits — plans 02, 03 and 04 all carry
+   `depends-on`. Patching the reference would have concealed the divergence. The fix
+   is a one-line amendment to spec §5.1, which is the user's call because the spec is
+   `approved`. **Resolved 2026-08-25:** the user chose to amend now. Spec §5.1 and
+   `references/artifact-chain.md` §9 both gained `plan approved with any depends-on
+   not yet done → "wait (dependencies pending)"`, matching plan 02's string exactly.
+   The spec stays `approved` — this closes a gap rather than redesigning.
+
+## Deviations
+
+- **`references/templates.md` is not in spec §3's plugin-structure tree.** §3 lists
+  exactly two files under `references/`. This third one is authorised by Task 2b but
+  was never recorded against §3, and §3 is what a later reader treats as the plugin's
+  shape. Plan 02 handles the analogous case explicitly, calling its `scripts/lib/`
+  layout a "Refinement over spec §3's tree"; this plan made no equivalent note.
+  Recorded here rather than by editing the approved spec.
+- **`**Content authority:**` added to the plan template**, beyond Task 2b's literal
+  enumeration. Verified against all four exemplar plans before accepting: a real
+  3-of-4 convention, so it ships marked optional.
+- **Task 4/5 ordering caveat in the plan proved unnecessary.** Task 4 hedged that
+  `claude plugin validate --strict` might require a README and that the two tasks
+  might need swapping. Probed both directions instead of guessing: a plugin with
+  nothing but a valid `plugin.json` passes, and the one field `--strict` actually
+  enforces is `author`. No reorder was needed, and the wider consequence is that
+  validate vouches for none of the six markdown files — the reviewer pass is their
+  only real gate.

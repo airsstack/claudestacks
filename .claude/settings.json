@@ -1,0 +1,24 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "disableWorkflows": true,
+  "enabledPlugins": {
+    "claudestacks@claudestacks": true,
+    "claudestacks-sdd@claudestacks": true,
+    "claudestacks-guideline-rust@claudestacks": true,
+    "claudestacks-journal@claudestacks": true,
+    "claudestacks-cmux@claudestacks": true
+  },
+  "extraKnownMarketplaces": {
+    "claudestacks": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
+    }
+  },
+  "feedbackSurveyRate": 0,
+  "editorMode": "vim"
+}

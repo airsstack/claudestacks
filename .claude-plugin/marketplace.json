@@ -4,7 +4,7 @@
     "name": "rstlix0x0",
     "email": "rstlix.dev@gmail.com"
   },
-  "description": "claudestacks — modular AI development methodology for Claude Code: execution agents, a spec-driven workflow, and per-language guideline plugins.",
+  "description": "claudestacks — modular AI development methodology for Claude Code: execution agents, a spec-driven workflow, and per-language guideline plugins. Published from airsstack/claudestacks.",
   "plugins": [
     {
       "name": "claudestacks",

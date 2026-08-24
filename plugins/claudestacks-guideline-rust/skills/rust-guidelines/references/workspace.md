@@ -13,7 +13,7 @@ A Cargo workspace has one or more members under `crates/` and stays a workspace 
 
 ## Root `Cargo.toml` shape
 
-The workspace root has **no `[package]` section**; this repo's own root `Cargo.toml` is the authoritative example — `[workspace]` with `resolver = "3"` and `members = ["crates/airs-transport", "crates/clauders", "crates/openrouter-rs"]`, then `[workspace.package]` (`edition = "2024"`, `rust-version = "1.85"`, license/repository/authors, `publish = false`), `[workspace.dependencies]`, `[workspace.lints.rust]` + `[workspace.lints.clippy]`, and `[profile.release]`.
+The workspace root has **no `[package]` section**; this repo's own root `Cargo.toml` is the authoritative example — `[workspace]` with `resolver = "3"` and `members = ["crates/clauders", "crates/claudevs", "crates/claudevs-cli"]`, then `[workspace.package]` (`edition = "2024"`, `rust-version = "1.94"`, license/repository/authors, `publish = false`), `[workspace.dependencies]`, `[workspace.lints.rust]` + `[workspace.lints.clippy]`, and `[profile.release]`.
 
 `resolver = "3"` is required for Edition 2024 and matches the latest Cargo book guidance. Keep `rust-version` in sync across all crates by inheriting it (`rust-version.workspace = true`).
 

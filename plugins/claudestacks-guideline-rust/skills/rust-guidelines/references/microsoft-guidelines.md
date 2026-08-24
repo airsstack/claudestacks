@@ -46,7 +46,7 @@ Where a `→` points at another reference, that file is the authority and states
 ### Resilience
 
 - **M-MOCKABLE-SYSCALLS** — Wrap syscalls and I/O behind a trait or fn-pointer so tests substitute fakes. No `std::fs` buried in business logic.
-- **M-TEST-UTIL** — Upstream gates downstream-visible test helpers behind a `test-util` feature. **This workspace deviates:** it declares no Cargo features, so `mockall` doubles live in dev-only `test_support` modules (`crates/clauders/src/test_support.rs`, `crates/openrouter-rs/src/test_support.rs`). Apply the intent — lean production builds — not the mechanism.
+- **M-TEST-UTIL** — Upstream gates downstream-visible test helpers behind a `test-util` feature. **This workspace deviates:** it declares no Cargo features, so `mockall` doubles live in dev-only `test_support` modules (`crates/clauders/src/test_support.rs`). Apply the intent — lean production builds — not the mechanism.
 - **M-STRONG-TYPES** — No primitive obsession: `UserId(u64)` not `u64`. → `references/strong-types.md`
 - **M-NO-GLOB-REEXPORTS** — No `pub use foo::*` in libraries; explicit re-exports only. → `references/mod-rs-export-only.md`
 - **M-AVOID-STATICS** — No `static mut`, no hidden global state; pass dependencies explicitly. If unavoidable, `OnceLock`/`LazyLock` with a documented lifetime.

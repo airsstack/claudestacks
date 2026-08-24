@@ -1,5 +1,5 @@
 #
-# cargo-deny policy for the airsstack workspace.
+# cargo-deny policy for the claudestacks workspace.
 #
 #   cargo make deny        # all four checks
 #   cargo deny check bans  # one of them

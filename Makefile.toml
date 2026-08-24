@@ -125,7 +125,7 @@ description = "Compile every Lua file, including the ones no test loads"
 # Runs before the tests because it is cheaper and its failures are more
 # fundamental: `airsl test` only compiles what a test file loads, and a hook's
 # entry point is loaded by nothing. Before this existed, a missing `end` in the
-# enforcement dispatcher left the suite at 244 passing and the hook exiting 0 —
+# enforcement dispatcher left the suite at 177 passing and the hook exiting 0 —
 # silent at both ends.
 #
 # No policy and no grants: nothing is executed, so there is no authority to grant.

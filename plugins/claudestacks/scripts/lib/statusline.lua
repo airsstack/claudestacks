@@ -107,7 +107,67 @@ function M.render(payload, git_info, home)
   end
   lines[1] = line1
 
+  local segments = {}
+
+  local cw = payload.context_window or {}
+  if cw.used_percentage then
+    -- Truncate, matching the bash reference's `printf "%d"`.
+    local pct = math.floor(tonumber(cw.used_percentage) or 0)
+    segments[#segments + 1] = M.band(pct) .. M.bar(cw.used_percentage) .. M.RESET
+      .. "  " .. pct .. "%  "
+      .. M.DIM .. M.format_tokens(cw.total_input_tokens)
+      .. "/" .. M.format_tokens(cw.context_window_size) .. M.RESET
+  end
+
+  local out = tonumber(cw.total_output_tokens) or 0
+  if out > 0 then
+    segments[#segments + 1] = M.DIM .. "out " .. M.format_tokens(out) .. M.RESET
+  end
+
+  local model = payload.model or {}
+  if model.display_name and model.display_name ~= "" then
+    local part = model.display_name
+    local effort = payload.effort or {}
+    if effort.level and effort.level ~= "" then
+      part = part .. " (" .. effort.level .. ")"
+    end
+    segments[#segments + 1] = part
+  end
+
+  -- Rate limits round, matching the bash reference's `printf "%.0f"`.
+  local limits = payload.rate_limits or {}
+  local halves = {}
+  local five = (limits.five_hour or {}).used_percentage
+  if five then
+    halves[#halves + 1] = string.format("5h:%.0f%%", five)
+  end
+  local seven = (limits.seven_day or {}).used_percentage
+  if seven then
+    halves[#halves + 1] = string.format("7d:%.0f%%", seven)
+  end
+  if #halves > 0 then
+    segments[#segments + 1] = M.DIM .. table.concat(halves, " ") .. M.RESET
+  end
+
+  if #segments > 0 then
+    lines[2] = M.join(segments)
+  end
+
   return lines
+end
+
+-- Parse `git rev-list --left-right --count @{upstream}...HEAD`, which emits "behind<TAB>ahead".
+-- Returns ahead, behind — or nil when the output is not two counts (no upstream configured,
+-- where git exits 128 and writes a fatal to stderr).
+function M.parse_ahead_behind(stdout)
+  if not stdout then
+    return nil
+  end
+  local behind, ahead = stdout:match("^(%d+)%s+(%d+)")
+  if not behind then
+    return nil
+  end
+  return tonumber(ahead), tonumber(behind)
 end
 
 return M

@@ -132,7 +132,13 @@ return {
   line_one_appends_ahead_behind_when_an_upstream_exists = function()
     local lines = sl.render({ workspace = { current_dir = "/Users/x/app" } },
       { branch = "main", ahead = 2, behind = 1 }, "/Users/x")
-    assert(lines[1]:match("↑2 ↓1$"), lines[1])
+    -- Full equality, not a tail match: pins the dim "·" separator ahead of the counts. A
+    -- mutant that drops `.. " " .. sl.DIM .. "·" .. sl.RESET` from this branch still ends in
+    -- "↑2 ↓1" and would slip past a `:match("↑2 ↓1$")` check untouched.
+    local want = sl.YELLOW .. "~/app" .. sl.RESET
+      .. " " .. sl.DIM .. "|" .. sl.RESET .. " " .. sl.CYAN .. "main" .. sl.RESET
+      .. " " .. sl.DIM .. "·" .. sl.RESET .. " " .. "↑2 ↓1"
+    assert(lines[1] == want, lines[1])
   end,
 
   line_one_omits_ahead_behind_without_an_upstream = function()
@@ -144,5 +150,88 @@ return {
   line_one_falls_back_to_the_top_level_cwd_field = function()
     local lines = sl.render({ cwd = "/tmp" }, {}, "/Users/x")
     assert(lines[1] == sl.YELLOW .. "/tmp" .. sl.RESET, lines[1])
+  end,
+
+  line_two_carries_the_meter_tokens_model_and_limits = function()
+    local lines = sl.render({
+      workspace = { current_dir = "/tmp" },
+      model = { display_name = "Opus 5" },
+      effort = { level = "high" },
+      context_window = {
+        used_percentage = 5, total_input_tokens = 46700,
+        total_output_tokens = 457, context_window_size = 1000000,
+      },
+      rate_limits = {
+        five_hour = { used_percentage = 3 },
+        seven_day = { used_percentage = 0 },
+      },
+    }, {}, "/Users/x")
+    -- Full equality over the whole line, built from the same primitives sl.render is pinned
+    -- against elsewhere in this file (band, bar, format_tokens, join). Five independent
+    -- mutations — a dropped join separator, a reversed segment order, or a segment stripped
+    -- of its band/DIM/RESET wrapper — all land on this one assertion; four separate
+    -- `:match()` calls, one per segment, cannot see any of them because none looks at what
+    -- sits *between* segments.
+    local meter = sl.band(5) .. sl.bar(5) .. sl.RESET .. "  5%  "
+      .. sl.DIM .. sl.format_tokens(46700) .. "/" .. sl.format_tokens(1000000) .. sl.RESET
+    local out = sl.DIM .. "out " .. sl.format_tokens(457) .. sl.RESET
+    local model = "Opus 5 (high)"
+    local limits = sl.DIM .. "5h:3% 7d:0%" .. sl.RESET
+    local want = sl.join({ meter, out, model, limits })
+    assert(lines[2] == want, lines[2])
+  end,
+
+  line_two_degrades_to_the_model_alone = function()
+    local lines = sl.render({ model = { display_name = "Haiku 4.5" } }, {}, "/Users/x")
+    assert(lines[2] == "Haiku 4.5", lines[2])
+  end,
+
+  line_two_is_absent_when_nothing_is_known = function()
+    local lines = sl.render({ workspace = { current_dir = "/tmp" } }, {}, "/Users/x")
+    assert(lines[2] == nil, tostring(lines[2]))
+  end,
+
+  line_two_omits_zero_output_tokens = function()
+    local lines = sl.render({
+      model = { display_name = "Opus 5" },
+      context_window = { total_output_tokens = 0 },
+    }, {}, "/Users/x")
+    -- Full equality rather than a substring-absence check: pins that the model segment
+    -- stands alone with no dangling separator, not just that the literal text "out" happens
+    -- not to appear.
+    assert(lines[2] == "Opus 5", lines[2])
+  end,
+
+  the_model_stands_alone_without_an_effort_level = function()
+    local lines = sl.render({ model = { display_name = "Opus 5" } }, {}, "/Users/x")
+    assert(lines[2] == "Opus 5", lines[2])
+  end,
+
+  the_context_percentage_truncates_but_rate_limits_round = function()
+    -- The bash reference is deliberately inconsistent here (%d vs %.0f) and the port keeps it.
+    local lines = sl.render({
+      context_window = { used_percentage = 5.7, total_input_tokens = 1, context_window_size = 2 },
+      rate_limits = { five_hour = { used_percentage = 5.7 } },
+    }, {}, "/Users/x")
+    -- Full equality: pins the truncated "5%" against the rounded "6%" in the same string,
+    -- plus the join separator between the two segments and the absent out/model segments.
+    local meter = sl.band(5) .. sl.bar(5) .. sl.RESET .. "  5%  "
+      .. sl.DIM .. sl.format_tokens(1) .. "/" .. sl.format_tokens(2) .. sl.RESET
+    local limits = sl.DIM .. "5h:6%" .. sl.RESET
+    local want = sl.join({ meter, limits })
+    assert(lines[2] == want, lines[2])
+  end,
+
+  ahead_and_behind_parse_from_tab_separated_counts = function()
+    -- `git rev-list --left-right --count @{upstream}...HEAD` emits "behind<TAB>ahead".
+    local ahead, behind = sl.parse_ahead_behind("0\t0\n")
+    assert(ahead == 0 and behind == 0, tostring(ahead) .. "/" .. tostring(behind))
+    local a2, b2 = sl.parse_ahead_behind("1\t2\n")
+    assert(b2 == 1 and a2 == 2, tostring(a2) .. "/" .. tostring(b2))
+  end,
+
+  unparseable_counts_yield_nil = function()
+    assert(sl.parse_ahead_behind("") == nil)
+    assert(sl.parse_ahead_behind("fatal: no upstream configured\n") == nil)
   end,
 }

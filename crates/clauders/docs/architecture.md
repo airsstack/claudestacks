@@ -29,7 +29,7 @@ graph LR
         A["src/agent/"]
         G["(not started)"]
     end
-    M -->|HTTPS via airs-transport| API["api.anthropic.com<br/>/v1/messages, /v1/models"]
+    M -->|HTTPS via crate::transport| API["api.anthropic.com<br/>/v1/messages, /v1/models"]
     A -->|stdin/stdout NDJSON| BIN["claude Code CLI<br/>as a subprocess"]
     G -.-> MA["/v1/agents<br/>/v1/sessions"]
 ```

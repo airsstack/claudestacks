@@ -23,7 +23,7 @@ plugins/claudestacks-sdlc/scripts/lib/status.lua   — [create] parse, scan, der
 plugins/claudestacks-sdlc/scripts/status_test.lua  — [create] airsl test suite over temp fixtures
 plugins/claudestacks-sdlc/scripts/status.lua       — [create] driver: require lib, print board for cwd
 plugins/claudestacks-sdlc/scripts/status.sh        — [create] airsl resolver/launcher, silent when absent
-plugins/claudestacks-sdlc/commands/status.md       — [create] command: run launcher, model fallback
+plugins/claudestacks-sdlc/skills/status/SKILL.md   — [create] skill: run launcher, model fallback
 ```
 
 Test invocation used throughout (same grants as `cargo make plugins-test`, Makefile.toml:158):
@@ -728,18 +728,21 @@ $ airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --
 
    Expected: no output, exit 0 (every file compiles, driver included).
 
-### Task 6 — `commands/status.md`
+### Task 6 — `skills/status/SKILL.md`
 
 **Files:**
-- Create `plugins/claudestacks-sdlc/commands/status.md`
+- Create `plugins/claudestacks-sdlc/skills/status/SKILL.md`
 
 **Steps:**
 
-1. Write the command:
+1. Write the skill. It keeps the default invocation setting — no
+   `disable-model-invocation` — because the board is read-only and Claude
+   reaching for it unprompted is useful:
 
    ````markdown
    ---
-   description: Render the claudestacks-sdlc chain status board — deterministic via airsl, model fallback otherwise.
+   name: status
+   description: Render the claudestacks-sdlc chain status board — deterministic via airsl, model fallback otherwise. Use when the user says "/claudestacks-sdlc:status", asks what state the SDLC chains are in, or asks what to work on next.
    ---
 
    ## Board

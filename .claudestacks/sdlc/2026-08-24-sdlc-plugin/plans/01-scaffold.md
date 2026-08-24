@@ -338,6 +338,14 @@ A–C. Follow-up pass: provenance note extended to the plan template and to
 - **`**Content authority:**` added to the plan template**, beyond Task 2b's literal
   enumeration. Verified against all four exemplar plans before accepting: a real
   3-of-4 convention, so it ships marked optional.
+- **Task 4's `commands/setup.md` was superseded the same day.** Checking the
+  structure against Anthropic's own documentation after this plan closed showed that
+  custom commands and skills are one mechanism — `commands/<name>.md` and
+  `skills/<name>/SKILL.md` both create `/<name>` and behave identically — and that
+  invocation is governed by frontmatter, not by directory. The file moved to
+  `skills/setup/SKILL.md` with `disable-model-invocation: true`, and spec §3 and §5
+  were amended to drop `commands/` entirely. The task as executed was faithful to the
+  plan; the plan was working from a wrong premise about the platform.
 - **Task 4/5 ordering caveat in the plan proved unnecessary.** Task 4 hedged that
   `claude plugin validate --strict` might require a README and that the two tasks
   might need swapping. Probed both directions instead of guessing: a plugin with

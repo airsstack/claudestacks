@@ -1,7 +1,7 @@
 # Artifact Chain — paths, naming, frontmatter, states
 
 Canonical location, naming, frontmatter schema, and state model for every artifact the
-`claudestacks-sdlc` workflow reads or writes. Every skill and command resolves paths and
+`claudestacks-sdlc` workflow reads or writes. Every skill resolves paths and
 states from this file — skills are told "paths and states come from
 `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`" and nothing else, so what follows
 is normative, not descriptive.
@@ -25,7 +25,7 @@ is normative, not descriptive.
 ## 3. Layout
 
 ```
-.claudestacks/sdlc/                        # committed; provisioned by the setup command
+.claudestacks/sdlc/                        # committed; provisioned by the setup skill
 ├── prds/                                  # optional product input docs (inbox)
 │   └── .gitkeep
 ├── rfcs/                                  # optional technical input docs (inbox)
@@ -186,7 +186,7 @@ tier of `/claudestacks-sdlc:status`). Derivation is states-only, no judgment cal
 Triage-sourced intents (`source: triage`) are tagged `(triage)` in the STATE column
 alongside their derived state. Chains whose intent is `dropped`, or whose every plan
 is `done`/`superseded`, are listed under a collapsed `DONE/DROPPED` tail section
-(count only), unless a verbose flag in the command's dialogue asks for the detail.
+(count only), unless a verbose flag in the status skill's dialogue asks for the detail.
 
 A chain whose intent, spec, or any plan names input docs via the provenance frontmatter keys
 (`derived-from-prd` / `derived-from-rfc`, §6) renders a `⤷ inputs:` annotation line

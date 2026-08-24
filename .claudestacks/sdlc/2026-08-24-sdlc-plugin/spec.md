@@ -147,27 +147,45 @@ plugins/claudestacks-sdlc/
 │                                     # uninstall-sdd note, attribution
 ├── LICENSE                           # Apache-2.0
 ├── skills/
-│   ├── intent/SKILL.md
-│   ├── design/SKILL.md
+│   ├── intent/SKILL.md               # the six workflow skills: model- and
+│   ├── design/SKILL.md               # user-invocable, default invocation
 │   ├── plan/SKILL.md
 │   ├── execute/SKILL.md
 │   ├── distill/SKILL.md
-│   └── triage/SKILL.md
-├── commands/
-│   ├── status.md                     # /claudestacks-sdlc:status
-│   └── setup.md                      # /claudestacks-sdlc:setup
+│   ├── triage/SKILL.md
+│   ├── status/SKILL.md               # /claudestacks-sdlc:status — read-only,
+│   │                                 # default invocation
+│   └── setup/SKILL.md                # /claudestacks-sdlc:setup — writes to the
+│                                     # repo, so disable-model-invocation: true
 ├── scripts/
 │   ├── status.lua                    # deterministic board renderer (airsl)
 │   └── status_test.lua               # unit tests, airsl test discovers them
 └── references/
     ├── artifact-chain.md             # canonical paths, naming, frontmatter,
     │                                 # states, transitions — the prose authority
+    ├── templates.md                  # body shapes for intent, spec, and plan
     └── review-policy.md              # REVIEW.md template + tuning guidance
 ```
 
 No `hooks/` directory. sdd needed SessionStart provisioning because its tree was
-per-worktree and HOME-global; this chain is committed, so `/sdlc:setup` once plus
-lazy-create in the writing skills covers every case.
+per-worktree and HOME-global; this chain is committed, so
+`/claudestacks-sdlc:setup` once plus lazy-create in the writing skills covers
+every case.
+
+No `commands/` directory either. Custom commands and skills are one mechanism —
+a `commands/<name>.md` and a `skills/<name>/SKILL.md` both create `/<name>` and
+behave identically — and `skills/` is the superset: it takes a directory for
+supporting files and the two invocation-control fields. Everything the plugin
+exposes therefore ships as a skill, and `status` and `setup` are ordinary skills
+that happen to be operational rather than part of the workflow pipeline.
+
+Invocation control is set per skill, not inherited from a directory. Both the
+user and Claude can invoke any skill by default. `setup` sets
+`disable-model-invocation: true` because it writes into the user's repository
+and its timing is the user's to choose; note that this also drops its
+description from context, so Claude will not know it exists — intended. Every
+other skill keeps the default: the six workflow skills are meant to be reached
+for by name or by relevance, and `status` is read-only.
 
 ## 4. Skills
 
@@ -316,7 +334,11 @@ Loop 3 entry. Manual invocation only in v1.
   precision — exact error text, exact commands. Enters the same queue as every
   intent; no special downstream handling.
 
-## 5. Commands
+## 5. Operational skills
+
+`status` and `setup` ship under `skills/` like everything else (§3); they are
+grouped separately here only because they serve the chain rather than advance
+it.
 
 ### 5.1 `/claudestacks-sdlc:status`
 

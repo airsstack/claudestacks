@@ -75,20 +75,25 @@ nothing here is git-ignored, and nothing is ever deleted, only superseded or dro
 ```
 
 `references/artifact-chain.md` is the canonical authority for paths, naming, the frontmatter
-schema, and the full state/transition tables — every skill and the status command's fallback
+schema, and the full state/transition tables — every skill and the status skill's fallback
 path resolve against it rather than restating the rules locally.
 
-## Commands
+## Operational skills
+
+Two more skills serve the chain rather than advance it. They ship under `skills/` like
+the six above; nothing here uses a `commands/` directory.
 
 - **`/claudestacks-sdlc:status`** — a deterministic board over every chain: state per
   artifact and a derived NEXT action. Runs `scripts/status.lua` under the `airsl` runtime
   when it's installed; falls back to the model performing the same scan by the rules in
   `references/artifact-chain.md` when it isn't. Same output shape either way, never a hard
-  failure.
+  failure. Read-only, so Claude may reach for it on its own.
 - **`/claudestacks-sdlc:setup`** — idempotent provisioning of the committed chain root:
   `.claudestacks/sdlc/`, `prds/.gitkeep`, `rfcs/.gitkeep`, and `REVIEW.md` from
   `references/review-policy.md`. Creates only what's missing, never overwrites, never
-  touches `.gitignore`, and reports what it created versus found.
+  touches `.gitignore`, and reports what it created versus found. Carries
+  `disable-model-invocation: true` — it writes into your repository, so only you can
+  trigger it.
 
 ## Attribution
 

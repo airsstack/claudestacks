@@ -1,5 +1,6 @@
 ---
-description: Provision the committed .claudestacks/sdlc/ chain root (prds/, rfcs/, REVIEW.md). Idempotent, never overwrites.
+name: setup
+description: Provision the committed .claudestacks/sdlc/ chain root (prds/, rfcs/, REVIEW.md). Idempotent, never overwrites. Use when the user says "/claudestacks-sdlc:setup" or asks to set up the SDLC chain in this repository.
 disable-model-invocation: true
 ---
 

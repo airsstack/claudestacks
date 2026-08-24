@@ -1,5 +1,6 @@
 ---
-description: Explain why the enforcement dispatcher does or does not fire for a given file path
+name: enforce-doctor
+description: Explain why the claudestacks enforcement dispatcher does or does not fire for a given file path — runs enforce.lua --explain and reads the trace back. Read-only diagnostic. Use when a guideline pointer failed to appear for a file, when one appeared unexpectedly, or when the user says "/claudestacks:enforce-doctor <path>".
 ---
 
 Diagnose the claudestacks rule-enforcement dispatcher for the path `$ARGUMENTS`.

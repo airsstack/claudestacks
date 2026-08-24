@@ -1,5 +1,6 @@
 ---
-description: Provision the claudestacks-journal vault and force a full rebuild of its derived recall index. Idempotent.
+name: journal-setup
+description: Provision the claudestacks-journal vault and force a full rebuild of its derived recall index. Idempotent. Use when the user says "/claudestacks-journal:journal-setup" or asks to set up or rebuild the journal vault.
 disable-model-invocation: true
 ---
 

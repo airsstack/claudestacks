@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same ref supersedes whatever is still running for it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Incremental artifacts are dead weight in a fresh runner and only bloat the cache.
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+
+jobs:
+  dod:
+    name: Definition of Done
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # `rustup show` resolves the override in rust-toolchain.toml and installs it.
+      # The pin is an exact patch release, so the runner's preinstalled stable never
+      # satisfies it and this step always downloads a toolchain — the version numbers
+      # printed below are the record of which one the gate actually ran on.
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+          cargo clippy --version
+          cargo fmt --version
+
+      # `shared-key` pins both this job and `claudevs-check` to the same cache
+      # slot instead of rust-cache's default per-job key, so whichever of the
+      # two finishes first primes the registry and target dir for the other —
+      # they build the same workspace from the same Cargo.lock, so there is
+      # nothing job-specific to keep separate.
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # One command, the same one a developer runs locally: fmt-check, clippy,
+      # rustdoc, tests, doctests — each with warnings as errors.
+      - name: cargo make dod
+        run: cargo make dod
+
+  claudevs-check:
+    name: claudevs fixture corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      # Same shared cache slot as the `dod` job — see the comment there. Same
+      # workspace, same Cargo.lock, nothing here is job-specific to isolate.
+      - name: Cache cargo registry and target dir
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # No `claude` binary on the runner: the validate stage reports itself
+      # skipped and the deterministic stages gate.
+      - name: cargo make claudevs-check
+        run: cargo make claudevs-check
+
+  deny:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Independent of the gate: this reads Cargo.lock and the advisory database,
+    # compiles nothing, and finishes in seconds, so it should not wait behind a
+    # build to report a licence or advisory problem.
+    steps:
+      - uses: actions/checkout@v5
+
+      # cargo-deny shells out to `cargo metadata`, and `cargo` here is a rustup
+      # shim that resolves rust-toolchain.toml, so the pinned toolchain gets
+      # fetched either way. Doing it in its own step keeps that cost out of the
+      # check's log.
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      # Advisories, licences, duplicate versions and source registries. Policy
+      # and every suppression live in deny.toml.
+      - name: cargo deny check
+        run: cargo deny check

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-25
 depends-on: [01]
 ---
@@ -151,3 +151,66 @@ plugins/claudestacks-sdlc/skills/triage/SKILL.md   — [create] failure → inte
 - `claude plugin validate … --strict` passes with all six skills present.
 - Contract re-read per file: every element the task names appears.
 - The leftovers grep returns nothing.
+
+---
+
+## Review findings
+
+Two independent `claudestacks:reviewer` passes, 2026-08-25. All six skills delivered
+against their task contracts; three defects found, all fixed and re-verified. Final
+gates: `claude plugin validate --strict` passed · `cargo make plugins` 278 passed,
+0 failed (17 files) · leftovers grep across all eight skills exit 1, no matches.
+
+**Important — fixed.**
+
+1. compliance — `skills/plan/SKILL.md` carried **none** of this plan's binding
+   guided-dialogue boilerplate (:30-35): no one-question-at-a-time, no never-a-battery,
+   no multiple-choice, no overridable-assumption rule. Every other workflow skill
+   carried it. It also lacked spec §4.1:202's sharpening specific to `plan` — raise
+   every spec ambiguity as a question, never resolve one as an assumption. Both added,
+   and confirmed on re-review as genuinely tuned to `plan` rather than pasted from a
+   sibling.
+2. correctness — `skills/design/SKILL.md` renamed a superseded spec to
+   `spec-superseded-YYYY-MM-DD.md` per `artifact-chain.md` §4 but never flipped its
+   frontmatter, so the archived file would have read `status: approved` forever. §7.2
+   assigns that transition to `design`.
+3. correctness — `skills/distill/SKILL.md` cited `artifact-chain.md` and `templates.md`
+   as owning the `## Review findings` line shape. Neither defines it; the only
+   definition is in `execute/SKILL.md`, the skill that writes it (spec §4.5.3). Since
+   those sections are distill's entire input, it now cites where the shape is actually
+   defined, and states positively what each reference does and does not own.
+
+**Clean on both passes.** `intent`, `execute`, `triage` — every contract element
+present, including the verbatim `## Hard gate — no solution content` heading. All eight
+skills cross-reference each other by the new names only; no sdd path, `_archive/`, or
+plan-deletion language survives anywhere.
+
+**Nit — accepted, not fixed.** One design hand-off item judged not trivially safe to
+change late; the rest batched. `claude plugin validate --strict` was demoted as evidence
+throughout: its output is a single line naming `plugin.json`, so it opens no skill file
+and vouches for none of this plan's prose. The real gate was per-element contract
+re-reading.
+
+## Deviations
+
+- **Task 7's expected result was stale on arrival.** It predicted validate "passes with
+  six skills, two commands". No `commands/` directory exists in this plugin — `setup`
+  and `status` are skills, per the amendment to spec §3 and §5 made the day plan 01
+  closed. The gate passes; only the prediction was written against the old layout.
+- **Task 7's leftovers grep was run scoped, then whole-directory.** Its literal form
+  sweeps all of `skills/`, but three coders were writing there concurrently, so each ran
+  it over its own files and the full sweep ran once at the end. Same coverage, no
+  mid-flight false positives.
+- **`design` drops sdd `brainstorm`'s multi-scope-assessment step.** Spec §4.2:223
+  assigns the multi-scope check to `intent`, §4.3 never mentions it, and this plan's
+  Task 2 omits it from **Keep intact** while its **Remove** clause covers problem-shaping
+  language. Verified against all three sources before accepting.
+- **A documentation precision gap was found and left unfixed, deliberately.**
+  `artifact-chain.md:131` (reproducing spec §2.4) attributes the intent `— → draft`
+  transition to `intent` alone, but spec §4.7 has `triage` writing a fresh `intent.md`
+  at `status: draft`. So `triage` is an unlisted second writer of that transition.
+  Documentation only — nothing derives behaviour from the "Flipped by" column — and it
+  reproduces an approved spec faithfully, so patching the reference alone would conceal
+  the divergence rather than close it. Raised for the author; the same call taken on
+  plan 01's finding 4.
+- **Task 7 (commit) not executed.** The user holds the commit gate; no agent commits.

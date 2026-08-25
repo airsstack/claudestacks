@@ -12,9 +12,9 @@
       "description": "Execution engine: a TDD coder, a merged code+spec reviewer, and a read-only explorer, plus an orchestration driver, process guidelines, project-local memory, and a concise response mode (inspired by the caveman plugin, github.com/juliusbrussee/caveman)."
     },
     {
-      "name": "claudestacks-sdd",
-      "source": "./plugins/claudestacks-sdd",
-      "description": "Spec-driven development workflow: brainstorm an idea into a spec, write a one-objective implementation plan, and execute it with review checkpoints. Adapted from the superpowers plugin (superpowers@claude-plugins-official) with claudestacks-specific adjustments."
+      "name": "claudestacks-sdlc",
+      "source": "./plugins/claudestacks-sdlc",
+      "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops and a deterministic status board. Implements Anthropic's AI-native SDLC playbook; execution discipline descends from the superpowers plugin (superpowers@claude-plugins-official) via the retired claudestacks-sdd."
     },
     {
       "name": "claudestacks-guideline-rust",

@@ -8,8 +8,9 @@ description: Use when committing or delegating work to subagents — supplies th
 The conventions for *how the work gets done* — commits and delegation. `SKILL.md` carries the
 load-bearing one-liners; the detail lives in `references/` and is read on demand.
 
-> Spec and plan artifact conventions (one objective per plan, durable specs vs disposable plans,
-> the deletion lifecycle) live with the workflow that produces them — see the `claudestacks-sdd` plugin.
+> Spec and plan artifact conventions (one objective per plan, the chain-root layout, and a state
+> model where nothing is ever deleted, only marked superseded or dropped) live with the workflow
+> that produces them — see the `claudestacks-sdlc` plugin.
 
 ## The essentials
 

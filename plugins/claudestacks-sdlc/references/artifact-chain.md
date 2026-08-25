@@ -181,12 +181,13 @@ tier of `/claudestacks-sdlc:status`). Derivation is states-only, no judgment cal
 - plan `approved` with any plan named in its `depends-on` not yet `done` →
   `wait (dependencies pending)`
 - plan `executing` → shown as executing (no further derivation; it is mid-flight)
-- all plans in the chain `done` → chain complete
+- all plans in the chain `done` or `superseded`, with at least one `done` → chain complete
 
 Triage-sourced intents (`source: triage`) are tagged `(triage)` in the STATE column
 alongside their derived state. Chains whose intent is `dropped`, or whose every plan
-is `done`/`superseded`, are listed under a collapsed `DONE/DROPPED` tail section
-(count only), unless a verbose flag in the status skill's dialogue asks for the detail.
+is `done`/`superseded` with at least one `done`, are listed under a collapsed
+`DONE/DROPPED` tail section (count only), unless a verbose flag in the status skill's
+dialogue asks for the detail.
 
 A chain whose intent, spec, or any plan names input docs via the provenance frontmatter keys
 (`derived-from-prd` / `derived-from-rfc`, §6) renders a `⤷ inputs:` annotation line

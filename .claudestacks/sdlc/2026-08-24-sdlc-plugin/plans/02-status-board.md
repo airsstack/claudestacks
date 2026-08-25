@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-25
 depends-on: [01]
 ---
@@ -799,3 +799,83 @@ $ airsl test --policy confined --allow-read / --allow-write "${TMPDIR:-/tmp}" --
 - `airsl check plugins/claudestacks-sdlc` compiles driver and module.
 - Manual launcher run against this repository's real chain renders a board.
 - `claude plugin validate plugins/claudestacks-sdlc --strict` passes.
+
+---
+
+## Review findings
+
+Two independent `claudestacks:reviewer` passes, 2026-08-25, each re-running all four
+gates itself rather than reading the coders' receipts. Final gate state: `airsl check`
+exit 0 · targeted `airsl test` 31 passed, 0 failed · `cargo make plugins` 278 passed,
+0 failed (17 files) · `claude plugin validate --strict` passed.
+
+**The central finding: five wrong-output bugs shipped inside this plan's own authored
+code literals.** The coder implemented them faithfully; the contract was wrong. Every
+one sat in an `M.derive` branch with no test, and all four gates passed over all five.
+
+**Important — fixed.**
+
+1. correctness — `"wait (dependencies pending)"` was written as a bare `or` fallback
+   (this plan, :535), so a lone `executing` plan with no `depends-on` anywhere derived
+   it. Fabricated claim; `artifact-chain.md` §9:183 says an executing plan gets no
+   further derivation. The string is licensed by spec §5.1 for exactly one case — an
+   `approved` plan with an unmet `depends-on` — and is now conditional on that case.
+2. correctness — `all_done` (this plan, :520-531) folded `superseded` in with no
+   ≥1-`done` guard, so an all-superseded chain rendered `chain complete; run execute
+   walk-up`. Spec §2.4:116 requires ≥1 `done`, so `execute` would have refused the
+   action the board prescribed.
+3. correctness — `deps_met` read dependency numbers with `gmatch("%d%d")` (this plan,
+   :481), so `depends-on: [1]` yielded an empty list and the plan reported executable
+   while its dependency was still `draft`. Silent: no INVALID, no warning.
+4. consistency — the `(triage)` tag was dropped once a chain advanced past intent,
+   while `artifact-chain.md` §9:186 and spec §5.1:372 tag unconditionally. The Lua tier
+   and the model-fallback tier disagreed about the same chain.
+5. consistency — a chain with every plan `done` rendered a live row using the strings
+   `plans complete` and `chain complete; run execute walk-up`, which appear in neither
+   spec §5.1 nor reference §9, instead of collapsing into the `DONE/DROPPED` tail.
+
+**Risk — fixed in a second round.**
+
+6. correctness — an unrecognised plan status fell through to `or "plan"`: a plan typed
+   `status: pending` derived NEXT `plan` with no INVALID, though the intent and spec
+   branches both emit `INVALID (… unknown status …)`. Plans were the inconsistent case.
+7. consistency — `references/artifact-chain.md:184,187-188` stated the chain-complete
+   and tail-collapse rules without the ≥1-`done` guard §7.2 requires, so the prose told
+   the fallback tier to hide a live all-superseded chain. Amended; see Deviations.
+8. consistency — `skills/status/SKILL.md:21` scoped the fallback tier's collapse to the
+   intent status, while the Lua tier had begun collapsing chain-complete chains too —
+   the same two-tier divergence as finding 4, newly created by the finding-5 fix.
+
+**Verified by breaking, not by reading.** `status.sh` genuinely exits 0 on every path —
+non-executable `AIRSL_BIN`, failing-executable `AIRSL_BIN`, no `airsl` reachable, and
+`airsl` present with the Lua raising, where `--fail-open` swallows stdout and stderr.
+One stderr leak on a broken `PATH`, logged as a nit and left.
+
+**Nit — accepted, not fixed.** Thirteen from the first pass and seven from the second,
+principally items the plan mandates verbatim. `claude plugin validate --strict` was
+demoted as evidence throughout: its output is one line naming `plugin.json`, so it opens
+no skill and vouches for none of the markdown.
+
+## Deviations
+
+- **Five plan code literals were rewritten** (findings 1–5). Deviating was required, not
+  optional: the literals produced provably wrong output against `artifact-chain.md` §9.
+  Recorded here rather than by editing this approved plan's task bodies.
+- **An existing test's expectation was deliberately changed.** `status_test.lua:225`
+  asserted `plans complete` / `chain complete; run execute walk-up`; both strings exist
+  in no authority — grep confirms — so the assertion encoded the bug. It now asserts
+  `chain complete`, verbatim from reference §9:184, plus the tail collapse. Reviewed
+  independently and confirmed a strengthening, not a retune to match new behaviour.
+- **`references/artifact-chain.md` was amended** — outside this plan's file list, and it
+  is a plan 01 deliverable. Justification: §9's collapse sentence had broadened its own
+  spec. Spec §5.1:370-371 keys the collapse on the **intent's** status alone
+  ("dropped/done chains"); the clause "or whose every plan is `done`/`superseded`" was
+  added during plan 01 and has no spec basis, and without a ≥1-`done` guard it
+  contradicted §7.2. Tightening it back is therefore a reference-level correction, and
+  the approved spec is untouched. Both :184 and :187-188 now carry the guard.
+- **A fix was accepted whose stated justification was wrong.** The all-superseded case
+  was documented in code and test comments as one "reference §9 does not name". §9:187-188
+  named it. The behaviour was right, the reasoning was not; the second review caught it
+  and both comments were corrected. Noted because a right answer resting on a false
+  premise survives a diff read and fails later.
+- **Task 7 (commit) not executed.** The user holds the commit gate; no agent commits.

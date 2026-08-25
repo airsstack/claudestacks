@@ -1,0 +1,149 @@
+---
+name: design
+description: Use when a chain's intent is approved and the design is not yet settled — turns an approved intent into an approved spec through a one-question-at-a-time design dialogue, then hands off to the plan skill. Invoke once an intent exists and is approved, before writing an implementation plan or any code.
+---
+
+# Design
+
+Transform an approved intent into a fully-formed, user-approved spec through structured
+collaborative dialogue. The only goal of this skill is to produce a spec the user stands
+behind — one that roots every decision in the intent's problem and desired outcome.
+
+Paths, naming, frontmatter, and state transitions all come from
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`; artifact body shapes come from
+`${CLAUDE_PLUGIN_ROOT}/references/templates.md`. Lazy-create the chain directory before
+first write — never assume `/claudestacks-sdlc:setup` ran.
+
+## State gate
+
+This skill requires a chain whose `intent.md` is `status: approved`. Before anything
+else, read the intent and check its state:
+
+- `draft` — refuse. Name the file, its current state (`draft`), and that the `intent`
+  skill is what advances it (approval, or amendment, happens there).
+- `dropped` — refuse. Name the file and state; the idea is dead unless the user
+  un-drops it via the `intent` skill.
+- `done` — refuse. Name the file and state; the chain already completed its plans. A
+  new round of work is a new intent, not a redesign of a finished chain.
+- `approved` — proceed.
+
+## Hard gate
+
+Do NOT invoke any implementation skill, write code, or scaffold anything until you have
+presented a complete design AND received explicit user approval. This rule holds
+regardless of how simple the work appears. A simple intent may produce a short spec, but
+the spec must still be written, presented, and approved before moving forward.
+
+## Checklist
+
+Work through these steps in order. Create a `TodoWrite` item for each step so progress
+is visible.
+
+1. **Read the intent.** Load the chain's `intent.md` in full — problem, affected
+   systems, desired outcome, constraints, non-goals. This is the required input and the
+   root every later design decision traces back to.
+
+2. **Load provenance and scan `rfcs/`.** Load every file the intent's
+   `derived-from-prd` / `derived-from-rfc` frontmatter names. Then scan the chain root's
+   `rfcs/` directory for additional relevant input: if it holds files, surface them and
+   ask which (if any) are relevant before proceeding; if empty or absent, proceed with
+   no prompt. If the user explicitly names an RFC or other file by path, load it as
+   primary input; if that named file is missing, report the path and ask for a
+   correction rather than guessing. `rfcs/` is read-only — never create, edit, move, or
+   delete a file in it.
+
+3. **Explore project context.** Read relevant files, docs, and recent commits to
+   understand the codebase, its conventions, and what already exists. Do not design in
+   a vacuum. **Detect the active stack** and load its guideline now — see below.
+
+4. **Ask clarifying questions one at a time.** Surface the questions that matter most
+   for the design: purpose, constraints, success criteria, non-goals. Prefer
+   multiple-choice questions where natural — they give the user concrete options and
+   keep the dialogue moving. Never ask a battery of questions at once; ask one, get the
+   answer, then ask the next. Ask only when the answer changes the spec about to be
+   written; anything derivable from the intent, the repo, or a loaded guideline is
+   derived and stated as an overridable assumption.
+
+5. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
+   or three distinct approaches along with their trade-offs. Lead with your
+   recommendation and explain why you favor it. Invite the user to redirect before
+   committing to any path.
+
+6. **Present the design section by section.** Walk through the design in sections
+   scaled to their complexity. At minimum, cover architecture, key components and their
+   responsibilities, data flow, error handling, and testing strategy. Each section must
+   conform to the active stack's guideline architecture rules loaded in step 3 — call
+   out where a design choice is driven by a guideline rule. After each non-trivial
+   section, confirm the user's understanding and agreement before moving to the next.
+   This incremental gate catches disagreements early, before the full spec is written.
+
+7. **Write the spec.** Once the design is agreed upon, write `spec.md` in the chain
+   directory, in the body shape from `${CLAUDE_PLUGIN_ROOT}/references/templates.md`,
+   with `status: draft` frontmatter. Carry forward any provenance frontmatter
+   (`derived-from-prd` / `derived-from-rfc`) the intent or this dialogue names. The spec
+   is the durable record — write it to stand on its own without reference to this
+   conversation.
+
+8. **Self-review the spec.** Re-read what you wrote from the perspective of someone
+   seeing it for the first time, and fix issues directly in the file. Check for:
+   **placeholders** — no TBD, TODO, "to be determined," or vague deferral language;
+   either fill the gap or make the decision explicit. **Internal consistency** —
+   component names, data shapes, and behavioral descriptions agree throughout; a
+   component described one way in the architecture section must match its description
+   in the error-handling section. **Scope** — the spec is focused enough to map to a
+   coherent implementation cycle; if multiple independent objectives are woven
+   together, decompose before proceeding. **Ambiguity** — wherever the spec could be
+   read two ways, pick one interpretation and make it explicit. **Intent tracing** —
+   every spec section roots in the intent's problem or desired outcome; anything
+   without a root is scope creep — cut it from the spec, or take it back to the user as
+   a question about whether the intent itself needs to grow.
+
+9. **User review gate.** Ask the user to read the spec file you just wrote and give
+   explicit approval. This is a mandatory stop, not a formality. If they request
+   changes — small clarifications or significant redesigns — revise the spec and re-run
+   the self-review. Only on explicit approval, flip `spec.md`'s frontmatter
+   `status: draft → approved` as the last step of this interaction. Committing the spec
+   is the user's call — do not auto-commit.
+
+10. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
+    already `approved`: rename the existing file to `spec-superseded-YYYY-MM-DD.md`
+    (today's date), then flip that renamed file's frontmatter
+    `status: approved → superseded` — `artifact-chain.md` §7.2 assigns this transition
+    to `design`, and the archived file must not go on reading `approved` forever. Only
+    then write a fresh `spec.md` with `status: draft`, starting again from step 1.
+    `spec.md` — the unsuffixed name — is always the governing spec for the chain.
+
+11. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
+    write code or scaffold files yourself; the approved spec is the handoff artifact.
+
+## Design for isolation
+
+When structuring the design, break the system into small units each with one clear
+purpose and well-defined interfaces. Each unit should be understandable and testable on
+its own, without needing to hold the rest of the system in your head. Highly coupled
+designs are harder to test, harder to change, and harder to reason about in review.
+Reach for loose coupling and obvious interfaces over clever integration.
+
+## Honor the active stack's guidelines
+
+Before proposing architecture, detect the project's active stack(s) and load the
+matching guideline. A guideline plugin advertises itself with an `enforcement.json` at
+its root (read by the `claudestacks` plugin's enforcement dispatcher); its `detect`
+markers — e.g. `Cargo.toml` for Rust — tell you which stack a repo is. For every active
+stack whose guideline skill is installed (e.g.
+`claudestacks-guideline-rust:rust-guidelines`), invoke that skill and let its
+**architecture** rules — not merely its Definition of Done — shape the design: type
+modeling, module layout, dispatch choices, doc and test mandates. A spec that ignores
+the guideline's architecture rules produces a plan that bakes those violations in
+before a single line of code is written. If no installed guideline matches the active
+stack, say so and proceed on general principles.
+
+## Key principles
+
+The checklist carries the dialogue rules (one question at a time, multiple-choice where
+natural, 2–3 alternatives, agreement section by section). Two more bind throughout:
+
+- **YAGNI ruthlessly.** No designing for imagined future requirements. Every component
+  in the spec has a concrete, immediate reason to exist, traceable to the intent.
+- **Be flexible.** If the user redirects mid-dialogue, update your understanding and
+  carry forward without defending the prior path.

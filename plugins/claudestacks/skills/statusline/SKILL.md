@@ -7,6 +7,7 @@ description: >
   Gates on the airsl binary, refuses to overwrite a status line it does not own, and backs up
   settings. Deterministic, no subagent. Use when the user says "install the status line" /
   "/claudestacks:statusline", or asks to remove it.
+disable-model-invocation: true
 ---
 
 # statusline

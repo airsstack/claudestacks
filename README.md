@@ -41,7 +41,7 @@ project's spec-driven, review-gated development methodology for
 | Plugin | What it provides |
 | --- | --- |
 | **`claudestacks`** | Execution engine: a TDD `coder`, a merged code+spec `reviewer`, a read-only `explorer`, an `orchestrate` driver, process guidelines, project-local snapshot memory, and a `concise` output mode. |
-| **`claudestacks-sdd`** | Spec-driven workflow: `brainstorm` an idea into a spec → `write-plan` (one objective per plan) → `execute-plan` with review checkpoints. |
+| **`claudestacks-sdlc`** | AI-native SDLC workflow: a committed `intent` → `design` → `plan` → `execute` chain under `.claudestacks/sdlc/`, with `distill`/`triage` feedback loops and a `status` board. |
 | **`claudestacks-guideline-rust`** | Rust engineering guidelines plus a strict Definition-of-Done, delivered as a single lazily-loaded skill the execution agents consult when they touch Rust. |
 | **`claudestacks-journal`** | Transparent, note-based experiential memory: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index (`capture` / `note` / `recall` / `link` / `review` / `helped`). |
 | **`claudestacks-cmux`** | Native [cmux](https://cmux.com) terminal control as four lazily-loaded skills (`cmux-control` hub, `cmux-workspace`, `cmux-browser`, `cmux-config`) over the real `cmux` CLI. Requires a cmux install on the machine. |
@@ -53,10 +53,13 @@ The plugins are language-agnostic except for the guideline plugin: the agents ob
 Definition-of-Done and rules from whichever `*-guidelines` skill is installed, and degrade
 gracefully when none is present.
 
-Upstream attribution, restated from each plugin's own README: the `brainstorm → write-plan →
-execute-plan` workflow in `claudestacks-sdd` is adapted from the
-[superpowers](https://github.com/obra/superpowers) plugin, and the `concise` skill in
-`claudestacks` is inspired by [caveman](https://github.com/juliusbrussee/caveman).
+Upstream attribution, restated from each plugin's own README: `claudestacks-sdlc` credits two
+lineages — the stage model and `distill`/`triage` feedback loops implement Anthropic's
+[AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook), while the
+`design` → `plan` → `execute` discipline (gated design dialogue, TDD plan format, checkpointed
+execution) descends from the retired `claudestacks-sdd`, itself adapted from the
+[superpowers](https://github.com/obra/superpowers) plugin. The `concise` skill in `claudestacks`
+is inspired by [caveman](https://github.com/juliusbrussee/caveman).
 
 ## Commands
 
@@ -91,14 +94,14 @@ Then install from the GitHub marketplace:
 ```
 /plugin marketplace add airsstack/claudestacks
 /plugin install claudestacks@claudestacks
-/plugin install claudestacks-sdd@claudestacks
+/plugin install claudestacks-sdlc@claudestacks
 /plugin install claudestacks-guideline-rust@claudestacks
 /plugin install claudestacks-journal@claudestacks
 /plugin install claudestacks-cmux@claudestacks
 ```
 
 Each plugin has its own README under `plugins/<name>/` with the full component list. Everything is
-namespaced (`claudestacks:<name>`, `claudestacks-sdd:<name>`, `claudestacks-journal:<name>`, …).
+namespaced (`claudestacks:<name>`, `claudestacks-sdlc:<name>`, `claudestacks-journal:<name>`, …).
 
 ## License
 

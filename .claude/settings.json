@@ -5,11 +5,11 @@
   },
   "disableWorkflows": true,
   "enabledPlugins": {
-    "claudestacks@claudestacks": true,
-    "claudestacks-sdlc@claudestacks": true,
-    "claudestacks-guideline-rust@claudestacks": true,
-    "claudestacks-journal@claudestacks": true,
-    "claudestacks-cmux@claudestacks": true
+    "claudestacks@claudestacks": false,
+    "claudestacks-sdlc@claudestacks": false,
+    "claudestacks-guideline-rust@claudestacks": false,
+    "claudestacks-journal@claudestacks": false,
+    "claudestacks-cmux@claudestacks": false
   },
   "extraKnownMarketplaces": {
     "claudestacks": {

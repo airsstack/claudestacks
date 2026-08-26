@@ -56,9 +56,14 @@ instead of a path under the session tree above. The session tree's lease, heartb
 pruning exist to stop concurrent multi-agent pipelines from colliding over one shared
 directory; a flow with a single spawn has nothing to collide with, so paying for a
 session buys nothing. The `<summary>`/`<detail>` file schema and the return contract
-below still apply unchanged — only the *path* the report lands at differs. A pipeline
-that spawns more than one subagent, or spawns them across turns, still MUST use the
-session tree; this exception does not extend to those cases.
+below still apply unchanged — only the *path* the report lands at differs. A
+single-subagent flow may also re-spawn **sequentially** — a review repeated over a
+revised draft, say — provided the caller assigns each round its own path, for example a
+zero-padded round counter in the filename. The rounds do not overlap, so there is still
+nothing for a lease to arbitrate. What still MUST use the session tree is a pipeline
+that holds more than one subagent in flight at once, or that interleaves spawns of
+different agents whose reports refer to each other; this exception does not extend to
+those cases.
 
 ## Return & routing contract
 

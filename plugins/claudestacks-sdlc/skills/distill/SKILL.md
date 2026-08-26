@@ -33,11 +33,42 @@ here to accepting an edit instead.
 
 ## Input
 
-Scan every plan file under `.claudestacks/sdlc/*/plans/*.md` for its `## Review findings` section. This
-data is durable by construction — each finding was written to disk by `execute` before the plan flipped
-`done`, so no session memory or prior conversation is needed to reconstruct it. Read the whole corpus
-across every chain, not just the most recent one; a category that recurred six months ago and again last
-week is still a recurrence.
+Every plan file under `.claudestacks/sdlc/*/plans/*.md` may carry a `## Review findings`
+section. That data is durable by construction — each finding was written to disk by
+`execute` before the plan flipped `done` — so no session memory or prior conversation is
+needed to reconstruct it. The whole corpus is in scope, across every chain, not just the
+most recent one; a category that recurred six months ago and again last week is still a
+recurrence.
+
+Do not read those plan files yourself. A plan is a full construction manual and its
+findings section is a few lines, so scanning the corpus inline pulls an enormous amount
+of text in to extract very little — and that cost grows with every chain the repository
+accumulates, while the answer stays a short table. Spawn
+`claudestacks-sdlc:chain-reader` instead:
+
+```
+glob: .claudestacks/sdlc/*/plans/*.md
+heading: ## Review findings
+report: <TMPDIR>/claudestacks-sdlc-corpus-findings-<NN>.md
+```
+
+Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives
+its brief as literal text and runs no shell over it, so an unexpanded variable would
+reach it as a filename. The `corpus` segment stands where a chain name goes in the
+report-path shape, because this scan spans every chain rather than one. `<NN>` starts at
+`01` and increments on each re-scan.
+
+The agent returns a summary — how many files the glob matched, how many carried the
+heading — plus that path. Read the `<detail>` yourself: the extraction is exactly what
+you apply the recurrence rule to, so this is the case where the main thread does need
+the detail rather than routing off the summary alone.
+
+What comes back is verbatim, tagged by source file, and nothing else. The agent does not
+group, count, categorize, or rank, and refuses if asked. That work is yours, below —
+it is judgment, and it feeds a dialogue with the user that a subagent can never hold.
+
+If the glob matches plan files but none carries a `## Review findings` heading, there is
+no findings corpus yet: say so and stop, rather than proposing anything.
 
 ## Recurrence rule
 

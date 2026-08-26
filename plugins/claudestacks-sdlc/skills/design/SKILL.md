@@ -56,6 +56,15 @@ is visible.
    understand the codebase, its conventions, and what already exists. Do not design in
    a vacuum. **Detect the active stack** and load its guideline now — see below.
 
+   Delegate the locating half. When the exploration is broad — mapping an unfamiliar
+   directory, sweeping for every use of a symbol, finding which files own a behavior —
+   spawn `claudestacks:explorer` and work from the `file:line` tables it returns instead
+   of reading those files into this thread. Read directly only what you must actually
+   judge: a guideline, a convention you are about to follow, a file whose contents decide
+   the design. If `claudestacks:explorer` does not resolve — the `claudestacks` main
+   plugin is not installed — do the locating inline here and tell the user the agent was
+   unavailable. Never fail hard for want of the main plugin.
+
 4. **Ask clarifying questions one at a time.** Surface the questions that matter most
    for the design: purpose, constraints, success criteria, non-goals. Prefer
    multiple-choice questions where natural — they give the user concrete options and
@@ -84,24 +93,37 @@ is visible.
    is the durable record — write it to stand on its own without reference to this
    conversation.
 
-8. **Self-review the spec.** Re-read what you wrote from the perspective of someone
-   seeing it for the first time, and fix issues directly in the file. Check for:
-   **placeholders** — no TBD, TODO, "to be determined," or vague deferral language;
-   either fill the gap or make the decision explicit. **Internal consistency** —
-   component names, data shapes, and behavioral descriptions agree throughout; a
-   component described one way in the architecture section must match its description
-   in the error-handling section. **Scope** — the spec is focused enough to map to a
-   coherent implementation cycle; if multiple independent objectives are woven
-   together, decompose before proceeding. **Ambiguity** — wherever the spec could be
-   read two ways, pick one interpretation and make it explicit. **Intent tracing** —
-   every spec section roots in the intent's problem or desired outcome; anything
-   without a root is scope creep — cut it from the spec, or take it back to the user as
-   a question about whether the intent itself needs to grow.
+8. **Review the spec — by an agent, not by yourself.** You wrote every line of this
+   spec and held the dialogue that produced it, so you are the weakest available reader
+   of it. Spawn `claudestacks-sdlc:artifact-reviewer` over the draft:
+
+   ```
+   kind: spec
+   draft: <chain>/spec.md
+   authority: <chain>/intent.md
+   report: <TMPDIR>/claudestacks-sdlc-<chain>-spec-<NN>.md
+   ```
+
+   Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent
+   receives its brief as literal text and runs no shell over it, so an unexpanded
+   variable would reach it as a filename. `<NN>` starts at `01` and increments on each
+   re-review of a revised draft, so sequential rounds never overwrite one another.
+
+   The agent returns a verdict summary plus that path. Route off the summary; read the
+   `<detail>` only when you must act on a finding. Fix the draft yourself — the agent
+   never edits it, never flips a `status`, and never commits.
+
+   The criteria it applies live in
+   `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md` § *Reviewing a draft spec*. If
+   the agent does not resolve, or returns nothing you can act on, apply that same file's
+   criteria inline yourself and tell the user the review ran inline — never skip the
+   review for want of the agent.
 
 9. **User review gate.** Ask the user to read the spec file you just wrote and give
    explicit approval. This is a mandatory stop, not a formality. If they request
    changes — small clarifications or significant redesigns — revise the spec and re-run
-   the self-review. Only on explicit approval, flip `spec.md`'s frontmatter
+   step 8's agent review over the revised draft, incrementing `<NN>`. Only on explicit
+   approval, flip `spec.md`'s frontmatter
    `status: draft → approved` as the last step of this interaction. Committing the spec
    is the user's call — do not auto-commit.
 

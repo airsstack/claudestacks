@@ -103,6 +103,14 @@ tests/auth_integration.rs  — [create] integration test for the token round-tri
 Then assign each file to exactly the tasks that touch it. A task listing files it does not
 touch is a defect; a file in no task is a dangling artefact.
 
+Delegate the locating. Working out which files exist, what they export, and which one
+owns the behavior the spec describes is exactly `claudestacks:explorer`'s job — spawn it
+and build the file map from the `file:line` tables it returns, rather than reading the
+tree into this thread. Deciding what *should* change stays here; the agent only reports
+what is there, and refuses judgment if you ask for more. If `claudestacks:explorer` does
+not resolve — the `claudestacks` main plugin is not installed — map the files inline here
+and tell the user the agent was unavailable. Never fail hard for want of the main plugin.
+
 ## Task granularity
 
 Each task is a 2–5 minute action — doable, testable, and committable in one sitting. Longer
@@ -183,31 +191,39 @@ output at every step. Substitute your actual language and names:
 Where two tasks share code structure, write it out in full in both — a plan that says "similar
 to Task N" is no longer standalone, which is the property the whole format exists to protect.
 
-## No placeholders
+## Before saving — review by an agent
 
-Fix these before saving:
+You wrote these plans, so you are the weakest available reader of them. Spawn
+`claudestacks-sdlc:artifact-reviewer` over the whole draft set:
 
-- `TBD`, `TODO`, `implement later`.
-- "add appropriate error handling / validation / edge cases" without naming them and showing
-  the code.
-- "write tests for the above" without the test code.
-- A step saying *what* without showing *how* — no code block, no command, no expected output.
-- A reference to a type, function, or constant defined neither earlier in the plan nor in the
-  codebase (no forward references).
+```
+kind: plan-set
+draft: <chain>/plans/NN-*.md      — every draft plan in the set
+authority: <chain>/spec.md        — or <chain>/intent.md on the spec-skip path
+report: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
+```
 
-## Before saving
+Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives
+its brief as literal text and runs no shell over it, so an unexpanded variable would
+reach it as a filename. `<NN>` starts at `01` and increments on each re-review of a
+revised set.
 
-Check each draft plan on three axes, fixing inline:
+One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
+requirement satisfied in plan `03` is covered even though plan `01` says nothing about
+it, and a reviewer shown one plan at a time cannot see that. The per-plan approval gate
+below is unaffected — each plan is still presented and approved on its own.
 
-- **Spec coverage** — every in-scope spec requirement (or, on the spec-skip path, every
-  requirement stated in the intent) maps to a task across the plan set, or is explicitly
-  deferred with a justification.
-- **Type consistency** — every type, signature, and constant used in Task N+1 was defined in an
-  earlier task or already exists. A forward reference is a defect: reorder, or add the
-  definition.
-- **Guideline conformance** — every code block scanned against the active guideline's
-  architecture rules. Cheaper to fix here than after the coder ships it. If no guideline matches
-  the stack, say so.
+The agent returns a verdict summary plus that path. Route off the summary; read the
+`<detail>` only when you must act on a finding. Fix every finding in the drafts
+yourself. The agent never edits a plan, never flips a `status`, and never commits.
+
+The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
+§ *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
+and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
+rather than waiting for the agent to find them — a plan that reaches the reviewer full
+of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can
+act on, apply that same file's criteria inline yourself and tell the user the review ran
+inline; never skip the review for want of the agent.
 
 ## Approval gate
 

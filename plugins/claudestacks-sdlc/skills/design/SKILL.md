@@ -56,6 +56,15 @@ is visible.
    understand the codebase, its conventions, and what already exists. Do not design in
    a vacuum. **Detect the active stack** and load its guideline now — see below.
 
+   Delegate the locating half. When the exploration is broad — mapping an unfamiliar
+   directory, sweeping for every use of a symbol, finding which files own a behavior —
+   spawn `claudestacks:explorer` and work from the `file:line` tables it returns instead
+   of reading those files into this thread. Read directly only what you must actually
+   judge: a guideline, a convention you are about to follow, a file whose contents decide
+   the design. If `claudestacks:explorer` does not resolve — the `claudestacks` main
+   plugin is not installed — do the locating inline here and tell the user the agent was
+   unavailable. Never fail hard for want of the main plugin.
+
 4. **Ask clarifying questions one at a time.** Surface the questions that matter most
    for the design: purpose, constraints, success criteria, non-goals. Prefer
    multiple-choice questions where natural — they give the user concrete options and

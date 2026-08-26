@@ -95,6 +95,28 @@ the six above; nothing here uses a `commands/` directory.
   `disable-model-invocation: true` — it writes into your repository, so only you can
   trigger it.
 
+## Agents
+
+Two leaf agents ship under `agents/`, namespaced `claudestacks-sdlc:<name>`. Neither
+declares the `Agent` tool, so neither can spawn anything: the skill on the main thread
+does every spawn, receives every report, and holds every user gate. No agent flips an
+artifact `status` and no agent commits — `references/artifact-chain.md` §7.3 keeps both
+where they were.
+
+- **`chain-reader`** (haiku · low) — mechanical section extractor. Given a glob and a
+  heading, returns each match's content verbatim, tagged with its file. It does not
+  group, count, or judge; the calling skill does that. `distill` spawns it to pull
+  `## Review findings` out of every plan in the chain root without loading the plan
+  bodies into the main context.
+- **`artifact-reviewer`** (opus · high) — judges a draft `spec.md`, or a draft plan set,
+  against its upstream authority and the criteria in `references/artifact-review.md`.
+  Report-only, severity-tagged. `design` and `plan` spawn it in place of self-reviewing
+  an artifact they just wrote themselves.
+
+The read-heavy locating steps in `design` and `plan` reuse `claudestacks:explorer` from
+the main plugin. That is a cross-plugin dependency, so it degrades: if the agent does not
+resolve, the skill does the work inline and says the agent was unavailable.
+
 ## Attribution
 
 Two lineages meet here. The stage model and the `distill`/`triage` feedback loops implement

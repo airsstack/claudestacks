@@ -231,7 +231,7 @@ The calling skill expands `${TMPDIR:-/tmp}` itself before the path enters an age
 brief. An agent receives its brief as literal text and runs no shell over it, so an
 unexpanded variable would reach it as a filename.
 
-This extends the single-subagent exception at `context-handoff.md:51-61` rather than
+This extends the single-subagent exception at `context-handoff.md:51-66` rather than
 minting a handoff session. The exception as written stops short of a flow that spawns
 across turns, which `design` does when step 9 re-reviews a revised spec. The round counter
 supplies what the session tree's lease and pruning exist to supply — collision-free paths
@@ -266,7 +266,7 @@ this plugin claims to follow.
 |---|---|
 | `claudestacks:explorer` does not resolve | Do the locating inline on the main thread and tell the user the agent was unavailable. Never fail hard. Matches `skills/execute/SKILL.md:55-64`. |
 | `artifact-reviewer` returns nothing usable | The skill applies the §5 criteria inline and states that the review ran inline. The reference file is what makes this possible. |
-| An agent's report write fails | The agent returns its full report inline and says the write failed. Already the rule at `context-handoff.md:106`. |
+| An agent's report write fails | The agent returns its full report inline and says the write failed. Already the rule at `context-handoff.md:111`. |
 | `chain-reader` matches no heading anywhere | It returns an empty extraction; `distill` reports that there is no findings corpus yet — unchanged from its behavior on an empty scan today. |
 | An agent is asked to edit, flip a `status`, or commit | Hard-refuse with a fixed line and stop, in the pattern of `explorer.md:36`. |
 

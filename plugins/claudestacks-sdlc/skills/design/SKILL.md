@@ -122,7 +122,8 @@ is visible.
 9. **User review gate.** Ask the user to read the spec file you just wrote and give
    explicit approval. This is a mandatory stop, not a formality. If they request
    changes — small clarifications or significant redesigns — revise the spec and re-run
-   the self-review. Only on explicit approval, flip `spec.md`'s frontmatter
+   step 8's agent review over the revised draft, incrementing `<NN>`. Only on explicit
+   approval, flip `spec.md`'s frontmatter
    `status: draft → approved` as the last step of this interaction. Committing the spec
    is the user's call — do not auto-commit.
 

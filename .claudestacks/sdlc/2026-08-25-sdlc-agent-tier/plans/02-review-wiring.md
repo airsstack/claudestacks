@@ -298,7 +298,7 @@ task touches.
    hop:
 
    ```
-   $ grep -c "Spec coverage" plugins/claudestacks-sdlc/skills/plan/SKILL.md
+   $ grep -c "^- \*\*Spec coverage\*\*" plugins/claudestacks-sdlc/skills/plan/SKILL.md
    1
    $ grep -c "^## No placeholders$" plugins/claudestacks-sdlc/skills/plan/SKILL.md
    1
@@ -384,15 +384,20 @@ task touches.
    reference:
 
    ```
-   $ grep -c "Spec coverage" plugins/claudestacks-sdlc/skills/plan/SKILL.md
+   $ grep -c "^- \*\*Spec coverage\*\*" plugins/claudestacks-sdlc/skills/plan/SKILL.md
    0
    $ grep -c "^## No placeholders$" plugins/claudestacks-sdlc/skills/plan/SKILL.md
    0
-   $ grep -c "Spec coverage" plugins/claudestacks-sdlc/references/artifact-review.md
+   $ grep -c "^- \*\*Spec coverage\*\*" plugins/claudestacks-sdlc/references/artifact-review.md
    1
    ```
 
    Exit 1, exit 1, exit 0. That triple is spec §9 check 2 for the plan hop.
+
+   The anchor matters. A bare `grep -c "Spec coverage"` would return `1` here, because
+   the replacement text above says "Spec coverage is a property of the *set*" as ordinary
+   prose. What check 2 asserts is that the criteria *bullet* moved, not that the phrase
+   never appears — so the pattern matches the bullet's exact shape.
 
 4. Confirm the other two axis names are gone too:
 
@@ -433,7 +438,7 @@ task touches.
 | Explorer wired, design | `grep -c "claudestacks:explorer" plugins/claudestacks-sdlc/skills/design/SKILL.md` | `2` |
 | Explorer wired, plan | `grep -c "claudestacks:explorer" plugins/claudestacks-sdlc/skills/plan/SKILL.md` | `2` |
 | Spec criteria moved | `grep -c "Intent tracing" plugins/claudestacks-sdlc/skills/design/SKILL.md` | `0` |
-| Plan criteria moved | `grep -c "Spec coverage" plugins/claudestacks-sdlc/skills/plan/SKILL.md` | `0` |
+| Plan criteria moved | `grep -c "^- \*\*Spec coverage\*\*" plugins/claudestacks-sdlc/skills/plan/SKILL.md` | `0` |
 | Criteria still exist once | `grep -c "Intent tracing\|Spec coverage" plugins/claudestacks-sdlc/references/artifact-review.md` | `2` |
 | User gates intact | `grep -c "^9\. \*\*User review gate\.\*\*" plugins/claudestacks-sdlc/skills/design/SKILL.md` and `grep -c "^## Approval gate$" plugins/claudestacks-sdlc/skills/plan/SKILL.md` | `1` each |
 

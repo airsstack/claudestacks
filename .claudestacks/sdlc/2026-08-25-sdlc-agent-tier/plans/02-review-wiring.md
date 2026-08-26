@@ -367,8 +367,9 @@ task touches.
    it, and a reviewer shown one plan at a time cannot see that. The per-plan approval gate
    below is unaffected — each plan is still presented and approved on its own.
 
-   Fix every finding in the drafts yourself. The agent never edits a plan, never flips a
-   `status`, and never commits.
+   The agent returns a verdict summary plus that path. Route off the summary; read the
+   `<detail>` only when you must act on a finding. Fix every finding in the drafts
+   yourself. The agent never edits a plan, never flips a `status`, and never commits.
 
    The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
    § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,

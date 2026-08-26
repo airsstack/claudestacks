@@ -103,6 +103,14 @@ tests/auth_integration.rs  — [create] integration test for the token round-tri
 Then assign each file to exactly the tasks that touch it. A task listing files it does not
 touch is a defect; a file in no task is a dangling artefact.
 
+Delegate the locating. Working out which files exist, what they export, and which one
+owns the behavior the spec describes is exactly `claudestacks:explorer`'s job — spawn it
+and build the file map from the `file:line` tables it returns, rather than reading the
+tree into this thread. Deciding what *should* change stays here; the agent only reports
+what is there, and refuses judgment if you ask for more. If `claudestacks:explorer` does
+not resolve — the `claudestacks` main plugin is not installed — map the files inline here
+and tell the user the agent was unavailable. Never fail hard for want of the main plugin.
+
 ## Task granularity
 
 Each task is a 2–5 minute action — doable, testable, and committable in one sitting. Longer

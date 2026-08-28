@@ -6,7 +6,7 @@
   "disableWorkflows": true,
   "enabledPlugins": {
     "claudestacks@claudestacks": false,
-    "claudestacks-sdlc@claudestacks": false,
+    "claudestacks-sdlc@claudestacks": true,
     "claudestacks-guideline-rust@claudestacks": false,
     "claudestacks-journal@claudestacks": false,
     "claudestacks-cmux@claudestacks": false

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-08-26
 depends-on: [01]
 ---

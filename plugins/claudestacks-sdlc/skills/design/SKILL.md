@@ -134,8 +134,19 @@ is visible.
 
    Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent
    receives its brief as literal text and runs no shell over it, so an unexpanded
-   variable would reach it as a filename. `<NN>` starts at `01` and increments on each
-   re-review of a revised draft, so sequential rounds never overwrite one another.
+   variable would reach it as a filename. The report is always `01`.
+
+   **Exactly one review round. Never a second.** Fix the findings and go to the author.
+   Do not re-spawn the reviewer over the revised draft, and do not spawn it again after
+   the author asks for changes — revise and present.
+
+   A second round is not worth what it costs. Rounds beyond the first return
+   progressively smaller findings on the reasoning, while the errors that actually reach
+   code are wrong external facts, which no round can find because every criterion but one
+   compares documents to each other. Grounding those facts against the artifact — the step
+   above — is what replaces the extra rounds, and the compiler catches the rest in seconds
+   rather than twenty minutes. If a draft needs more than one round, it needs rewriting,
+   not re-reviewing.
 
    The agent returns a verdict summary plus that path. Route off the summary; read the
    `<detail>` only when you must act on a finding. Fix the draft yourself — the agent
@@ -149,8 +160,9 @@ is visible.
 
 10. **User review gate.** Ask the user to read the spec file you just wrote and give
    explicit approval. This is a mandatory stop, not a formality. If they request
-   changes — small clarifications or significant redesigns — revise the spec and re-run
-   step 9's agent review over the revised draft, incrementing `<NN>`. Only on explicit
+   changes — small clarifications or significant redesigns — revise the spec and present
+   it again. **Do not re-spawn the reviewer**; step 9 has already run and runs once per
+   spec. Only on explicit
    approval, flip `spec.md`'s frontmatter
    `status: draft → approved` as the last step of this interaction. Committing the spec
    is the user's call — do not auto-commit.

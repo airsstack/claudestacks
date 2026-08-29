@@ -227,8 +227,18 @@ report: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
 
 Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives
 its brief as literal text and runs no shell over it, so an unexpanded variable would
-reach it as a filename. `<NN>` starts at `01` and increments on each re-review of a
-revised set.
+reach it as a filename. The report is always `01`.
+
+**Exactly one review round over the set. Never a second.** Fix the findings and take the
+plans to the author. Do not re-spawn the reviewer over the revised set, and do not spawn
+it again when the author asks for changes — revise and present.
+
+Rounds beyond the first return progressively smaller findings about the plan's internal
+reasoning, while the defects that actually reach code are wrong external facts and
+compile-level details. The first no round can catch, because every criterion but one
+compares documents to each other — grounding against the artifact is what replaces them.
+The second the compiler catches in seconds. A plan set that would need a second round
+needs rewriting, not re-reviewing.
 
 One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
 requirement satisfied in plan `03` is covered even though plan `01` says nothing about

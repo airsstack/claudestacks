@@ -1,0 +1,292 @@
+# Third-party plugin corpus — 13 repositories, 156 plugin roots.
+#
+# Plugins nobody in this repository authored, pinned by commit. They exist to
+# answer a question this repository's own fixtures structurally cannot: not
+# "does claudevs do what we intended?" but "was what we intended right?".
+# `tests/fixtures/` holds four plugins written here, by the same hand as the
+# code they exercise, so they encode the same assumptions and cannot disconfirm
+# them. Every plugin below was written by someone who had never heard of
+# claudevs.
+#
+# Cloned and swept on 2026-08-29 with `claudevs check` built from `main` at
+# 2db55e4. That sweep is the source of every corpus number in
+# `.claudestacks/sdlc/2026-08-29-claudevs-plugin-correctness/`: 43 of 156 roots
+# failing with only 3 genuine, 34 `refs` errors partitioning 29/3/1/1, and 77
+# dead-file warnings partitioning 40/26/5/5. Without this file those numbers are
+# unreproducible, because nothing else records which repositories at which
+# commits produced them.
+#
+# The `sha` values are what was actually measured — `git rev-parse HEAD` in each
+# `git clone --depth 1` at sweep time. Re-fetching one is
+# `git fetch --depth 1 origin <sha>`, which GitHub serves for a reachable commit.
+# That is not a guarantee: a repository can be deleted, made private, or
+# force-pushed, and then its row becomes a record of what was tested rather than
+# something re-runnable. Spot-checked at write time — `anthropics/claude-code`
+# HEAD still resolves to the pinned commit.
+#
+# `plugins` holds paths relative to the repository root. "." means the
+# repository root is itself the plugin, which is true for three of the thirteen.
+# A path here is a plugin root: a directory containing `.claude-plugin/`.
+#
+# This file is data, not a test. Nothing reads it yet.
+
+[[repo]]
+name = "acostanzo/quickstop"
+url = "https://github.com/acostanzo/quickstop.git"
+sha = "b819fe74169e25382be42782ef004599e7248b3e"
+branch = "main"
+plugins = [
+  "plugins/claudit",
+]
+
+[[repo]]
+name = "AgriciDaniel/claude-seo"
+url = "https://github.com/AgriciDaniel/claude-seo.git"
+sha = "a1480c7e590b16001bd9dc1627eacdcd44d580f9"
+branch = "main"
+plugins = [
+  ".",
+]
+
+[[repo]]
+name = "anthropics/claude-code"
+url = "https://github.com/anthropics/claude-code.git"
+sha = "f1af9b1f4b1fd4c776135381606edada82ef638e"
+branch = "main"
+plugins = [
+  "plugins/agent-sdk-dev",
+  "plugins/claude-opus-4-5-migration",
+  "plugins/code-review",
+  "plugins/commit-commands",
+  "plugins/explanatory-output-style",
+  "plugins/feature-dev",
+  "plugins/frontend-design",
+  "plugins/hookify",
+  "plugins/learning-output-style",
+  "plugins/pr-review-toolkit",
+  "plugins/ralph-wiggum",
+  "plugins/security-guidance",
+]
+
+[[repo]]
+name = "georgeguimaraes/claude-code-elixir"
+url = "https://github.com/georgeguimaraes/claude-code-elixir.git"
+sha = "36ce0002f65b41d8c040a578c394049b1e7fea14"
+branch = "main"
+plugins = [
+  "plugins/elixir",
+  "plugins/elixir-lsp",
+  "plugins/mix-compile",
+  "plugins/mix-credo",
+  "plugins/mix-format",
+]
+
+[[repo]]
+name = "ivan-magda/claude-code-plugin-template"
+url = "https://github.com/ivan-magda/claude-code-plugin-template.git"
+sha = "4ce5572a16fa43f49d0f7ad2d4dfb947b0815011"
+branch = "main"
+plugins = [
+  "plugins/hello-world",
+  "plugins/plugin-development",
+]
+
+[[repo]]
+name = "mukiwu/muki-ai-plugins"
+url = "https://github.com/mukiwu/muki-ai-plugins.git"
+sha = "3f8755e45a4c30981d92cc1c0fa2a3f61220fe91"
+branch = "master"
+plugins = [
+  "plugins/figma-visual-reviewer",
+  "plugins/lore",
+  "plugins/review-tests",
+]
+
+[[repo]]
+name = "nagisanzenin/engram"
+url = "https://github.com/nagisanzenin/engram.git"
+sha = "0590eb8f008680acbfb5aaa4dbc73bf63ca643dd"
+branch = "main"
+plugins = [
+  ".",
+]
+
+[[repo]]
+name = "obra/superpowers-marketplace"
+url = "https://github.com/obra/superpowers-marketplace.git"
+sha = "1ab7b8eeef707f21565471f11d3782fac3dd1c61"
+branch = "main"
+plugins = [
+]
+
+[[repo]]
+name = "obra/superpowers"
+url = "https://github.com/obra/superpowers.git"
+sha = "b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
+branch = "main"
+plugins = [
+  ".",
+]
+
+[[repo]]
+name = "paddo/claude-tools"
+url = "https://github.com/paddo/claude-tools.git"
+sha = "b76c35180960ae33e9ae84db7bd2d9fd7f501b5e"
+branch = "main"
+plugins = [
+  "plugins/codex",
+  "plugins/dns",
+  "plugins/gemini-tools",
+  "plugins/grok",
+  "plugins/headless",
+  "plugins/kimi",
+  "plugins/miro",
+  "plugins/mobile",
+  "plugins/monday",
+  "plugins/whatsapp",
+]
+
+[[repo]]
+name = "Piebald-AI/claude-code-lsps"
+url = "https://github.com/Piebald-AI/claude-code-lsps.git"
+sha = "92afe66527c948082c1a751e484f6eaf20815b36"
+branch = "main"
+plugins = [
+]
+
+[[repo]]
+name = "trailofbits/skills-curated"
+url = "https://github.com/trailofbits/skills-curated.git"
+sha = "6d05be4889017b06fb15069f371afd220daffb62"
+branch = "main"
+plugins = [
+  "plugins/ffuf-web-fuzzing",
+  "plugins/ghidra-headless",
+  "plugins/humanizer",
+  "plugins/last30days",
+  "plugins/openai-cloudflare-deploy",
+  "plugins/openai-develop-web-game",
+  "plugins/openai-doc",
+  "plugins/openai-gh-address-comments",
+  "plugins/openai-gh-fix-ci",
+  "plugins/openai-jupyter-notebook",
+  "plugins/openai-netlify-deploy",
+  "plugins/openai-pdf",
+  "plugins/openai-playwright",
+  "plugins/openai-screenshot",
+  "plugins/openai-security-best-practices",
+  "plugins/openai-security-ownership-map",
+  "plugins/openai-security-threat-model",
+  "plugins/openai-sentry",
+  "plugins/openai-spreadsheet",
+  "plugins/openai-yeet",
+  "plugins/planning-with-files",
+  "plugins/productivity",
+  "plugins/python-code-simplifier",
+  "plugins/react-pdf",
+  "plugins/scv-scan",
+  "plugins/security-awareness",
+  "plugins/skill-extractor",
+  "plugins/wooyun-legacy",
+  "plugins/x-research",
+]
+
+[[repo]]
+name = "wshobson/agents"
+url = "https://github.com/wshobson/agents.git"
+sha = "38e19c20d2b154510b0e624a2e3e186b19b5c527"
+branch = "main"
+plugins = [
+  "plugins/accessibility-compliance",
+  "plugins/agent-orchestration",
+  "plugins/agent-teams",
+  "plugins/api-scaffolding",
+  "plugins/api-testing-observability",
+  "plugins/application-performance",
+  "plugins/arm-cortex-microcontrollers",
+  "plugins/avoid-ai-writing",
+  "plugins/backend-api-security",
+  "plugins/backend-development",
+  "plugins/before-you-build",
+  "plugins/block-no-verify",
+  "plugins/blockchain-web3",
+  "plugins/brand-landingpage",
+  "plugins/business-analytics",
+  "plugins/c4-architecture",
+  "plugins/cicd-automation",
+  "plugins/cloud-infrastructure",
+  "plugins/code-documentation",
+  "plugins/code-refactoring",
+  "plugins/codebase-cleanup",
+  "plugins/comprehensive-review",
+  "plugins/conductor",
+  "plugins/content-marketing",
+  "plugins/context-management",
+  "plugins/customer-sales-automation",
+  "plugins/data-engineering",
+  "plugins/data-validation-suite",
+  "plugins/database-cloud-optimization",
+  "plugins/database-design",
+  "plugins/database-migrations",
+  "plugins/debugging-toolkit",
+  "plugins/dependency-management",
+  "plugins/deployment-strategies",
+  "plugins/deployment-validation",
+  "plugins/developer-essentials",
+  "plugins/dgx-spark-ops",
+  "plugins/distributed-debugging",
+  "plugins/documentation-generation",
+  "plugins/documentation-standards",
+  "plugins/dotnet-contribution",
+  "plugins/error-debugging",
+  "plugins/error-diagnostics",
+  "plugins/file-conversion",
+  "plugins/framework-migration",
+  "plugins/frontend-mobile-development",
+  "plugins/frontend-mobile-security",
+  "plugins/full-stack-orchestration",
+  "plugins/functional-programming",
+  "plugins/game-development",
+  "plugins/git-pr-workflows",
+  "plugins/hermes-tweet",
+  "plugins/hr-legal-compliance",
+  "plugins/incident-response",
+  "plugins/javascript-typescript",
+  "plugins/julia-development",
+  "plugins/jvm-languages",
+  "plugins/kubernetes-operations",
+  "plugins/llm-application-dev",
+  "plugins/llm-finetuning",
+  "plugins/machine-learning-ops",
+  "plugins/meigen-ai-design",
+  "plugins/multi-platform-apps",
+  "plugins/observability-monitoring",
+  "plugins/operating-kit",
+  "plugins/payment-processing",
+  "plugins/performance-testing-review",
+  "plugins/plugin-eval",
+  "plugins/pptx-deck-creation",
+  "plugins/protect-mcp",
+  "plugins/python-development",
+  "plugins/quantitative-trading",
+  "plugins/reverse-engineering",
+  "plugins/review-agent-governance",
+  "plugins/security-compliance",
+  "plugins/security-scanning",
+  "plugins/seo-analysis-monitoring",
+  "plugins/seo-content-creation",
+  "plugins/seo-technical-optimization",
+  "plugins/shell-scripting",
+  "plugins/ship-mate",
+  "plugins/signed-audit-trails",
+  "plugins/skill-forge-essentials",
+  "plugins/social-publishing",
+  "plugins/startup-business-analyst",
+  "plugins/systems-programming",
+  "plugins/tdd-workflows",
+  "plugins/team-collaboration",
+  "plugins/ui-design",
+  "plugins/unit-testing",
+  "plugins/web-scripting",
+]
+

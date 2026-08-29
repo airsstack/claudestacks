@@ -1,6 +1,7 @@
 ---
 status: approved
 created: 2026-08-29
+amended: 2026-08-30
 ---
 
 # Spec: claudevs answers to the plugin contract, not to this repository's plugins
@@ -13,6 +14,27 @@ settles, before publication freezes the answer, which parts of the public surfac
 
 Where this spec's findings contradict the intent's Evidence, §1 and §4.1 say so at the point of
 contradiction. Two claims in that Evidence did not survive re-checking.
+
+## Amendments — 2026-08-30
+
+Four claims about the Claude Code hooks reference were wrong, and were corrected while plan 01 was
+being executed. They originated in research done through a summarizing fetch tool, which truncates a
+long page and invents plausible content past the cutoff; the corrections come from the raw markdown of
+`code.claude.com/docs/en/hooks.md` (316,753 bytes) fetched with `curl` and grepped, so every one now
+carries a line citation.
+
+| § | Was | Is | Consequence |
+|---|---|---|---|
+| §1 | 31 documented events | **33** | catalogue length, and the test asserting it |
+| §1, §3.5 | bare stdout is context for 3 events | **4** — adds `PostModelSwitch` | `hooks.md:786` |
+| §1, §2.1 | the reference carries no per-event decision-control table | **it does**, `hooks.md:1011-1025`, covering all 33 | `DecisionMechanism` is twelve variants with no `Unspecified`, not four plus one |
+| §2.2 | one exact-match character set for all events | `FileChanged` and `StopFailure` use a **narrower** one, `hooks.md:301` | matcher evaluation takes the event, not only the value |
+
+The third is the one that changed a design rather than a number: §2.1's enum was shaped around a column
+that would be almost entirely `Unspecified`, on a premise one fetch of the page disproves.
+
+Anything in §3 through §7 not touched above was audited separately against the same artifact. Claims
+about `claudevs`' own source and about the corpus sweep are internal and were not part of that audit.
 
 ## 1. Design premises
 
@@ -50,15 +72,29 @@ Both populations account exactly, and both leave exactly one survivor: 77 dead-f
 40 / 26 / 5 / 5 with one residual, and 34 `refs` errors partition 29 / 3 / 1 with one residual. §4 gives
 each class and what survives it.
 
-**The documentation does not answer every question.** The hooks reference names the 31 events and
-states verbatim which ten take no matcher — `UserPromptSubmit`, `PostToolBatch`, `Stop`, `TeammateIdle`,
-`TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove`, `MessageDisplay`, `CwdChanged` —
-adding that a matcher on one of them "is silently ignored". It states that stdout is injected as context
-for exactly `UserPromptSubmit`, `UserPromptExpansion` and `SessionStart`. It does **not** carry a
-per-event decision-control table; the guide links a reference section that is not present on the page.
-The contract table must therefore be able to record "the documentation does not specify" and produce no
-finding from it. Inventing a rule to fill that gap would recreate the defect this chain exists to
-remove, one layer down.
+**The documentation answers more than this spec first credited.** Corrected during execution against
+the raw reference; every citation below is a line in `code.claude.com/docs/en/hooks.md` fetched as raw
+markdown rather than through a summarizing tool.
+
+The hooks reference names **33** events (summary table, 33 rows) — not 31, as this section originally
+said. It states verbatim which ten take no matcher — `UserPromptSubmit`, `PostToolBatch`, `Stop`,
+`TeammateIdle`, `TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove`, `MessageDisplay`
+(`hooks.md:327`), `CwdChanged` (`hooks.md:319`) — adding at `hooks.md:351` that "If you add a `matcher`
+field to an event without matcher support, it is silently ignored."
+
+It states that bare stdout is injected as context for **four** events, not three (`hooks.md:786`): "The
+exceptions are `UserPromptSubmit`, `UserPromptExpansion`, `SessionStart`, and `PostModelSwitch`, where
+Claude Code adds plain-text stdout as context that Claude can see and act on."
+
+It **does** carry a per-event decision-control table, at `hooks.md:1011-1025`, under
+`#### Decision control`. This section originally recorded the opposite — that the guide links a
+reference section absent from the page — and that error shaped §2.1. The table assigns all 33 events to
+one of twelve patterns, so there is no event whose decision mechanism the documentation leaves
+unstated.
+
+What remains true is the principle: where the documentation is silent, the contract table records that
+and produces no finding from it. Inventing a rule to fill a gap would recreate the defect this chain
+exists to remove, one layer down. It simply turns out that, for the decision column, there is no gap.
 
 **This corrects the intent on `SessionEnd`.** The intent's Evidence describes a probe carrying "bogus
 matchers on `UserPromptSubmit` and `SessionEnd` — both of which the runtime would ignore". Only the
@@ -95,10 +131,20 @@ is a translation step the plan performs once, per event, against the matcher-pat
 table's subject cannot be resolved to a payload field, the row records that and dispatch treats the
 event as unfiltered rather than guessing.
 
-The decision mechanism is a four-state value — `PermissionDecision`, `TopLevelBlock`, `BehaviorField`,
-`ExitTwo` — plus an explicit `Unspecified`. `Unspecified` is not a default meaning "probably none"; it
-means the documentation is silent, and no checker may emit a finding from it. An event whose decision
-shape is later documented becomes a one-line table edit.
+The decision mechanism transcribes the reference's `#### Decision control` table (`hooks.md:1011-1025`)
+into twelve variants — `TopLevelDecision`, `ExitCodeOrContinueFalse`, `ExitCodeOrTopLevelDecision`,
+`PermissionDecision`, `PermissionDecisionOrTopLevelDecision`, `DecisionBehavior`, `Retry`, `PathReturn`,
+`ElicitationAction`, `DisplayContent`, `ContextOnly`, `NoDecisionControl`.
+
+This section originally specified a four-state value plus an explicit `Unspecified`, on §1's premise
+that the reference carried no such table. It does, and it covers all 33 events, so there is deliberately
+**no `Unspecified` variant**: a value meaning "the documentation is silent" would have no rows. Note the
+distinction the enum has to keep — `NoDecisionControl` means the reference states this event has no
+decision control, which is a documented fact a checker may act on, not an absence of information.
+
+An event whose decision shape changes in a later Claude Code release becomes a one-line table edit. The
+principle the original `Unspecified` protected still stands and is now enforced by the type: no checker
+may emit a finding from an unstated fact, and there is no way to spell one.
 
 The catalogue deliberately does **not** carry a "can claudevs simulate this?" fact. That would be the
 same fact in two places, and §2.3 already answers it: an event is simulatable exactly when
@@ -132,6 +178,21 @@ contract module exists to prevent.
 
 Unanchored is preserved: `Edit.*` matches `NotebookEdit`, per the documentation's own example. claudevs
 does not tighten it.
+
+**The exact-match set is not the same for every event**, which this section originally missed.
+`hooks.md:301`: "`FileChanged` and `StopFailure` use a narrower exact-match set of letters, digits, `_`,
+and `|` only. A hyphen, space, or comma in a matcher for those two events keeps it on the
+regular-expression path, and only `|` separates alternatives. Every other event uses the wider set." So
+evaluation takes the event as well as the value — a `StopFailure` matcher of `code-reviewer` is an
+unanchored regex that also fires for `senior-code-reviewer`, where the same value on any other event is
+one exact string. The table above describes the wider set, which covers the other 31 events.
+
+Two further facts the reference states and this module records but does not act on. Comma separators
+and surrounding-whitespace tolerance require Claude Code v2.1.191 or later, and hyphens in the wider
+exact set require v2.1.195 or later (`hooks.md:297`, `:299`); claudevs models current behaviour only.
+And `FileChanged`'s matcher has a second role when building its watch list — split on `|`, each segment
+a literal filename, regex not meaningful (`hooks.md:2791`) — which is a different mechanism from the
+filtering matcher this module parses.
 
 ### 2.3 Two event types, deliberately
 
@@ -283,12 +344,20 @@ case can still assert too little.
 
 `harness/semantics.rs` sets `observed.decision` from exactly two sources — `permissionDecision` and
 `PreToolUse` exit 2 — and gates bare-stdout context injection on `SessionStart` alone. Both are
-corrected against the catalogue: the top-level `decision: "block"` field and
-`hookSpecificOutput.decision.behavior` are read, and stdout-as-context is keyed off the catalogue's
-flag, which the documentation sets for `UserPromptSubmit`, `UserPromptExpansion` and `SessionStart`.
+corrected against the catalogue: the top-level `decision: "block"` field (`hooks.md:1013`) and
+`hookSpecificOutput.decision.behavior` (`hooks.md:1018`) are read, and stdout-as-context is keyed off
+the catalogue's flag, which the documentation sets for **four** events — `UserPromptSubmit`,
+`UserPromptExpansion`, `SessionStart` and `PostModelSwitch` (`hooks.md:786`). This section originally
+named only the first three; the mechanism is unaffected, since it reads the catalogue rather than a list
+written here, but a reader working from the old sentence would have expected three.
+
+Reading the decision from the catalogue now means reading one of twelve mechanisms rather than the four
+this spec first assumed — see §2.1. The mechanisms `TopLevelDecision`, `PermissionDecision`,
+`DecisionBehavior` and the exit-code pair are the ones this section's correction depends on; the rest
+exist because the reference states them.
 
 The four `permissionDecision` values `allow` / `deny` / `ask` / `defer` were verified correct and
-complete. They are not touched.
+complete against `hooks.md:1016`. They are not touched.
 
 ### 3.6 Failures carry their evidence
 
@@ -543,12 +612,16 @@ raise it rather than deciding that type by hand.
 - Plugin cache staleness and dead registry entries. Separate chain, and §3.4 stays out of it: the
   synthetic registry keeps the shape-fidelity-only role `installed.rs:11-14` gives it, and no mechanism
   is invented here to point a hook at it.
-- Widening `types::HookEvent` toward all 31 events. §2.3 makes that unnecessary rather than deferring
+- Widening `types::HookEvent` toward all 33 events. §2.3 makes that unnecessary rather than deferring
   it.
 - Simulating events claudevs cannot synthesize a payload for. Recognising `Stop` in `check` is in
   scope; running a `Stop` case is not.
-- Filling the documentation's missing per-event decision-control table by inference. `Unspecified` is
-  the honest value and produces no finding.
+- Inferring a decision mechanism the reference does not state. This was written as a non-goal on the
+  premise that the reference had no per-event decision-control table; it has one, at
+  `hooks.md:1011-1025`, covering all 33 events, so nothing is inferred and the catalogue has no
+  `Unspecified` variant to spell. The non-goal survives as a rule for the next release that adds an
+  event: transcribe what the table says, or leave the row out — do not reason from what a similar event
+  does.
 - Reaching zero `refs` false positives. §4.1's fourth class needs authorial intent to resolve; one in
   156 is the target, not none.
 - Prompt-based, agent-based, `http` and `mcp_tool` hook handler types. `contract::handler` models

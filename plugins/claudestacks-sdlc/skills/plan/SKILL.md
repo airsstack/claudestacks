@@ -89,6 +89,28 @@ sentence without an "and". If a plan's goal sentence needs an "and", split it in
 plans. Tasks are not objectives — three tasks implementing parts of one feature belong in one
 plan.
 
+## Re-verify the spec's external claims before they become code
+
+A plan turns the spec's prose into constants, exhaustive matches, expected test values and literal
+lists — the exact forms that are painful to correct once written. **This is the last gate before
+someone writes code, and the spec is not a trustworthy source for facts about outside systems.**
+
+Before writing a task that encodes such a fact, check it against the artifact — not against the spec
+that supplied it. Fetch documentation as raw source into a local file and grep it (`curl -sS -L
+'<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"`); never through a summarizing fetch tool, which
+truncates long pages and invents plausible content past the cutoff. Prefer the shipped artifact —
+type declarations, the binary's `--help` — over documentation about it.
+
+Every count, exhaustive list, field name, and negative existence claim that reaches a task carries a
+citation to what you read: `<file>:<line>`. **Check exhaustive lists for completeness, not just for
+correctness** — a list where every entry is right but three entries are missing reads as verified and
+is not. Where a fact already lives in a type the plan is building, have the task read it from there
+rather than restating it; a second copy in a task is a copy that drifts.
+
+When the artifact contradicts the spec, do not quietly plan around it. Stop, tell the author which
+claim failed and what the artifact says, and fix the spec — a plan that faithfully implements a wrong
+spec still produces wrong code, and the sibling plans are still quoting the same wrong text.
+
 ## File structure first
 
 Before defining tasks, map the file changes, one sentence of responsibility each. Prefer a new

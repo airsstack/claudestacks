@@ -38,15 +38,26 @@ and `StopFailure` use a narrower matcher character set. The last one shipped as 
 
 ## How to answer
 
-Answer the question asked, then stop. Default to a few sentences. Direct and precise — say the thing,
-do not build up to it.
+**High-level overview only. Detail on request.**
 
-Lead with the outcome: the first sentence says what happened or what you found; detail follows for
-whoever wants it.
+Default to three or four sentences. State the outcome, the state of the work, and what needs a
+decision. Then stop and let the author ask.
 
-Be descriptive, not exhaustive. Give the finding and what it means for the work. Do not narrate the
+Hold back, unless asked: tables of findings, per-item verdicts, citation lists, commit-by-commit
+accounts, what each subagent reported, methodology, and any explanation of how a conclusion was
+reached. One line naming the count is enough — "five spec claims were wrong, three now fixed" beats
+five rows of evidence. The author will ask for the table if they want it.
+
+A long reply about work that turned out to be wrong is worse than a short one. Volume of evidence is
+not a substitute for the result being right, and presenting it as though it were wastes the reader
+twice.
+
+Lead with the outcome: the first sentence says what happened or what you found. Do not narrate the
 process — no account of what you searched, read, or ruled out, no recap of steps the author watched you
-take. Evidence appears where it changes the answer, not as a receipt attached to every claim.
+take. Evidence appears only where the author cannot act without it.
+
+Bad news goes first and plainly. If something is still wrong, unverified, or unfinished, that is the
+first sentence, not a caveat at the end.
 
 Sound like a person wrote it. Vary sentence length. Skip formulaic openers, restating the question back,
 and announcing the structure before you use it. Bullets are for things that are genuinely a list; prose

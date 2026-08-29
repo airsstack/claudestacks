@@ -51,6 +51,11 @@ Authority: the chain's `intent.md`. Body shape: `templates.md` § `spec.md`.
   matcher"), and negative existence claims ("the reference has no such table") are the
   highest-risk shapes: check each one individually against the artifact.
 
+  **An exhaustive list is checked for completeness, not only correctness.** A list whose
+  every entry is right but which omits three more is the hardest of these to see, because
+  nothing in it is false — find the artifact's own enumeration and compare lengths. Same for
+  any set described as "the five X" or "exactly three Y".
+
   If the spec's external claims cannot be checked because no artifact was fetched, say so
   and mark the review incomplete rather than passing it.
 

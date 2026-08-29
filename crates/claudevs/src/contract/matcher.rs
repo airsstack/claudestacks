@@ -48,6 +48,26 @@ impl PartialEq for MatcherRule {
     }
 }
 
+impl MatcherRule {
+    /// Whether this rule matches `subject`.
+    ///
+    /// The exact path compares whole strings; the regex path searches, since
+    /// the documented semantics are `RegExp.prototype.test` on an unanchored
+    /// pattern — the reference's own example has `Edit.*` reaching
+    /// `NotebookEdit`. An [`MatcherRule::Unsupported`] value matches nothing:
+    /// claudevs cannot evaluate it, and pretending it matched would route a
+    /// case to a handler the runtime might not have chosen.
+    #[must_use]
+    pub fn matches(&self, subject: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Exact(alternatives) => alternatives.iter().any(|a| a == subject),
+            Self::Regex(pattern) => pattern.is_match(subject),
+            Self::Unsupported { .. } => false,
+        }
+    }
+}
+
 /// The characters that keep a matcher on the exact-string path.
 const fn is_exact_mode_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | ' ' | ',' | '|')
@@ -82,6 +102,8 @@ pub fn parse(value: &str) -> MatcherRule {
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::panic, reason = "tests panic to reject an unexpected shape")]
+
     use super::{MatcherRule, parse};
 
     #[test]
@@ -118,5 +140,36 @@ mod tests {
     fn a_star_an_empty_string_and_nothing_all_match_everything() {
         assert_eq!(parse("*"), MatcherRule::All);
         assert_eq!(parse(""), MatcherRule::All);
+    }
+
+    #[test]
+    fn an_exact_list_matches_only_a_whole_element() {
+        let rule = parse("Edit|Write");
+        assert!(rule.matches("Edit"));
+        assert!(rule.matches("Write"));
+        assert!(!rule.matches("NotebookEdit"));
+        assert!(!rule.matches("Edit|Write"));
+    }
+
+    #[test]
+    fn a_regex_is_unanchored_so_edit_star_reaches_notebookedit() {
+        assert!(parse("Edit.*").matches("NotebookEdit"));
+    }
+
+    #[test]
+    fn all_matches_anything_including_the_empty_subject() {
+        assert!(parse("*").matches("Edit"));
+        assert!(parse("*").matches(""));
+    }
+
+    #[test]
+    fn an_unsupported_pattern_matches_nothing_and_says_which_engine_refused_it() {
+        let rule = parse("(?<=Edit)Write");
+        let MatcherRule::Unsupported { value, reason } = &rule else {
+            panic!("a lookbehind is not supported by Rust's regex crate: {rule:?}");
+        };
+        assert_eq!(value, "(?<=Edit)Write");
+        assert!(!reason.is_empty());
+        assert!(!rule.matches("EditWrite"));
     }
 }

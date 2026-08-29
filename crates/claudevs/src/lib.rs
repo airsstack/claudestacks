@@ -16,6 +16,7 @@ mod suite;
 
 pub mod case;
 pub mod check;
+pub mod contract;
 pub mod doctor;
 pub mod harness;
 pub mod layout;

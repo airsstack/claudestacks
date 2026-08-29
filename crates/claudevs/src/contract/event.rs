@@ -21,10 +21,15 @@ pub enum MatcherSupport {
     /// The event takes a matcher, and the reference names the payload field it
     /// is compared against.
     Field(&'static str),
-    /// The event takes a matcher, and the reference does not resolve its
-    /// subject to a named payload field — it describes what the matcher matches
-    /// in prose without naming the key it is read from. A caller that routes by
-    /// matcher treats such an event as unfiltered rather than guessing the key.
+    /// The event takes a matcher, and the reference names the payload field
+    /// the subject is derived from, but the matcher is compared against a
+    /// value Claude Code computes from that field, not the field's raw
+    /// value: the canonical model name derived from `to_model` for
+    /// `PreModelSwitch`/`PostModelSwitch`, or the changed file's basename
+    /// derived from `file_path` for `FileChanged`. A caller cannot recover
+    /// the compared value by reading the named key directly, so it must
+    /// treat such an event as unfiltered rather than comparing against that
+    /// key's raw value.
     Unresolved,
 }
 
@@ -299,13 +304,92 @@ pub fn lookup(name: &str) -> Option<&'static DocumentedEvent> {
     CATALOGUE.iter().find(|row| row.name == name)
 }
 
+/// The full documented-event catalogue, for a caller that needs to walk
+/// every row rather than look one up by name.
+///
+/// For example, checking whether a `matcher` was written on an event that
+/// takes none, or warning on an event name the reference does not document
+/// at all.
+#[must_use]
+pub const fn catalogue() -> &'static [DocumentedEvent] {
+    CATALOGUE
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MatcherSupport, lookup};
+    #![expect(
+        clippy::panic,
+        reason = "a missing fixture row means the test itself is broken, not the code under test"
+    )]
+
+    use super::{DecisionMechanism, DocumentedEvent, MatcherSupport, catalogue, lookup};
+
+    /// Looks up a row that a test expects the catalogue to contain, panicking
+    /// with the missing name if it doesn't — a broken fixture, not a normal
+    /// assertion failure.
+    fn must_lookup(name: &str) -> &'static DocumentedEvent {
+        lookup(name).unwrap_or_else(|| panic!("{name} should be documented but was not found"))
+    }
 
     #[test]
     fn the_catalogue_holds_every_documented_event() {
-        assert_eq!(super::CATALOGUE.len(), 33);
+        // hooks.md:37-69 — the summary table's "Event" column, in order.
+        assert_eq!(
+            super::CATALOGUE
+                .iter()
+                .map(|row| row.name)
+                .collect::<Vec<_>>(),
+            [
+                "SessionStart",
+                "Setup",
+                "UserPromptSubmit",
+                "UserPromptExpansion",
+                "PreToolUse",
+                "PermissionRequest",
+                "PermissionDenied",
+                "PostToolUse",
+                "PostToolUseFailure",
+                "PostToolBatch",
+                "Notification",
+                "MessageDisplay",
+                "SubagentStart",
+                "SubagentStop",
+                "TaskCreated",
+                "TaskCompleted",
+                "Stop",
+                "StopFailure",
+                "TeammateIdle",
+                "InstructionsLoaded",
+                "ConfigChange",
+                "CwdChanged",
+                "DirectoryAdded",
+                "FileChanged",
+                "WorktreeCreate",
+                "WorktreeRemove",
+                "PreCompact",
+                "PostCompact",
+                "PreModelSwitch",
+                "PostModelSwitch",
+                "Elicitation",
+                "ElicitationResult",
+                "SessionEnd",
+            ]
+        );
+    }
+
+    #[test]
+    fn every_catalogue_name_is_unique() {
+        use std::collections::HashSet;
+
+        let names: Vec<&str> = super::CATALOGUE.iter().map(|row| row.name).collect();
+        let unique: HashSet<&str> = names.iter().copied().collect();
+        assert_eq!(unique.len(), names.len(), "duplicate name in {names:?}");
+    }
+
+    #[test]
+    fn the_catalogue_function_returns_the_same_rows_as_lookup_sees() {
+        assert_eq!(catalogue().len(), super::CATALOGUE.len());
+        assert!(catalogue().iter().any(|row| row.name == "Stop"));
     }
 
     #[test]
@@ -360,11 +444,123 @@ mod tests {
         );
     }
 
+    /// Collects the names of every catalogue row carrying `mechanism`, sorted
+    /// so the comparison is order-independent.
+    fn names_with_decision(mechanism: DecisionMechanism) -> Vec<&'static str> {
+        let mut names: Vec<&'static str> = super::CATALOGUE
+            .iter()
+            .filter(|row| row.decision == mechanism)
+            .map(|row| row.name)
+            .collect();
+        names.sort_unstable();
+        names
+    }
+
+    fn sorted(mut names: Vec<&'static str>) -> Vec<&'static str> {
+        names.sort_unstable();
+        names
+    }
+
     #[test]
-    fn every_documented_event_has_a_stated_decision_mechanism() {
-        // The reference's "Decision control" table covers all 33 events, so no
-        // row may be left without one.
-        assert_eq!(super::CATALOGUE.len(), 33);
+    fn the_top_level_decision_group_matches_the_reference_exactly() {
+        // hooks.md:1013 — "UserPromptSubmit, UserPromptExpansion,
+        // PostToolUse, PostToolUseFailure, PostToolBatch, Stop, SubagentStop,
+        // ConfigChange, PreCompact".
+        assert_eq!(
+            names_with_decision(DecisionMechanism::TopLevelDecision),
+            sorted(vec![
+                "UserPromptSubmit",
+                "UserPromptExpansion",
+                "PostToolUse",
+                "PostToolUseFailure",
+                "PostToolBatch",
+                "Stop",
+                "SubagentStop",
+                "ConfigChange",
+                "PreCompact",
+            ])
+        );
+    }
+
+    #[test]
+    fn the_exit_code_or_continue_false_group_matches_the_reference_exactly() {
+        // hooks.md:1014 — "TeammateIdle, TaskCompleted".
+        assert_eq!(
+            names_with_decision(DecisionMechanism::ExitCodeOrContinueFalse),
+            sorted(vec!["TeammateIdle", "TaskCompleted"])
+        );
+    }
+
+    #[test]
+    fn the_context_only_group_matches_the_reference_exactly() {
+        // hooks.md:1024 — "SessionStart, SubagentStart, PostModelSwitch".
+        assert_eq!(
+            names_with_decision(DecisionMechanism::ContextOnly),
+            sorted(vec!["SessionStart", "SubagentStart", "PostModelSwitch"])
+        );
+    }
+
+    #[test]
+    fn the_no_decision_control_group_matches_the_reference_exactly() {
+        // hooks.md:1025 — "Setup, WorktreeRemove, Notification, SessionEnd,
+        // PostCompact, InstructionsLoaded, StopFailure, CwdChanged,
+        // DirectoryAdded, FileChanged".
+        assert_eq!(
+            names_with_decision(DecisionMechanism::NoDecisionControl),
+            sorted(vec![
+                "Setup",
+                "WorktreeRemove",
+                "Notification",
+                "SessionEnd",
+                "PostCompact",
+                "InstructionsLoaded",
+                "StopFailure",
+                "CwdChanged",
+                "DirectoryAdded",
+                "FileChanged",
+            ])
+        );
+    }
+
+    #[test]
+    fn each_single_event_decision_mechanism_pins_its_one_event() {
+        // hooks.md:1011-1025 — the "Decision control" table rows that name
+        // exactly one event each.
+        assert_eq!(
+            must_lookup("PreToolUse").decision,
+            DecisionMechanism::PermissionDecision,
+            "hooks.md:1016"
+        );
+        assert_eq!(
+            must_lookup("PermissionRequest").decision,
+            DecisionMechanism::DecisionBehavior,
+            "hooks.md:1018"
+        );
+        assert_eq!(
+            must_lookup("PermissionDenied").decision,
+            DecisionMechanism::Retry,
+            "hooks.md:1019"
+        );
+        assert_eq!(
+            must_lookup("WorktreeCreate").decision,
+            DecisionMechanism::PathReturn,
+            "hooks.md:1020"
+        );
+        assert_eq!(
+            must_lookup("MessageDisplay").decision,
+            DecisionMechanism::DisplayContent,
+            "hooks.md:1023"
+        );
+        assert_eq!(
+            must_lookup("TaskCreated").decision,
+            DecisionMechanism::ExitCodeOrTopLevelDecision,
+            "hooks.md:1015"
+        );
+        assert_eq!(
+            must_lookup("PreModelSwitch").decision,
+            DecisionMechanism::PermissionDecisionOrTopLevelDecision,
+            "hooks.md:1017"
+        );
     }
 
     #[test]
@@ -377,7 +573,7 @@ mod tests {
             "PermissionRequest",
             "PermissionDenied",
         ] {
-            let row = lookup(name).unwrap_or_else(|| unreachable!("{name} is documented"));
+            let row = must_lookup(name);
             assert_eq!(row.matcher, Field("tool_name"), "{name}");
         }
     }

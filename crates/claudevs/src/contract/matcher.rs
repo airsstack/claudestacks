@@ -6,7 +6,10 @@
 //! list of exact strings separated by `|` or `,` — and any other character
 //! makes the whole value a regular expression, matched **unanchored**. `"*"`,
 //! the empty string and an absent matcher all match everything, on every
-//! event.
+//! event. The reference (hooks.md:292) says "letters" without qualifying
+//! ASCII; this module's exact mode checks `is_ascii_alphanumeric`, so a
+//! non-ASCII letter such as `é` falls through to the regex path here — a
+//! divergence from the reference this module has not verified either way.
 //!
 //! `FileChanged` and `StopFailure` are the two exceptions: their exact-string
 //! set is narrower — letters, digits, `_`, and `|` only — so a hyphen, space,
@@ -14,11 +17,32 @@
 //! `|` separates alternatives (not `,`). Every other event uses the wider
 //! set above.
 //!
+//! Two behaviors the reference documents are version-gated and not modeled
+//! here: comma separators and surrounding-whitespace tolerance need Claude
+//! Code v2.1.191 or later (hooks.md:297), and hyphens in the wide exact set
+//! need v2.1.195 or later (hooks.md:299) — on an earlier version, a
+//! hyphenated value like `code-reviewer` is an unanchored regex that also
+//! fires for `senior-code-reviewer`. This module models current behavior
+//! only.
+//!
+//! `FileChanged`'s matcher value also builds its watch list, a role this
+//! module does not model. Per the reference (hooks.md:2791-2792), the same
+//! value is split on `|` and each segment is registered as a literal
+//! filename — regex patterns are not useful there, since a pattern is
+//! registered as a literal filename too — and `"*"` (hooks.md:2826) is
+//! registered as a literal file named `*`. This module parses only the
+//! *filtering* matcher, the value compared against the changed file's
+//! basename, not the watch list.
+//!
 //! The regex mode is JavaScript's, tested with `RegExp.prototype.test`. Rust's
 //! `regex` crate is a narrower dialect: it has no lookaround and no
 //! backreferences, so a pattern that is valid in Claude Code can fail to
 //! compile here. That divergence is reported as a warning naming the engine,
 //! never as an error, because the plugin is not the thing that is wrong.
+//! Rust's `regex` crate also treats `\d`, `\w`, `\b` and `.` as Unicode-aware
+//! by default, where JavaScript's `RegExp` without the `u` flag does not —
+//! so a `\w`-based matcher over a non-ASCII subject can match here and not
+//! in Claude Code, silently.
 //!
 //! One module owns this so that dispatch and the static checker can never
 //! disagree about what a matcher means.
@@ -32,13 +56,16 @@ pub enum MatcherRule {
     Exact(Vec<String>),
     /// Matches when the pattern is found anywhere in the subject.
     Regex(Box<regex::Regex>),
-    /// The value is regex-mode but Rust's `regex` crate rejects it. Carries
-    /// the value and the compile error so a caller can report which engine
-    /// refused it.
+    /// The value could not be resolved to a rule, for one of two reasons:
+    /// the value is regex-mode but Rust's `regex` crate rejects it, or the
+    /// value is exact-mode but holds only separator characters (`,`, `|`, or
+    /// whitespace) and so splits into zero non-empty alternatives — a case
+    /// the reference does not define. Carries the value and why it was
+    /// rejected so a caller can report it.
     Unsupported {
         /// The matcher value as written.
         value: String,
-        /// What Rust's `regex` crate said.
+        /// Why the value was rejected.
         reason: String,
     },
 }
@@ -90,16 +117,24 @@ const fn is_narrow_exact_char(c: char) -> bool {
 
 /// Hook events whose matcher uses [`is_narrow_exact_char`] instead of
 /// [`is_exact_mode_char`], and split alternatives on `|` only (not `,`).
+///
+/// This is a plain name list rather than a lookup into
+/// [`crate::contract::event`]'s catalogue: parsing needs nothing about an
+/// event beyond whether its name is one of these two, so there is no reason
+/// to require a resolved [`crate::contract::event::DocumentedEvent`] just to
+/// ask that. A test below pins both names against the catalogue so a rename
+/// there cannot silently orphan this list.
 const NARROW_EXACT_SET_EVENTS: [&str; 2] = ["FileChanged", "StopFailure"];
 
 /// Parses a `matcher` value into the rule that evaluates it.
 ///
 /// `event` is the hook event name the matcher belongs to (for example
-/// `"PreToolUse"`). It is a plain `&str` rather than a dedicated event type:
-/// this module owns only the matcher-parsing contract, and the narrow-set
-/// rule needs nothing about an event beyond its name, so borrowing the
-/// caller's string keeps this module free of a dependency on the event
-/// catalog being written elsewhere in `contract/`.
+/// `"PreToolUse"`). It takes a plain `&str` rather than a
+/// [`crate::contract::event::DocumentedEvent`] because the only thing this
+/// function needs about an event is its name, to check it against the
+/// narrow exact-mode set — requiring a resolved catalogue row would force
+/// every caller to look the event up first, even one that already has
+/// nothing but the raw event name from JSON.
 #[must_use]
 pub fn parse(event: &str, value: &str) -> MatcherRule {
     if value.is_empty() || value == "*" {
@@ -119,7 +154,12 @@ pub fn parse(event: &str, value: &str) -> MatcherRule {
             .filter(|part| !part.is_empty())
             .collect();
         return if alternatives.is_empty() {
-            MatcherRule::All
+            MatcherRule::Unsupported {
+                value: value.to_owned(),
+                reason: "the value holds only separator characters, so it splits into zero \
+                         alternatives; the reference does not define this case"
+                    .to_owned(),
+            }
         } else {
             MatcherRule::Exact(alternatives)
         };
@@ -259,5 +299,48 @@ mod tests {
     fn a_star_and_empty_string_match_everything_on_the_narrow_path_too() {
         assert_eq!(parse("StopFailure", "*"), MatcherRule::All);
         assert_eq!(parse("FileChanged", ""), MatcherRule::All);
+    }
+
+    #[test]
+    fn a_non_ascii_letter_takes_the_regex_path() {
+        // hooks.md:292 says "Only letters, digits, `_`, `-`, spaces, `,`, and
+        // `|`" without qualifying "letters" as ASCII. This module's exact
+        // mode is ASCII-only (`is_ascii_alphanumeric`), so a non-ASCII letter
+        // like `é` falls through to the regex path here. Whether Claude Code
+        // does the same is not verified; this test pins current behavior so
+        // a future change to it is deliberate, not accidental.
+        assert!(matches!(parse("PreToolUse", "café"), MatcherRule::Regex(_)));
+    }
+
+    #[test]
+    fn a_separators_only_value_is_unsupported_not_all() {
+        // hooks.md's matcher table (around line 291) grants "Match all" only
+        // to `"*"`, `""`, or an omitted matcher. It does not say what a value
+        // made only of separator characters does, so treating it as `All`
+        // would be an unverified guess in the most permissive direction.
+        for value in [",", "|", " ", "|,", ", "] {
+            let rule = parse("PreToolUse", value);
+            assert!(
+                matches!(rule, MatcherRule::Unsupported { .. }),
+                "{value:?} should be Unsupported, got {rule:?}"
+            );
+            assert!(!rule.matches("Edit"), "{value:?} should match nothing");
+            assert!(!rule.matches(""), "{value:?} should match nothing");
+        }
+    }
+
+    #[test]
+    fn narrow_exact_set_events_are_both_documented() {
+        // NARROW_EXACT_SET_EVENTS names two events by string rather than by
+        // catalogue row (see its doc comment for why). This pins that both
+        // names still exist in `contract::event`'s catalogue, so a rename
+        // there cannot silently orphan this list.
+        let names: Vec<&str> = super::super::event::catalogue()
+            .iter()
+            .map(|row| row.name)
+            .collect();
+        for event in super::NARROW_EXACT_SET_EVENTS {
+            assert!(names.contains(&event), "{event} should be documented");
+        }
     }
 }

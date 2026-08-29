@@ -12,8 +12,8 @@
 //! [`crate::types::HookEvent`]'s answer, and the two are deliberately separate
 //! types over overlapping sets.
 //!
-//! Export-only: module docs plus `mod` and `pub use`, no logic, and therefore
-//! no colocated test module.
+//! This module re-exports [`event`] and [`matcher`] and carries no logic of
+//! its own.
 
 pub mod event;
 pub mod matcher;

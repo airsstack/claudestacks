@@ -52,6 +52,23 @@ pub fn from_entry(entry: &serde_json::Value) -> Option<HookCommand> {
     })
 }
 
+impl HookCommand {
+    /// The handler as text, for substring matching and for reporting.
+    ///
+    /// One definition so the `hook:` disambiguator and a failure message can
+    /// never disagree about what a handler is called. For an exec handler
+    /// this is the argv actually spawned, joined by single spaces — the thing
+    /// a shell-only reading of `hooks.json` makes invisible.
+    #[must_use]
+    pub fn display(&self) -> String {
+        match self {
+            Self::Shell(command) => command.clone(),
+            Self::Exec { program, args } if args.is_empty() => program.clone(),
+            Self::Exec { program, args } => format!("{program} {}", args.join(" ")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{HookCommand, from_entry};
@@ -97,5 +114,31 @@ mod tests {
     fn an_entry_that_cannot_be_parsed_is_skipped_not_an_error() {
         assert_eq!(from_entry(&serde_json::json!(42)), None);
         assert_eq!(from_entry(&serde_json::json!({"type": "command"})), None);
+    }
+
+    #[test]
+    fn a_shell_handler_displays_as_its_command_string() {
+        assert_eq!(
+            HookCommand::Shell(String::from("echo hi")).display(),
+            "echo hi",
+        );
+    }
+
+    #[test]
+    fn an_exec_handler_displays_as_the_argv_it_spawns() {
+        let handler = HookCommand::Exec {
+            program: String::from("sh"),
+            args: vec![String::from("-c"), String::from("echo hi")],
+        };
+        assert_eq!(handler.display(), "sh -c echo hi");
+    }
+
+    #[test]
+    fn an_exec_handler_with_no_args_displays_as_its_program_alone() {
+        let handler = HookCommand::Exec {
+            program: String::from("true"),
+            args: Vec::new(),
+        };
+        assert_eq!(handler.display(), "true");
     }
 }

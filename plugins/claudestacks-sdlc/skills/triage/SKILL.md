@@ -45,6 +45,25 @@ an overridable assumption in the dialogue ("this looks tied to the `clauders::tr
 `ad6c1af` — is that right, or unrelated?") rather than presenting it as settled fact; the user can correct
 it in one answer.
 
+## Evidence about an outside system is cited or dropped
+
+A spike's findings routinely mix two kinds of claim: what *this* code did, and what some
+external system *specifies*. The first is grounded by the log you are holding. The second is
+not, and it is the one that propagates — an intent's "the reference documents N events" or
+"stdout is injected for these three events" becomes the spec's premise, then the plan's
+constants, then a test's expected value, and every review along the way checks it against the
+document above rather than against the world.
+
+So: any claim here about an outside system carries a citation to an artifact you fetched, in
+the form `<local file>:<line>` or a version and byte offset. Fetch documentation as raw source
+into a local file and grep it — `curl -sS -L '<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"` —
+rather than through a summarizing fetch tool, which truncates long pages and invents plausible
+content past the cutoff without erroring.
+
+Counts, exhaustive lists, and negative existence claims are the shapes that go wrong most
+often. Check each individually. An uncitable claim is written as "not verified" or left out
+entirely; it does not enter the Evidence section as a bare assertion.
+
 ## Short evidence-seeded dialogue
 
 Once the deterministic pass is done, ask what is left — usually one or two questions, not the 3–5 `intent`

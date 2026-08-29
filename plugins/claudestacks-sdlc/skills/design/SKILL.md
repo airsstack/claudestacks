@@ -65,7 +65,35 @@ is visible.
    plugin is not installed — do the locating inline here and tell the user the agent was
    unavailable. Never fail hard for want of the main plugin.
 
-4. **Ask clarifying questions one at a time.** Surface the questions that matter most
+4. **Ground every external claim against the artifact, before writing any of them down.**
+   A spec that describes an outside system — a documented API, a CLI's behaviour, a file
+   format, a wire protocol — is asserting facts this repository does not own. Fetch the
+   artifact and read it. For documentation, download the raw source to a local file and
+   grep it:
+
+   ```
+   curl -sS -L '<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"
+   ```
+
+   **Do not use a summarizing fetch tool for this.** Such tools truncate long pages and
+   hand the remainder to a small model, which emits plausible invented content instead of
+   an error — repeated fetches of the same section can return contradictory schemas. Prefer
+   the shipped artifact over documentation about it: type declarations, the sdist, the
+   binary's `--help`.
+
+   Every external claim that reaches `spec.md` carries a citation to what you actually read
+   — `<local file>:<line>`, a byte offset, a version. A claim you cannot cite does not go
+   in the spec; write "not verified" or leave it out. Counts, exhaustive lists, and
+   negative existence claims ("the reference documents no such field") are the shapes that
+   go wrong most often and cost most later — check each one individually.
+
+   An inherited claim is not a verified one. If the intent already asserts an external
+   fact, that is where the error is most likely to be: **verify it here rather than
+   carrying it forward.** Every downstream gate compares documents to each other, so a
+   wrong fact admitted at this step is confirmed by every later review and surfaces only
+   when code meets reality.
+
+5. **Ask clarifying questions one at a time.** Surface the questions that matter most
    for the design: purpose, constraints, success criteria, non-goals. Prefer
    multiple-choice questions where natural — they give the user concrete options and
    keep the dialogue moving. Never ask a battery of questions at once; ask one, get the
@@ -73,12 +101,12 @@ is visible.
    written; anything derivable from the intent, the repo, or a loaded guideline is
    derived and stated as an overridable assumption.
 
-5. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
+6. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
    or three distinct approaches along with their trade-offs. Lead with your
    recommendation and explain why you favor it. Invite the user to redirect before
    committing to any path.
 
-6. **Present the design section by section.** Walk through the design in sections
+7. **Present the design section by section.** Walk through the design in sections
    scaled to their complexity. At minimum, cover architecture, key components and their
    responsibilities, data flow, error handling, and testing strategy. Each section must
    conform to the active stack's guideline architecture rules loaded in step 3 — call
@@ -86,14 +114,14 @@ is visible.
    section, confirm the user's understanding and agreement before moving to the next.
    This incremental gate catches disagreements early, before the full spec is written.
 
-7. **Write the spec.** Once the design is agreed upon, write `spec.md` in the chain
+8. **Write the spec.** Once the design is agreed upon, write `spec.md` in the chain
    directory, in the body shape from `${CLAUDE_PLUGIN_ROOT}/references/templates.md`,
    with `status: draft` frontmatter. Carry forward any provenance frontmatter
    (`derived-from-prd` / `derived-from-rfc`) the intent or this dialogue names. The spec
    is the durable record — write it to stand on its own without reference to this
    conversation.
 
-8. **Review the spec — by an agent, not by yourself.** You wrote every line of this
+9. **Review the spec — by an agent, not by yourself.** You wrote every line of this
    spec and held the dialogue that produced it, so you are the weakest available reader
    of it. Spawn `claudestacks-sdlc:artifact-reviewer` over the draft:
 
@@ -119,15 +147,15 @@ is visible.
    criteria inline yourself and tell the user the review ran inline — never skip the
    review for want of the agent.
 
-9. **User review gate.** Ask the user to read the spec file you just wrote and give
+10. **User review gate.** Ask the user to read the spec file you just wrote and give
    explicit approval. This is a mandatory stop, not a formality. If they request
    changes — small clarifications or significant redesigns — revise the spec and re-run
-   step 8's agent review over the revised draft, incrementing `<NN>`. Only on explicit
+   step 9's agent review over the revised draft, incrementing `<NN>`. Only on explicit
    approval, flip `spec.md`'s frontmatter
    `status: draft → approved` as the last step of this interaction. Committing the spec
    is the user's call — do not auto-commit.
 
-10. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
+11. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
     already `approved`: rename the existing file to `spec-superseded-YYYY-MM-DD.md`
     (today's date), then flip that renamed file's frontmatter
     `status: approved → superseded` — `artifact-chain.md` §7.2 assigns this transition
@@ -135,7 +163,7 @@ is visible.
     then write a fresh `spec.md` with `status: draft`, starting again from step 1.
     `spec.md` — the unsuffixed name — is always the governing spec for the chain.
 
-11. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
+12. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
     write code or scaffold files yourself; the approved spec is the handoff artifact.
 
 ## Design for isolation

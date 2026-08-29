@@ -17,9 +17,24 @@ something you opened in the current task. Not memory, not inference, not plausib
 - **A passing test proves nothing until you have seen it fail.** Break the fix, watch it go red.
 - **Prefer the shipped artifact** — `sdk.d.ts`/`sdk.mjs`, the Python sdist, the binary — over
   documentation about them, and documentation over recollection.
+- **Get the artifact into a local file, then grep it.** For the Claude Code docs that means
+  `curl -sS -L 'https://code.claude.com/docs/en/<page>.md' -o <scratch>/<page>.md`. **Never WebFetch
+  these URLs.** WebFetch truncates the page and hands the remainder to a summarizing model, which
+  invents plausible content past the cutoff without erroring — three fetches of the same section
+  returned `session_start_reason`, then `resume_reason`, then a decision table that does not exist.
+  A summary of the artifact is not the artifact.
+- **A review pass cannot validate a premise nobody checked.** Reviewers — human or agent — check
+  internal consistency and conformance to an upstream document. They do not re-derive external facts,
+  so repeated rounds raise confidence in a false premise without ever testing it. Ground every
+  external claim against the artifact *before* it becomes the authority downstream work builds on.
 
 This has produced real defects: wrong claims reached committed docs, and a workstream was scoped out
-entirely on an unverified negative.
+entirely on an unverified negative. The claudevs plugin-correctness spec was researched through
+WebFetch and survived four `artifact-reviewer` rounds carrying four wrong facts about the hooks
+reference — 31 events instead of 33, three stdout-as-context events instead of four, "no per-event
+decision-control table exists" when it sits at `hooks.md:1011-1025`, and no mention that `FileChanged`
+and `StopFailure` use a narrower matcher character set. The last one shipped as a real bug. One
+`curl` of the 316,753-byte page answered all four by grep.
 
 ## How to answer
 
@@ -173,6 +188,22 @@ ships a README under `plugins/<name>/README.md`.
 Two plugins from the previous suite did not come across: the Open Knowledge Format toolkit, whose
 `knowledge/` bundle was never migrated, and the plugin-development cache-sync hook, which has no
 replacement here.
+
+### When execution disproves the spec
+
+Executing a plan is the first time a spec's claims meet the artifact they describe, so this is where
+a wrong premise surfaces. When it does, the code fix is only half the work — the other half is that
+the chain now lies to whoever executes the next plan.
+
+Stop and put it to the author as its own question: *the spec's premise is disproven, amend now or
+after this plan?* Do not fold it into a question about the implementation and read the answer as
+covering both — approving a code change is not approving the record. Sibling plans were written
+against the old text and cannot see the commit that corrected it; a commit body is not where the next
+plan's author looks.
+
+Superseding an approved spec belongs to the `design` skill (rename to `spec-superseded-YYYY-MM-DD.md`,
+flip its status, write a fresh draft), and the author authorizes it. "Not without asking" means
+*asking*, not carrying on quietly.
 
 ## Before re-deriving, query the stores
 

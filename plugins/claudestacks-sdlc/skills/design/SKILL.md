@@ -34,6 +34,39 @@ presented a complete design AND received explicit user approval. This rule holds
 regardless of how simple the work appears. A simple intent may produce a short spec, but
 the spec must still be written, presented, and approved before moving forward.
 
+## Zero assumptions — every claim is proven before it enters the spec
+
+**A spec contains no assumptions, no predictions, and no recollections. Only claims you
+proved in this task.** Plausibility is not evidence. "This is how it surely works" is not
+evidence. A prior artifact in this chain asserting it is not evidence — inherited claims are
+where errors concentrate, because nothing downstream re-checks them.
+
+Before a claim reaches `spec.md`, classify it and produce the matching proof:
+
+| Claim about | Proof required |
+|---|---|
+| This codebase's behaviour | A **temporary test or probe you ran**, with its real output. Not a reading of the source — run it. |
+| This codebase's structure | `file:line` you opened in this task. |
+| An external system's documented behaviour | The artifact fetched to a local file, cited `<file>:<line>`, quoted verbatim. |
+| An external tool's actual behaviour | The command run and its real output, pasted. |
+| A count, or an exhaustive list | The command that produced it (`grep -c`, the artifact's own enumeration), and its output. |
+| A negative — "X does not exist", "there is no such flag" | The exact search run, plus a **control**: the same method finding a sibling you know is present. Without the control the search proves nothing. |
+
+**Write throwaway tests to settle behavioural questions.** Does the harness actually drop
+`args`? Write a probe plugin and run it. Does this assertion ever fail? Break it and watch.
+Does the tool accept that flag? Run it with the flag. A temporary test that is run and
+deleted is worth more than any amount of reasoning about the source, and it is the only way
+to catch a behaviour that differs from what the code appears to say. Delete the probes
+afterwards; keep their output in the spec as the evidence.
+
+Record the evidence inline, next to the claim, at the precision someone else could re-run.
+A spec section whose claims carry no citations is not finished, however confident it reads.
+
+**A claim you cannot prove does not go in.** Write "not verified" beside it, or leave it out
+and say so in the dialogue. An unproven claim admitted here becomes a plan's constant, then a
+test's expected value, and every gate between here and there compares documents to each other
+rather than to the world — so it will not be caught until code meets reality.
+
 ## Checklist
 
 Work through these steps in order. Create a `TodoWrite` item for each step so progress

@@ -36,6 +36,13 @@ Authority: the chain's `intent.md`. Body shape: `templates.md` § `spec.md`.
 - **Ambiguity** — anywhere the spec reads two ways. Name both readings.
 - **Intent tracing** — every section roots in the intent's problem or desired outcome. A
   section with no root is scope creep: it gets cut, or the intent itself has to grow.
+- **Every claim carries its proof, and the proof is the right kind.** The spec's rule is
+  zero assumptions: a behavioural claim about the codebase needs a probe that was run and
+  its output, not a reading of the source; a structural claim needs `file:line`; a count or
+  exhaustive list needs the command that produced it; a negative needs the search plus a
+  control showing that search finds a sibling that does exist. A claim with no evidence is
+  a finding even when it is probably true — "probably true" is exactly the state this rule
+  exists to eliminate. Re-run the cheap ones yourself and report any whose output differs.
 - **External claims are cited, and the citations resolve.** Every assertion about a system
   outside this repository — a documented API, a CLI's behaviour, a file format, a wire
   protocol — carries a citation to a fetched artifact (`<local file>:<line>`, a byte

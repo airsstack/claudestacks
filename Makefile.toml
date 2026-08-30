@@ -171,15 +171,16 @@ description = "claudevs check over the fixture plugin corpus, both directions"
 # stopped. `claude` is absent on the runner, so the validate stage skips and
 # the deterministic stages carry the gate, which is the documented degradation.
 #
-# `claude plugin validate --strict` on this machine (claude 2.1.237) passes all
-# four fixtures except bad-matcher-plugin, which it rejects with exit 1
-# ("hooks.PreToolUseX: Invalid key in record"). That means locally the validate
-# stage catches bad-matcher-plugin and stops the pipeline before wiring ever
-# runs — the matcher checker itself is never exercised on this machine. On the
-# CI runner, where `claude` is absent, validate reports itself skipped and the
-# deterministic matcher checker is what produces the same exit 1. Same exit
-# code, different stage; do not read a local pass as proof the matcher checker
-# works — only the CI run does that.
+# `claude plugin validate`, run without `--strict` (the CLI's own default),
+# still rejects bad-matcher-plugin on a machine that has `claude` installed:
+# exit 1, "hooks.PreToolUseX: Invalid key in record". A failing stage no
+# longer stops the run, so the wiring stage runs right after it and reports
+# its own FAIL for the same fixture (an unknown hook event and an
+# unparseable matcher regex) — both FAIL lines show up in one report. On the
+# CI runner, where `claude` is absent, validate reports itself skipped and
+# wiring's FAIL is the only one produced. Either way wiring FAILs, and that
+# is the stage this lane asserts — so the deterministic matcher checker is
+# exercised here and on CI alike, and a local pass is evidence for both.
 #
 # `root` is deliberately relative: `claudevs check` resolves `plugin_dir` to
 # an absolute path once, up front, and uses that single value for both the
@@ -264,27 +265,19 @@ expect_stage_fail() {
     echo "ok  $plugin (FAIL $stage)"
 }
 
-# bad-matcher-plugin is the one fixture whose failing stage depends on the
-# machine, per the comment above: `claude` present (this machine) catches it at
-# validate before wiring ever runs; `claude` absent (CI) means the
-# deterministic wiring matcher checker catches the same defect instead. Accept
-# either stage here rather than asserting one, so this lane is not
-# machine-dependent while every other assertion still pins an exact stage.
-expect_stage_fail_either() {
-    plugin="$1"; want_exit="$2"; stage_pattern="$3"; label="$4"
-    _run "$plugin" "$want_exit"
-    if ! echo "$out" | grep -Eq "^  FAIL  ($stage_pattern)\$"; then
-        echo "claudevs check $plugin: expected FAIL at $label, got:" >&2
-        echo "$out" >&2
-        exit 1
-    fi
-    echo "ok  $plugin (FAIL $label)"
-}
+# bad-matcher-plugin FAILs at wiring on every machine: the wiring checkers are
+# native and run whether or not `claude` is installed. Where `claude` IS
+# installed the validate stage FAILs too, and since a failing stage no longer
+# stops the run, both FAIL lines land in one report. `expect_stage_fail` greps
+# for its own stage's line rather than requiring it to be the only FAIL, so
+# pinning `wiring` here holds in both environments — and, unlike accepting
+# "validate or wiring", it still fails this lane if the matcher checker ever
+# stops reporting.
 
 expect_no_fail minimal-plugin 0
 expect_no_fail dead-script-plugin 0
 expect_stage_fail escape-plugin 1 wiring
-expect_stage_fail_either bad-matcher-plugin 1 "validate|wiring" "validate or wiring"
+expect_stage_fail bad-matcher-plugin 1 wiring
 '''
 
 [tasks.install-airsl]

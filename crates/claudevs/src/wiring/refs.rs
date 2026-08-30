@@ -74,10 +74,13 @@ pub fn check(plugin_dir: &Path) -> Result<Vec<Finding>> {
         if !entry.file_type().is_file() {
             continue;
         }
-        let relative = entry
-            .path()
-            .strip_prefix(plugin_dir)
-            .unwrap_or_else(|_| entry.path());
+        // `WalkDir` is rooted at `plugin_dir`, so every entry it yields is a
+        // descendant and the strip always succeeds. Skipping beats falling
+        // back to the unstripped path, which would put an absolute path in the
+        // `file` field of every finding built from this entry.
+        let Ok(relative) = entry.path().strip_prefix(plugin_dir) else {
+            continue;
+        };
         if !crate::contract::site::is_loaded_file(relative) {
             continue;
         }

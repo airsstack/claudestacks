@@ -11,6 +11,26 @@
 //! step in this repository that touches the network. `cargo test` neither runs
 //! this nor fails when the corpus is missing; `cargo make corpus-check`
 //! reaches it with `--ignored`.
+//!
+//! Know what this lane can execute before fetching it. `claudevs check` runs a
+//! plugin's case suite whenever the plugin carries one, and a declared native
+//! suite is not confined: `src/native/declared.rs:66` hands each `run` string
+//! from the plugin's own `claudevs.toml` to `run_shell` (imported at `:20`),
+//! which is a shell carrying this process's privileges. Lua cases are confined
+//! — `Policy::confined()` at `src/case/lua.rs:91` and `:116` grants them no
+//! filesystem, process or network capability.
+//!
+//! None of the pinned repositories ships a case file today, so no third-party
+//! code actually runs. The snapshot's `Skipped` on both suite stages of all 156
+//! roots is consistent with that but does not establish it: `src/check.rs:164`
+//! maps `Error::Marketplace` and `Error::Layout` to `Skipped` alongside
+//! `Error::NoCases`, so a `Skipped` column alone leaves three explanations
+//! open. The claim comes from the checkouts instead — walking each root's
+//! `tests/` tree and finding nothing `src/case/discover.rs:71` would classify
+//! as a case, on trees that do hold files, three of them. Re-derive it the same
+//! way after a repin rather than reading it off the column. That is a fact
+//! about those thirteen upstreams, not a guarantee this lane offers, and the
+//! next repin can change it. Fetch and sweep only what you are willing to run.
 
 #![expect(
     clippy::expect_used,
@@ -22,7 +42,9 @@
 )]
 
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::fmt::Write as _;
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
 /// One pinned repository from the corpus manifest.
@@ -31,6 +53,15 @@ struct Repo {
     name: String,
     url: String,
     sha: String,
+    /// The branch the pinned `sha` sat on when the corpus was measured.
+    ///
+    /// Nothing fetches by it: `corpus-fetch` reads only `name`, `url` and
+    /// `sha` from this manifest and clones with
+    /// `git fetch --depth 1 origin <sha>`. It is recorded so that a human
+    /// repinning a repository knows which history the commit came from —
+    /// twelve of the thirteen are `main` and one is `master`, so the answer is
+    /// not guessable. The manifest assertion below only keeps it from being
+    /// recorded empty.
     branch: String,
     plugins: Vec<String>,
 }
@@ -84,11 +115,95 @@ fn corpus_root() -> PathBuf {
     root
 }
 
+/// The `claude` binary the `validate` stage delegates to.
+///
+/// That stage degrades to `Skipped` when the binary is absent rather than
+/// failing the run, so a sweep on a machine without it records
+/// `validate=Skipped` on every root while the committed snapshot records the
+/// real `Passed`/`Failed` verdicts. All 156 rows would then diverge for an
+/// environmental reason and read as a change in what claudevs reports, so the
+/// precondition is stated up front instead. Resolving the path is enough; the
+/// binary is not spawned here.
+///
+/// The decision itself lives in [`claude_resolves_in`], which takes the `PATH`
+/// value rather than reading the environment, so it can be exercised against a
+/// synthetic one.
+fn require_claude_on_path() {
+    assert!(
+        claude_resolves_in(std::env::var_os("PATH").as_deref()),
+        "`claude` is not on PATH; the sweep delegates its `validate` stage to that \
+         binary and the committed snapshot records the verdicts it returned, so \
+         without it every root would render `validate=Skipped` and the snapshot \
+         comparison would fail for an environmental reason rather than a real one"
+    );
+}
+
+/// Whether a spawnable `claude` resolves in the `PATH` value `path`.
+///
+/// Executability is part of the question, not a refinement of it. The
+/// `validate` stage spawns the binary — `src/validate.rs:97` hands the argv to
+/// the process harness — so a plain file named `claude` sitting on `PATH`
+/// fails to exec and leaves the stage `Skipped` exactly as an absent one does.
+/// A check that stopped at `is_file` would report the precondition satisfied on
+/// a machine where the sweep is about to diverge on all 156 rows, which is the
+/// one outcome this precondition exists to prevent.
+///
+/// Any execute bit counts, rather than resolving this process's uid and gid
+/// against the file's owner and group: that is the approximation `PATH` lookups
+/// conventionally make, and the exec itself remains the real authority.
+fn claude_resolves_in(path: Option<&OsStr>) -> bool {
+    path.is_some_and(|path| {
+        std::env::split_paths(path).any(|dir| {
+            std::fs::metadata(dir.join("claude"))
+                .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+        })
+    })
+}
+
+#[test]
+fn claude_resolves_only_from_a_path_entry_holding_an_executable_file() {
+    let temp = tempfile::tempdir().expect("a temp dir");
+    let executable = temp.path().join("executable");
+    let not_executable = temp.path().join("not-executable");
+    let empty = temp.path().join("empty");
+    for dir in [&executable, &not_executable, &empty] {
+        std::fs::create_dir(dir).expect("a PATH entry");
+    }
+    for (dir, mode) in [(&executable, 0o755), (&not_executable, 0o644)] {
+        let binary = dir.join("claude");
+        std::fs::write(&binary, "#!/bin/sh\nexit 0\n").expect("a claude to find");
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(mode))
+            .expect("the mode under test");
+    }
+
+    let as_path = |dirs: &[&Path]| std::env::join_paths(dirs).expect("a PATH value");
+
+    let found = as_path(&[&executable]);
+    assert!(claude_resolves_in(Some(&found)));
+
+    // The precondition is about a binary the `validate` stage can spawn, so a
+    // file named `claude` that cannot be executed counts as absent.
+    let present_but_not_runnable = as_path(&[&not_executable]);
+    assert!(!claude_resolves_in(Some(&present_but_not_runnable)));
+
+    let nothing_named_claude = as_path(&[&empty]);
+    assert!(!claude_resolves_in(Some(&nothing_named_claude)));
+
+    // A process with no PATH at all resolves nothing rather than falling back
+    // to some default set of directories.
+    assert!(!claude_resolves_in(None));
+
+    // Order does not matter: one usable entry anywhere is enough.
+    let mixed = as_path(&[&empty, &not_executable, &executable]);
+    assert!(claude_resolves_in(Some(&mixed)));
+}
+
 /// The directory name a repository's clone lives under inside `target/corpus`.
 ///
 /// Shared by [`sweep`] (to find a clone) and
-/// [`the_sweep_renders_one_row_per_manifest_root`] (to check one is there),
-/// so the two agree on where a repository is supposed to be.
+/// [`the_sweep_covers_every_manifest_root_and_matches_the_committed_snapshot`]
+/// (to check one is there), so the two agree on where a repository is supposed
+/// to be.
 fn checkout_slug(repo_name: &str) -> String {
     repo_name.replace('/', "_")
 }
@@ -208,9 +323,17 @@ fn render_row(repo: &str, plugin: &str, root: &Path) -> String {
 
     let wiring = claudevs::wiring::run(root).unwrap_or_default();
     for finding in &wiring.findings {
+        // The line is part of the identity of a finding: without it two
+        // findings differing only in where they sit render identically, and
+        // one can replace the other in the snapshot unnoticed. A checker that
+        // knows no line renders `-` rather than dropping the field, so the
+        // column stays in the same place on every line.
+        let line = finding
+            .line
+            .map_or_else(|| String::from("-"), |line| line.to_string());
         writeln!(
             row,
-            "  {:?} {} {} {}",
+            "  {:?} {} {}:{line} {}",
             finding.severity, finding.checker, finding.file, finding.message
         )
         .expect("writing to a String never fails");
@@ -220,7 +343,14 @@ fn render_row(repo: &str, plugin: &str, root: &Path) -> String {
 
 #[test]
 #[ignore = "needs the corpus fetched by `cargo make corpus-fetch`"]
-fn the_sweep_renders_one_row_per_manifest_root() {
+fn the_sweep_covers_every_manifest_root_and_matches_the_committed_snapshot() {
+    // Environment first, before a single root is swept: without the delegate
+    // every row renders `validate=Skipped` and the snapshot comparison at the
+    // end would fail for that reason rather than for a real one.
+    require_claude_on_path();
+
+    // One sweep for every assertion below: sweeping 156 roots twice costs the
+    // wall clock twice and answers nothing the first pass already did.
     let manifest = load_manifest();
     let expected_roots: usize = manifest.repo.iter().map(|r| r.plugins.len()).sum();
     let actual = sweep();
@@ -265,14 +395,10 @@ fn the_sweep_renders_one_row_per_manifest_root() {
          or fix the plugin path in tests/corpus/corpus.toml if it moved",
         corpus.display()
     );
-}
 
-#[test]
-#[ignore = "needs the corpus fetched by `cargo make corpus-fetch`"]
-fn the_sweep_matches_the_committed_snapshot() {
-    let actual = sweep();
+    // The snapshot comes last, so a short or mis-fetched corpus reports what
+    // is missing rather than a 156-line diff caused by that same absence.
     let path = snapshot_path();
-
     if std::env::var_os("CLAUDEVS_CORPUS_BLESS").is_some() {
         std::fs::write(&path, &actual).expect("write snapshot");
         return;

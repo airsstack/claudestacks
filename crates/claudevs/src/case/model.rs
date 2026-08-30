@@ -17,6 +17,16 @@ use crate::types::{CaseName, HookEvent};
 /// transparent wrapper a caller only ever reads back (from a loaded [`Case`]
 /// or [`Step`]), never builds from a literal. `#[non_exhaustive]` documents
 /// that read-only contract.
+///
+/// On a tuple struct the attribute also closes the constructor to other
+/// crates, so downstream code can neither build one nor destructure it. Which
+/// diagnostic that produces depends on how the type is named at the site.
+/// With it imported, `let FixtureRef(name) = fixture;` is
+/// `error[E0532]: cannot match against a tuple struct which contains private
+/// fields` and `FixtureRef(s)` is `error[E0423]: cannot initialize a tuple
+/// struct which contains private fields`; named through its path, the same
+/// pattern is instead ``error[E0603]: tuple struct constructor `FixtureRef`
+/// is private``. Reading the name through `.0` stays available in every form.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[non_exhaustive]
 pub struct FixtureRef(pub String);

@@ -138,14 +138,6 @@ mod tests {
     }
 
     #[test]
-    fn an_event_name_the_catalogue_does_not_know_is_a_warning_not_an_error() {
-        let dir = plugin(r#"{"hooks":{"PreToolUseX":[{"hooks":[]}]}}"#);
-        let findings = check(dir.path()).unwrap();
-        assert_eq!(findings.len(), 1, "{findings:?}");
-        assert_eq!(findings[0].severity, Severity::Warning);
-    }
-
-    #[test]
     fn a_matcher_on_an_event_that_takes_none_is_a_warning() {
         let dir = plugin(
             r#"{"hooks":{

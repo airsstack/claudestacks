@@ -3,7 +3,7 @@
 # Plugins nobody in this repository authored, pinned by commit. They exist to
 # answer a question this repository's own fixtures structurally cannot: not
 # "does claudevs do what we intended?" but "was what we intended right?".
-# `tests/fixtures/` holds four plugins written here, by the same hand as the
+# `tests/fixtures/` holds eight plugins written here, by the same hand as the
 # code they exercise, so they encode the same assumptions and cannot disconfirm
 # them. Every plugin below was written by someone who had never heard of
 # claudevs.
@@ -28,7 +28,19 @@
 # repository root is itself the plugin, which is true for three of the thirteen.
 # A path here is a plugin root: a directory containing `.claude-plugin/`.
 #
-# This file is data, not a test. Nothing reads it yet.
+# This file has two readers, and a change to its shape has to satisfy both.
+#
+# `tests/corpus.rs` parses it as TOML and asserts against it: that it still
+# names 13 repositories and 156 plugin roots, and that every repository carries
+# a url, a pinned sha and a branch. Its `--ignored` sweep resolves each
+# `plugins` path against the matching checkout, runs `claudevs check` there, and
+# compares the whole rendering against `tests/corpus/expected.snap`.
+#
+# The fetch lane does not parse TOML at all: an `awk` extraction pulls `name`,
+# `url` and `sha` off their own lines, in that order, and feeds the clone loop.
+# So the key order inside a `[[repo]]` table is load-bearing for the fetch even
+# though the TOML reader is indifferent to it, and a reordered or reflowed table
+# can still deserialize cleanly while the fetch reads a shifted record.
 
 [[repo]]
 name = "acostanzo/quickstop"

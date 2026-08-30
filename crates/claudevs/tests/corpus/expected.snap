@@ -19,7 +19,7 @@ georgeguimaraes/claude-code-elixir  plugins/mix-credo  validate=Passed wiring=Pa
 georgeguimaraes/claude-code-elixir  plugins/mix-format  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 ivan-magda/claude-code-plugin-template  plugins/hello-world  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 ivan-magda/claude-code-plugin-template  plugins/plugin-development  validate=Passed wiring=Failed test=Skipped test--installed=Skipped
-  Error refs skills/plugin-authoring/SKILL.md `${CLAUDE_PLUGIN_ROOT}/scripts/format.sh` does not exist
+  Error refs skills/plugin-authoring/SKILL.md:69 `${CLAUDE_PLUGIN_ROOT}/scripts/format.sh` does not exist
 mukiwu/muki-ai-plugins  plugins/figma-visual-reviewer  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 mukiwu/muki-ai-plugins  plugins/lore  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 mukiwu/muki-ai-plugins  plugins/review-tests  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
@@ -56,7 +56,7 @@ trailofbits/skills-curated  plugins/openai-sentry  validate=Passed wiring=Passed
 trailofbits/skills-curated  plugins/openai-spreadsheet  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 trailofbits/skills-curated  plugins/openai-yeet  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 trailofbits/skills-curated  plugins/planning-with-files  validate=Failed wiring=Failed test=Skipped test--installed=Skipped
-  Error matchers hooks/hooks.json has no `hooks` object at the top level
+  Error matchers hooks/hooks.json:- has no `hooks` object at the top level
 trailofbits/skills-curated  plugins/productivity  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 trailofbits/skills-curated  plugins/python-code-simplifier  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 trailofbits/skills-curated  plugins/react-pdf  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
@@ -124,7 +124,7 @@ wshobson/agents  plugins/julia-development  validate=Passed wiring=Passed test=S
 wshobson/agents  plugins/jvm-languages  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 wshobson/agents  plugins/kubernetes-operations  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 wshobson/agents  plugins/llm-application-dev  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
-  Warning invocations skills/prompt-engineering-patterns/scripts/optimize-prompt.py `optimize-prompt.py` is referenced by nothing in this plugin
+  Warning invocations skills/prompt-engineering-patterns/scripts/optimize-prompt.py:- `optimize-prompt.py` is referenced by nothing in this plugin
 wshobson/agents  plugins/llm-finetuning  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 wshobson/agents  plugins/machine-learning-ops  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 wshobson/agents  plugins/meigen-ai-design  validate=Passed wiring=Passed test=Skipped test--installed=Skipped

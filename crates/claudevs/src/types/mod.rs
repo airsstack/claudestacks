@@ -18,10 +18,13 @@
 //! module holds five open error structs against only four open newtypes.
 //!
 //! Every other public type in this crate carries `#[non_exhaustive]` except
-//! two, both still open pending a decision by the crate's maintainers rather
-//! than an oversight: [`crate::case::Invocation`], whose fields are all
-//! `pub` with no invariant guarding them, and [`crate::harness::TModule`],
-//! whose fields are already private so the attribute would add nothing.
+//! two. Both are deliberately open, and neither is waiting on a decision.
+//! [`crate::case::Invocation`] has all-`pub` fields with no invariant
+//! guarding them and derives no `Default`, so closing it would withdraw
+//! literal construction without offering a route to replace it.
+//! [`crate::harness::TModule`] has private fields already, so the compiler
+//! rejects external literal construction with or without the attribute and
+//! adding it would change nothing a caller can observe.
 //! This file is where the closed exceptions, and the one look-alike that is
 //! not one, are written down; those two open types are not among them.
 

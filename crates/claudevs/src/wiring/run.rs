@@ -66,9 +66,8 @@ mod tests {
         // One error: `refs` on the missing `hooks/absent.sh`. Three warnings:
         // `invocations` on the unreferenced `orphan.sh`, `matchers` on the
         // unknown `Nope` event, and `matchers` on the `Edit(` matcher Rust
-        // cannot compile (`matchers.rs`'s
-        // `an_event_name_the_catalogue_does_not_know_is_a_warning_not_an_error`
-        // and `a_matcher_rust_cannot_compile_is_a_warning_not_proof_the_plugin_is_broken`).
+        // cannot compile. Both warning severities are pinned by their own
+        // tests in `matchers.rs`.
         assert_eq!(report.counts(), (1, 3));
         assert!(
             report

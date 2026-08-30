@@ -203,7 +203,7 @@ pub fn check(plugin_dir: &Path) -> Result<Vec<Finding>> {
 /// regardless: that tree is what Claude Code runs, so a stray file there is
 /// worth a warning even without a bit set.
 fn presents_as_executable(path: &Path, text: &str, relative: &str) -> bool {
-    if relative.starts_with("hooks/") || relative.starts_with("hooks\\") {
+    if relative.starts_with("hooks/") {
         return true;
     }
     if text.starts_with("#!") {
@@ -218,7 +218,7 @@ fn presents_as_executable(path: &Path, text: &str, relative: &str) -> bool {
 /// naming is not the only convention — a plugin with a `tests/test_guard.py`
 /// is testing itself, not shipping dead wiring.
 fn is_in_tests_tree(relative: &str) -> bool {
-    relative == "tests" || relative.starts_with("tests/") || relative.starts_with("tests\\")
+    relative == "tests" || relative.starts_with("tests/")
 }
 
 /// The paths `case::discover` classifies as case files under `plugin_dir`.
@@ -268,12 +268,14 @@ fn readable_files(plugin_dir: &Path) -> Result<Vec<(PathBuf, String, String)>> {
         let Ok(text) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
-        let relative = entry
-            .path()
-            .strip_prefix(plugin_dir)
-            .unwrap_or_else(|_| entry.path())
-            .display()
-            .to_string();
+        // `WalkDir` is rooted at `plugin_dir`, so every entry it yields is a
+        // descendant and the strip always succeeds. Skipping beats falling
+        // back to the unstripped path, which would put an absolute path in the
+        // `file` field of every finding built from this entry.
+        let Ok(relative) = entry.path().strip_prefix(plugin_dir) else {
+            continue;
+        };
+        let relative = relative.display().to_string();
         files.push((entry.path().to_path_buf(), relative, text));
     }
     Ok(files)

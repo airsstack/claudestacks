@@ -27,6 +27,7 @@ pub mod wiring;
 pub use check::{CheckReport, Stage, StageStatus};
 pub use doctor::{Diagnosis, Probe, ProbeStatus};
 pub use error::{Error, Result};
+pub use harness::{Mismatch, Verdict};
 pub use native::NativeOutcome;
 pub use report::{
     Report, check_exit_code, doctor_exit_code, exit_code, render_check_human, render_doctor_human,

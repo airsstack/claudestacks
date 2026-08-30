@@ -3,8 +3,8 @@
 //!
 //! Responsibilities: [`default_payload`], [`merge`], [`substitute_project`],
 //! [`Project`], [`overlay_into`], [`base_env`], [`Captured`], [`run`],
-//! [`run_shell`], [`Observed`], [`observe`], [`Verdict`], [`judge`],
-//! [`commands_for`], [`resolve_hook`], [`TModule`].
+//! [`run_shell`], [`run_handler`], [`Observed`], [`observe`], [`Verdict`],
+//! [`Mismatch`], [`judge`], [`commands_for`], [`resolve_hook`], [`TModule`].
 
 mod environment;
 mod hooks_file;
@@ -21,6 +21,6 @@ pub use payload::{default_payload, merge, substitute_project};
 pub(crate) use project::copy_tree;
 pub use project::{Project, overlay_into};
 pub use semantics::{Observed, observe};
-pub use spawn::{Captured, DEFAULT_TIMEOUT, run, run_shell};
+pub use spawn::{Captured, DEFAULT_TIMEOUT, run, run_handler, run_shell};
 pub use t_module::TModule;
-pub use verdict::{Verdict, judge};
+pub use verdict::{Mismatch, Verdict, judge};

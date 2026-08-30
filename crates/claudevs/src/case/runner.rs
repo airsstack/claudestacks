@@ -39,8 +39,16 @@ pub fn run_lua_file(
             name: name.to_string(),
             verdict: match outcome {
                 Ok(()) => crate::harness::Verdict::Pass,
-                Err(reason) => crate::harness::Verdict::Fail(vec![reason]),
+                Err(reason) => {
+                    crate::harness::Verdict::Fail(vec![crate::harness::Mismatch::Reported {
+                        reason,
+                    }])
+                }
             },
+            // A scripted case has no hook context to report: `t.script(...)`
+            // is not a hook invocation.
+            payload: None,
+            handler: None,
         });
     }
     Ok(outcomes)

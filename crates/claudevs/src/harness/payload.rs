@@ -1,9 +1,11 @@
 //! Hook payloads: built-in defaults, case overlay, `{project}` substitution.
 //!
-//! The defaults are provisional: hand-written against the shapes
-//! this repository's own hooks parse today, replaced as a base layer by
-//! captured payloads once capture exists. The overlay mechanism is the same
-//! either way, so swapping the base touches no case.
+//! The defaults describe a project that exists on disk: [`crate::harness::project`]
+//! builds it and this module points a payload's `tool_input.file_path` at it,
+//! both reading the same [`crate::harness::project::TRACKED_FILE`] constant so
+//! the payload and the project cannot drift apart. A case may still overlay its
+//! own values over any of these defaults; the overlay mechanism does not care
+//! where the base came from.
 
 use crate::types::HookEvent;
 
@@ -19,7 +21,9 @@ pub fn default_payload(event: HookEvent) -> serde_json::Value {
     let extra = match event {
         HookEvent::PreToolUse | HookEvent::PostToolUse => serde_json::json!({
             "tool_name": "Edit",
-            "tool_input": { "file_path": "{project}/file.txt" },
+            "tool_input": {
+                "file_path": format!("{{project}}/{}", crate::harness::project::TRACKED_FILE),
+            },
         }),
         HookEvent::UserPromptSubmit => serde_json::json!({ "prompt": "hello" }),
         HookEvent::SessionStart => serde_json::json!({ "source": "startup" }),
@@ -72,6 +76,8 @@ pub fn substitute_project(value: &mut serde_json::Value, project: &str) {
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid payloads")]
+
     use super::{default_payload, merge, substitute_project};
     use crate::types::HookEvent;
 
@@ -92,7 +98,22 @@ mod tests {
         let mut payload = default_payload(HookEvent::PreToolUse);
         substitute_project(&mut payload, "/tmp/p1");
         assert_eq!(payload["cwd"], "/tmp/p1");
-        assert_eq!(payload["tool_input"]["file_path"], "/tmp/p1/file.txt");
+        assert_eq!(
+            payload["tool_input"]["file_path"],
+            format!("/tmp/p1/{}", crate::harness::project::TRACKED_FILE)
+        );
+    }
+
+    #[test]
+    fn the_default_tool_input_resolves_to_a_file_that_exists() {
+        let project = crate::harness::Project::empty().unwrap();
+        let mut payload = default_payload(HookEvent::PreToolUse);
+        substitute_project(&mut payload, &project.path().display().to_string());
+        let target = payload["tool_input"]["file_path"].as_str().unwrap();
+        assert!(
+            std::path::Path::new(target).is_file(),
+            "a PreToolUse hook that stats its target must find one: {target}"
+        );
     }
 
     #[test]

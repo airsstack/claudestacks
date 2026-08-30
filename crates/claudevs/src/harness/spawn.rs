@@ -11,6 +11,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use crate::contract::handler::HookCommand;
 use crate::error::{Error, Result};
 
 /// What a spawned child produced.
@@ -121,11 +122,41 @@ pub fn run_shell(
     run(&argv, cwd, env, stdin, timeout)
 }
 
+/// Runs one hooks.json handler.
+///
+/// The two variants are two execution models, not two spellings of one. A
+/// shell handler is wrapped in `sh -c`, so its command string may carry
+/// pipelines, redirection and expansion. An exec handler is spawned directly
+/// with its `args` as the argument vector: there is no shell, and each element
+/// is one argument exactly as written, with no tokenization on any platform.
+///
+/// # Errors
+///
+/// Same conditions as [`run`].
+pub fn run_handler(
+    handler: &HookCommand,
+    cwd: &Path,
+    env: &BTreeMap<String, String>,
+    stdin: Option<&str>,
+    timeout: Duration,
+) -> Result<Captured> {
+    match handler {
+        HookCommand::Shell(command) => run_shell(command, cwd, env, stdin, timeout),
+        HookCommand::Exec { program, args } => {
+            let mut argv = Vec::with_capacity(args.len() + 1);
+            argv.push(program.clone());
+            argv.extend(args.iter().cloned());
+            run(&argv, cwd, env, stdin, timeout)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid fixtures")]
 
-    use super::{DEFAULT_TIMEOUT, run, run_shell};
+    use super::{DEFAULT_TIMEOUT, run, run_handler, run_shell};
+    use crate::contract::handler::HookCommand;
     use std::collections::BTreeMap;
     use std::time::Duration;
 
@@ -192,5 +223,58 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn an_exec_handler_spawns_its_argv_directly_with_no_shell() {
+        let dir = cwd();
+        let handler = HookCommand::Exec {
+            program: String::from("sh"),
+            args: vec![String::from("-c"), String::from("echo exec-args-ran")],
+        };
+        let captured = run_handler(
+            &handler,
+            dir.path(),
+            &BTreeMap::new(),
+            None,
+            DEFAULT_TIMEOUT,
+        )
+        .unwrap();
+        assert_eq!(captured.stdout.trim(), "exec-args-ran");
+    }
+
+    #[test]
+    fn an_exec_handler_does_not_tokenize_its_arguments() {
+        let dir = cwd();
+        // A shell would split this on `;` and run two commands; a direct
+        // spawn hands it to `echo` as one argument, verbatim.
+        let handler = HookCommand::Exec {
+            program: String::from("echo"),
+            args: vec![String::from("a; echo b")],
+        };
+        let captured = run_handler(
+            &handler,
+            dir.path(),
+            &BTreeMap::new(),
+            None,
+            DEFAULT_TIMEOUT,
+        )
+        .unwrap();
+        assert_eq!(captured.stdout.trim(), "a; echo b");
+    }
+
+    #[test]
+    fn a_shell_handler_still_goes_through_sh_so_a_pipeline_works() {
+        let dir = cwd();
+        let handler = HookCommand::Shell(String::from("echo a | tr a b"));
+        let captured = run_handler(
+            &handler,
+            dir.path(),
+            &BTreeMap::new(),
+            None,
+            DEFAULT_TIMEOUT,
+        )
+        .unwrap();
+        assert_eq!(captured.stdout.trim(), "b");
     }
 }

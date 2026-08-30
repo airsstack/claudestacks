@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use crate::check::{CheckReport, StageStatus};
 use crate::doctor::{Diagnosis, ProbeStatus};
 use crate::error::{Error, Result};
-use crate::harness::Verdict;
+use crate::harness::{Mismatch, Verdict};
 use crate::suite::SuiteReport;
 use crate::wiring::{Severity, WiringReport};
 
@@ -71,6 +71,59 @@ const fn plural(count: usize) -> &'static str {
     if count == 1 { "" } else { "s" }
 }
 
+/// One [`Mismatch`] rendered into the sentence a human reads.
+///
+/// One arm per variant, each producing the sentence that variant used to
+/// carry back when `Verdict::Fail` held rendered strings directly.
+/// `Mismatch` is `#[non_exhaustive]` outside this crate but not inside it, so
+/// this `match` stays exhaustive: a variant added without an arm here is a
+/// compile error, not a blank line in a report.
+#[must_use]
+fn render_mismatch(mismatch: &Mismatch) -> String {
+    match mismatch {
+        Mismatch::DidNotRun { reason } => format!("did not run: {reason}"),
+        Mismatch::Reported { reason } => format!("reported: {reason}"),
+        Mismatch::InStep { index, mismatch } => {
+            format!("step {index}: {}", render_mismatch(mismatch))
+        }
+        Mismatch::TimedOut => {
+            String::from("timeout: the child timed out and was killed before completing")
+        }
+        Mismatch::Exit { expected, observed } => {
+            format!("exit: expected {expected}, got {observed}")
+        }
+        Mismatch::Decision { expected, observed } => {
+            format!("decision: expected {expected:?}, got {observed:?}")
+        }
+        Mismatch::UnexpectedOutput {
+            observed: Some(context),
+        } => {
+            format!("output: expected none, but the hook emitted: {context}")
+        }
+        Mismatch::UnexpectedOutput { observed: None } => String::from(
+            "output: expected none, but the hook emitted with no additional context to show",
+        ),
+        Mismatch::ContextMissing { expected, observed } => {
+            format!("context: expected to contain `{expected}`, got {observed:?}")
+        }
+        Mismatch::StdoutMissing { expected, observed } if observed.is_empty() => {
+            format!("stdout: expected to contain `{expected}`, but nothing was printed")
+        }
+        Mismatch::StdoutMissing { expected, observed } => {
+            format!("stdout: expected to contain `{expected}`, got {observed:?}")
+        }
+        Mismatch::StderrMissing { expected, observed } if observed.is_empty() => {
+            format!("stderr: expected to contain `{expected}`, but nothing was printed")
+        }
+        Mismatch::StderrMissing { expected, observed } => {
+            format!("stderr: expected to contain `{expected}`, got {observed:?}")
+        }
+        Mismatch::FileMissing { expected } => {
+            format!("file: expected `{expected}` to exist in the project")
+        }
+    }
+}
+
 /// The human rendering: one line per case, mismatches indented, a summary.
 #[must_use]
 pub fn render_human(report: &SuiteReport) -> String {
@@ -86,7 +139,17 @@ pub fn render_human(report: &SuiteReport) -> String {
                 failed += 1;
                 let _ = writeln!(out, "  FAIL  {}", outcome.name);
                 for mismatch in mismatches {
-                    let _ = writeln!(out, "        {mismatch}");
+                    let _ = writeln!(out, "        {}", render_mismatch(mismatch));
+                }
+                // Spec §3.6: "the payload and the argv, printed beside the
+                // mismatch, can [tell an author which branch their hook
+                // took]." Both are populated only for a failing hook case
+                // (`CaseOutcome`'s contract), so they render only here.
+                if let Some(payload) = &outcome.payload {
+                    let _ = writeln!(out, "        payload: {payload}");
+                }
+                if let Some(handler) = &outcome.handler {
+                    let _ = writeln!(out, "        handler: {handler}");
                 }
             }
         }
@@ -230,7 +293,7 @@ mod tests {
         render_human, render_json, render_wiring_human,
     };
     use crate::doctor::{Diagnosis, Probe, ProbeStatus};
-    use crate::harness::Verdict;
+    use crate::harness::{Mismatch, Verdict};
     use crate::native::NativeOutcome;
     use crate::suite::{CaseOutcome, SuiteReport};
 
@@ -240,10 +303,17 @@ mod tests {
                 CaseOutcome {
                     name: String::from("good"),
                     verdict: Verdict::Pass,
+                    payload: None,
+                    handler: None,
                 },
                 CaseOutcome {
                     name: String::from("bad"),
-                    verdict: Verdict::Fail(vec![String::from("exit: expected 0, got 2")]),
+                    verdict: Verdict::Fail(vec![Mismatch::Exit {
+                        expected: 0,
+                        observed: 2,
+                    }]),
+                    payload: None,
+                    handler: None,
                 },
             ],
             native: vec![NativeOutcome {
@@ -259,8 +329,180 @@ mod tests {
         let text = render_human(&report());
         assert!(text.contains("ok    good"));
         assert!(text.contains("FAIL  bad"));
-        assert!(text.contains("exit: expected 0, got 2"));
+        assert!(text.contains("exit: expected 0, got 2"), "{text}");
         assert!(text.contains("1 passed, 1 failed"));
+    }
+
+    #[test]
+    fn a_stdout_mismatch_renders_both_sides() {
+        let line = super::render_mismatch(&Mismatch::StdoutMissing {
+            expected: String::from("token"),
+            observed: String::from("other"),
+        });
+        assert!(line.contains("token"), "{line}");
+        assert!(line.contains("other"), "{line}");
+    }
+
+    #[test]
+    fn silence_renders_as_silence_not_as_an_empty_gap() {
+        let line = super::render_mismatch(&Mismatch::StdoutMissing {
+            expected: String::from("token"),
+            observed: String::new(),
+        });
+        assert!(line.contains("nothing"), "{line}");
+    }
+
+    #[test]
+    fn a_step_mismatch_names_the_step_and_the_failure_inside_it() {
+        let line = super::render_mismatch(&Mismatch::InStep {
+            index: 2,
+            mismatch: Box::new(Mismatch::Exit {
+                expected: 0,
+                observed: 1,
+            }),
+        });
+        assert!(line.contains("step 2"), "{line}");
+        assert!(line.contains("exit"), "{line}");
+    }
+
+    #[test]
+    fn unexpected_output_with_no_context_does_not_claim_the_hook_emitted_the_word_none() {
+        // Pre-fix this rendered `"... the hook emitted None"` — a literal
+        // `None` from `{observed:?}`, indistinguishable from an actual
+        // decision. This is the common case: a `PreToolUse` gate that writes
+        // a decision envelope with no `additionalContext` has `context ==
+        // None`.
+        let line = super::render_mismatch(&Mismatch::UnexpectedOutput { observed: None });
+        assert!(!line.contains("None"), "{line}");
+        assert!(line.contains("emitted"), "{line}");
+    }
+
+    #[test]
+    fn unexpected_output_with_context_shows_it() {
+        let line = super::render_mismatch(&Mismatch::UnexpectedOutput {
+            observed: Some(String::from("extra context")),
+        });
+        assert!(line.contains("extra context"), "{line}");
+    }
+
+    #[test]
+    fn a_reported_mismatch_is_prefixed_like_its_siblings() {
+        let line = super::render_mismatch(&Mismatch::Reported {
+            reason: String::from("boom"),
+        });
+        assert!(line.starts_with("reported:"), "{line}");
+        assert!(line.contains("boom"), "{line}");
+    }
+
+    #[test]
+    fn a_failing_hook_case_prints_its_payload_and_handler_beside_the_mismatch() {
+        // Spec §3.6 and plan Task 9 step 6: "printed beside the mismatch".
+        // The payload is built directly here (not through a real
+        // `run_suite`) so the assertion stays deterministic — a real
+        // synthesized payload carries an absolute temp-directory `cwd`,
+        // which would make a `contains` check either flaky across machines
+        // or too weak to catch a dropped field.
+        let report = SuiteReport {
+            outcomes: vec![CaseOutcome {
+                name: String::from("a-emits"),
+                verdict: Verdict::Fail(vec![Mismatch::UnexpectedOutput { observed: None }]),
+                payload: Some(serde_json::json!({"hook_event_name": "SessionStart"})),
+                handler: Some(String::from("true")),
+            }],
+            native: vec![],
+        };
+        let text = render_human(&report);
+        assert!(
+            text.contains("hook_event_name") && text.contains("SessionStart"),
+            "the payload is missing: {text}"
+        );
+        assert!(
+            text.contains("handler: true"),
+            "the handler is missing: {text}"
+        );
+    }
+
+    #[test]
+    fn a_passing_case_never_prints_a_payload_or_handler_line() {
+        let report = SuiteReport {
+            outcomes: vec![CaseOutcome {
+                name: String::from("a-quiet-hook"),
+                verdict: Verdict::Pass,
+                payload: None,
+                handler: None,
+            }],
+            native: vec![],
+        };
+        let text = render_human(&report);
+        assert!(!text.contains("payload:"), "{text}");
+        assert!(!text.contains("handler:"), "{text}");
+    }
+
+    #[test]
+    fn every_mismatch_variant_renders_a_non_empty_sentence() {
+        for mismatch in [
+            Mismatch::DidNotRun {
+                reason: String::from("r"),
+            },
+            Mismatch::Reported {
+                reason: String::from("r"),
+            },
+            Mismatch::InStep {
+                index: 0,
+                mismatch: Box::new(Mismatch::TimedOut),
+            },
+            Mismatch::TimedOut,
+            Mismatch::Exit {
+                expected: 0,
+                observed: 1,
+            },
+            Mismatch::Decision {
+                expected: crate::case::Decision::Deny,
+                observed: None,
+            },
+            Mismatch::UnexpectedOutput { observed: None },
+            Mismatch::ContextMissing {
+                expected: String::from("e"),
+                observed: None,
+            },
+            Mismatch::StdoutMissing {
+                expected: String::from("e"),
+                observed: String::from("o"),
+            },
+            Mismatch::StderrMissing {
+                expected: String::from("e"),
+                observed: String::from("o"),
+            },
+            Mismatch::FileMissing {
+                expected: String::from("f"),
+            },
+        ] {
+            assert!(
+                !super::render_mismatch(&mismatch).is_empty(),
+                "{mismatch:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_json_report_carries_structured_mismatches() {
+        let report = SuiteReport {
+            outcomes: vec![CaseOutcome {
+                name: String::from("a-case"),
+                verdict: Verdict::Fail(vec![Mismatch::StdoutMissing {
+                    expected: String::from("token"),
+                    observed: String::new(),
+                }]),
+                payload: None,
+                handler: None,
+            }],
+            native: Vec::new(),
+        };
+        let json = render_json(&report).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mismatch = &parsed["outcomes"][0]["verdict"]["Fail"][0];
+        assert_eq!(mismatch["kind"], "stdout_missing", "{json}");
+        assert_eq!(mismatch["expected"], "token", "{json}");
     }
 
     #[test]

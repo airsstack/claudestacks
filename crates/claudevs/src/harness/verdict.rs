@@ -1,7 +1,9 @@
 //! Judging an [`Observed`] run against a case's [`Expectations`].
 //!
-//! Every mismatch is one precise sentence; a verdict lists all of them rather
-//! than stopping at the first, so one run shows the full distance to green.
+//! Every mismatch is a typed [`Mismatch`], not a rendered sentence; a verdict
+//! lists all of them rather than stopping at the first, so one run shows the
+//! full distance to green. Rendering a mismatch into text is
+//! [`crate::report`]'s job, not this module's.
 
 use std::path::Path;
 
@@ -14,7 +16,99 @@ pub enum Verdict {
     /// Every expectation held.
     Pass,
     /// At least one expectation failed; each mismatch described.
-    Fail(Vec<String>),
+    Fail(Vec<Mismatch>),
+}
+
+/// One way a case failed.
+///
+/// Eleven variants in two groups. Eight are assertions — one per expectation
+/// [`judge`] can test — and three are structural: a case that never ran
+/// ([`Mismatch::DidNotRun`]), a scripted case that reported its own failure
+/// ([`Mismatch::Reported`]), and a wrapper naming which flow step failed
+/// ([`Mismatch::InStep`]). The three exist because a run's outcomes are one
+/// list, and a caller reading that list should not need a second shape for the
+/// entries that never reached an assertion.
+///
+/// Typed rather than a rendered sentence, so `--json` carries structure a
+/// consumer can act on and the human text has one place it is derived. The
+/// assertion group grows every time an assertion is added, which is why this
+/// enum is `#[non_exhaustive]`: that is a change claudevs makes routinely, and
+/// a downstream exhaustive `match` should not break on it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Mismatch {
+    // ── structural ──────────────────────────────────────────────────────
+    /// Nothing ran: the case would not load, its hook resolved to nothing, or
+    /// a flow declared no run step.
+    DidNotRun {
+        /// What stopped it.
+        reason: String,
+    },
+    /// A scripted case reported its own failure.
+    Reported {
+        /// What it said. Opaque to claudevs — the script decides the wording.
+        reason: String,
+    },
+    /// A flow step failed; which one, and how.
+    InStep {
+        /// 0-based index of the step, in declaration order.
+        index: usize,
+        /// The failure inside it.
+        mismatch: Box<Self>,
+    },
+
+    // ── assertions ──────────────────────────────────────────────────────
+    /// The child was killed before it finished.
+    TimedOut,
+    /// Exit code differed.
+    Exit {
+        /// What the case asked for.
+        expected: i32,
+        /// What the run produced.
+        observed: i32,
+    },
+    /// The decision differed.
+    Decision {
+        /// What the case asked for.
+        expected: crate::case::Decision,
+        /// What the hook communicated, if anything.
+        observed: Option<crate::case::Decision>,
+    },
+    /// `output: none` was asserted and the hook emitted.
+    UnexpectedOutput {
+        /// The context it injected, if any. `None` when the hook
+        /// communicated only a decision or exit code, with no
+        /// `additionalContext` — the only producer is `observed.context`,
+        /// which never carries the raw envelope.
+        observed: Option<String>,
+    },
+    /// Injected context did not contain the expected substring.
+    ContextMissing {
+        /// The substring asked for.
+        expected: String,
+        /// The context that was injected, if any.
+        observed: Option<String>,
+    },
+    /// stdout did not contain the expected substring.
+    StdoutMissing {
+        /// The substring asked for.
+        expected: String,
+        /// Everything the run printed to stdout.
+        observed: String,
+    },
+    /// stderr did not contain the expected substring.
+    StderrMissing {
+        /// The substring asked for.
+        expected: String,
+        /// Everything the run printed to stderr.
+        observed: String,
+    },
+    /// A file the case expected is not in the project.
+    FileMissing {
+        /// The path, relative to the project root.
+        expected: String,
+    },
 }
 
 /// Judges `observed` (plus the project tree for file asserts) against `expect`.
@@ -25,25 +119,28 @@ pub fn judge(expect: &Expectations, observed: &Observed, project: &Path) -> Verd
     // A killed child is never a pass: no expectation can vouch for a run that
     // did not finish on its own.
     if observed.timed_out {
-        mismatches.push(String::from(
-            "timeout: the child timed out and was killed before completing",
-        ));
+        mismatches.push(Mismatch::TimedOut);
     }
     if let Some(exit) = expect.exit
         && observed.exit != exit
     {
-        mismatches.push(format!("exit: expected {exit}, got {}", observed.exit));
+        mismatches.push(Mismatch::Exit {
+            expected: exit,
+            observed: observed.exit,
+        });
     }
     if let Some(decision) = expect.decision
         && observed.decision != Some(decision)
     {
-        mismatches.push(format!(
-            "decision: expected {decision:?}, got {:?}",
-            observed.decision
-        ));
+        mismatches.push(Mismatch::Decision {
+            expected: decision,
+            observed: observed.decision,
+        });
     }
     if expect.output.as_deref() == Some("none") && observed.emitted {
-        mismatches.push(String::from("output: expected none, but the hook emitted"));
+        mismatches.push(Mismatch::UnexpectedOutput {
+            observed: observed.context.clone(),
+        });
     }
     if let Some(needle) = &expect.context_contains
         && !observed
@@ -52,24 +149,32 @@ pub fn judge(expect: &Expectations, observed: &Observed, project: &Path) -> Verd
             .unwrap_or("")
             .contains(needle.as_str())
     {
-        mismatches.push(format!(
-            "context: expected to contain `{needle}`, got {:?}",
-            observed.context
-        ));
+        mismatches.push(Mismatch::ContextMissing {
+            expected: needle.clone(),
+            observed: observed.context.clone(),
+        });
     }
     if let Some(needle) = &expect.stdout_contains
         && !observed.stdout.contains(needle.as_str())
     {
-        mismatches.push(format!("stdout: expected to contain `{needle}`"));
+        mismatches.push(Mismatch::StdoutMissing {
+            expected: needle.clone(),
+            observed: observed.stdout.clone(),
+        });
     }
     if let Some(needle) = &expect.stderr_contains
         && !observed.stderr.contains(needle.as_str())
     {
-        mismatches.push(format!("stderr: expected to contain `{needle}`"));
+        mismatches.push(Mismatch::StderrMissing {
+            expected: needle.clone(),
+            observed: observed.stderr.clone(),
+        });
     }
     for rel in &expect.files_exist {
         if !project.join(rel).exists() {
-            mismatches.push(format!("file: expected `{rel}` to exist in the project"));
+            mismatches.push(Mismatch::FileMissing {
+                expected: rel.clone(),
+            });
         }
     }
 
@@ -85,7 +190,7 @@ mod tests {
     #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid fixtures")]
     #![expect(clippy::panic, reason = "tests panic to reject an unexpected shape")]
 
-    use super::{Verdict, judge};
+    use super::{Mismatch, Verdict, judge};
     use crate::case::{Decision, Expectations};
     use crate::harness::Observed;
 
@@ -152,7 +257,46 @@ mod tests {
         else {
             panic!("a killed run must not pass");
         };
-        assert!(mismatches[0].contains("timed out"), "{mismatches:?}");
+        assert_eq!(mismatches[0], Mismatch::TimedOut);
+    }
+
+    #[test]
+    fn a_stdout_mismatch_carries_what_was_actually_printed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut run = observed();
+        run.stdout = String::from("something else entirely");
+        let expect = Expectations {
+            stdout_contains: Some(String::from("expected-token")),
+            ..Expectations::default()
+        };
+        let Verdict::Fail(mismatches) = judge(&expect, &run, dir.path()) else {
+            panic!("expected a failing verdict");
+        };
+        assert_eq!(
+            mismatches[0],
+            Mismatch::StdoutMissing {
+                expected: String::from("expected-token"),
+                observed: String::from("something else entirely"),
+            },
+        );
+    }
+
+    #[test]
+    fn a_stdout_mismatch_on_silence_is_distinguishable_from_a_wrong_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut run = observed();
+        run.stdout = String::new();
+        let expect = Expectations {
+            stdout_contains: Some(String::from("expected-token")),
+            ..Expectations::default()
+        };
+        let Verdict::Fail(mismatches) = judge(&expect, &run, dir.path()) else {
+            panic!("expected a failing verdict");
+        };
+        let Mismatch::StdoutMissing { observed, .. } = &mismatches[0] else {
+            panic!("{mismatches:?}");
+        };
+        assert!(observed.is_empty(), "silence must be visible as silence");
     }
 
     #[test]

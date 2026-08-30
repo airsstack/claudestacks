@@ -23,13 +23,9 @@ fn the_exemplar_plugin_runs_fully_green() {
 
 #[test]
 fn the_filter_selects_across_yaml_and_lua_alike() {
-    let report = run_suite(
-        &fixture_plugin(),
-        &SuiteOptions {
-            case_filter: Some(String::from("blocks")),
-        },
-    )
-    .unwrap();
+    let mut filtered = SuiteOptions::default();
+    filtered.case_filter = Some(String::from("blocks"));
+    let report = run_suite(&fixture_plugin(), &filtered).unwrap();
     // blocks-lockfile (YAML) + blocks_Cargo_lock + blocks_poetry_lock (Lua data).
     assert_eq!(report.outcomes.len(), 3);
 }

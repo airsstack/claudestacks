@@ -21,6 +21,7 @@ use crate::validate::{Strictness, Validation};
 /// How one stage ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum StageStatus {
     /// Nothing wrong.
     Passed,
@@ -32,6 +33,7 @@ pub enum StageStatus {
 
 /// One stage's outcome.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct Stage {
     /// The stage name, as it appears in the summary.
     pub name: &'static str,
@@ -43,6 +45,7 @@ pub struct Stage {
 
 /// Every stage that ran, in order.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct CheckReport {
     /// The stages.
     pub stages: Vec<Stage>,

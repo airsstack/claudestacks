@@ -41,6 +41,7 @@ edition = \"2024\"
 
 /// A materialized temp project (deleted on drop).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Project {
     dir: tempfile::TempDir,
 }

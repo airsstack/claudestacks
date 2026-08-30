@@ -17,6 +17,7 @@ use crate::harness::{DEFAULT_TIMEOUT, run as spawn};
 /// The delegate's verdict.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Validation {
     /// The delegate exited 0.
     Passed {
@@ -47,6 +48,7 @@ const PROGRAM: &str = "claude";
 /// plugin whose only defect is a missing `author` field works, and a gate that
 /// stops it never reaches the deterministic stages that would find a real one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum Strictness {
     /// Warnings stay warnings; the delegate exits 0.
     #[default]

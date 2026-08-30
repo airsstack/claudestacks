@@ -33,6 +33,7 @@ use crate::validate::Validation;
 /// How one probe came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ProbeStatus {
     /// What was probed is usable.
     Ok,
@@ -45,6 +46,7 @@ pub enum ProbeStatus {
 
 /// One thing that was looked at.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct Probe {
     /// What was probed.
     pub name: &'static str,
@@ -56,6 +58,7 @@ pub struct Probe {
 
 /// Every probe, in order.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct Diagnosis {
     /// The probes.
     pub probes: Vec<Probe>,

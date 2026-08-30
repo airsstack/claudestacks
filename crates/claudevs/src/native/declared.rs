@@ -21,6 +21,7 @@ use crate::harness::{DEFAULT_TIMEOUT, run_shell};
 
 /// One native suite's outcome.
 #[derive(Debug, Clone, serde::Serialize)]
+#[non_exhaustive]
 pub struct NativeOutcome {
     /// The declared command.
     pub command: String,

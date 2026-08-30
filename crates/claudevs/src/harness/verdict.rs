@@ -12,6 +12,7 @@ use crate::harness::Observed;
 
 /// The outcome of one case.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub enum Verdict {
     /// Every expectation held.
     Pass,

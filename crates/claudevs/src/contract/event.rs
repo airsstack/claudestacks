@@ -14,6 +14,7 @@
 
 /// Whether an event accepts a `matcher`, and what the matcher is compared to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MatcherSupport {
     /// The event takes no matcher; one written here is silently ignored by the
     /// runtime, so a plugin that writes one is not being served.

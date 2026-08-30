@@ -27,6 +27,7 @@ use crate::types::HookEvent;
 
 /// The meaning extracted from one captured run.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Observed {
     /// Exit code.
     pub exit: i32,

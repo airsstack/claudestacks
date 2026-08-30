@@ -23,6 +23,7 @@ use crate::layout::manifest;
 
 /// A materialized install-cache layout (deleted on drop).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Installed {
     /// Root of the throwaway tree; dropping it removes the copy.
     root: tempfile::TempDir,

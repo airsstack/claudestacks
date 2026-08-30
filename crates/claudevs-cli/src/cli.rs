@@ -98,7 +98,8 @@ const fn strictness_from_flag(strict: bool) -> claudevs::Strictness {
 
 /// `claudevs test`.
 fn run_test(case: Option<String>, installed: bool, json: bool, path: &std::path::Path) -> i32 {
-    let options = claudevs::SuiteOptions { case_filter: case };
+    let mut options = claudevs::SuiteOptions::default();
+    options.case_filter = case;
     let outcome = if installed {
         claudevs::run_suite_installed(path, &options)
     } else {

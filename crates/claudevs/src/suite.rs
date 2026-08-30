@@ -21,6 +21,7 @@ use crate::types::HookEvent;
 
 /// Knobs for one suite run.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct SuiteOptions {
     /// Only run cases whose name contains this substring.
     pub case_filter: Option<String>,
@@ -28,6 +29,7 @@ pub struct SuiteOptions {
 
 /// One case's reported outcome.
 #[derive(Debug, Clone, serde::Serialize)]
+#[non_exhaustive]
 pub struct CaseOutcome {
     /// The case name.
     pub name: String,
@@ -47,6 +49,7 @@ pub struct CaseOutcome {
 
 /// Everything one run produced.
 #[derive(Debug, Clone, serde::Serialize)]
+#[non_exhaustive]
 pub struct SuiteReport {
     /// Case outcomes, in discovery order.
     pub outcomes: Vec<CaseOutcome>,

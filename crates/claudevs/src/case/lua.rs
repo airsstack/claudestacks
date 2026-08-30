@@ -16,6 +16,7 @@ use crate::error::{Error, Result};
 use crate::types::CaseName;
 
 /// A loaded Lua case file: parsed data cases plus named scripted entries.
+#[non_exhaustive]
 pub struct LuaFile {
     /// Data cases, ready to run like YAML ones.
     pub cases: Vec<Case>,

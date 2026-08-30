@@ -16,6 +16,7 @@ use crate::error::{Error, Result};
 
 /// What a spawned child produced.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Captured {
     /// Exit code (`-1` for signal death, `-2` for timeout kill).
     pub exit: i32,

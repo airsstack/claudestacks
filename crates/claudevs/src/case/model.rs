@@ -12,7 +12,13 @@ use std::collections::BTreeMap;
 use crate::types::{CaseName, HookEvent};
 
 /// A named fixture directory under `tests/fixtures/`.
+///
+/// Not a validated newtype — the field is `pub` and unvalidated, so this is a
+/// transparent wrapper a caller only ever reads back (from a loaded [`Case`]
+/// or [`Step`]), never builds from a literal. `#[non_exhaustive]` documents
+/// that read-only contract.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
 pub struct FixtureRef(pub String);
 
 /// A command to spawn: argv plus environment overrides.
@@ -29,6 +35,7 @@ pub struct Invocation {
 /// The decision a hook communicates about a tool call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Decision {
     /// The call may proceed.
     Allow,
@@ -45,6 +52,7 @@ pub enum Decision {
 /// translation from an observed run into that meaning.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Expectations {
     /// Exact exit code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +96,7 @@ impl Expectations {
 /// One step of a flow.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Step {
     /// A command to run (absent for a pure fixture-overlay step).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,6 +111,7 @@ pub struct Step {
 
 /// What kind of case this is.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CaseKind {
     /// Spawn one hook with a payload on stdin.
     Hook {
@@ -128,6 +138,7 @@ pub enum CaseKind {
 
 /// A fully-validated test case.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Case {
     /// Reporting identity.
     pub name: CaseName,
@@ -147,6 +158,7 @@ pub struct Case {
 /// concept.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RawCase {
     /// Hook kind: the event name.
     #[serde(default)]
@@ -177,6 +189,7 @@ pub struct RawCase {
 /// `project:` accepts `fixture: name` (mapping) or a bare fixture name.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum ProjectField {
     /// `project: { fixture: rust-repo }`
     Tagged {

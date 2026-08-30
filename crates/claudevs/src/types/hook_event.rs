@@ -12,6 +12,7 @@
 
 /// A hook event name from hooks.json.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum HookEvent {
     /// Before a tool call runs. Exit 2 blocks the call.
     PreToolUse,

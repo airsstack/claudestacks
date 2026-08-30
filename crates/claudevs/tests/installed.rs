@@ -75,22 +75,13 @@ fn a_hook_that_only_resolves_in_the_checkout_fails_from_the_cache() {
     )
     .unwrap();
 
-    let source_run = claudevs::run_suite(
-        &plugin,
-        &SuiteOptions {
-            case_filter: Some(String::from("session-banner")),
-        },
-    )
-    .unwrap();
+    let mut filtered = SuiteOptions::default();
+    filtered.case_filter = Some(String::from("session-banner"));
+
+    let source_run = claudevs::run_suite(&plugin, &filtered).unwrap();
     assert!(source_run.all_green(), "{source_run:?}");
 
-    let installed_run = run_suite_installed(
-        &plugin,
-        &SuiteOptions {
-            case_filter: Some(String::from("session-banner")),
-        },
-    )
-    .unwrap();
+    let installed_run = run_suite_installed(&plugin, &filtered).unwrap();
     assert!(
         !installed_run.all_green(),
         "the leaky hook must fail once installed: {installed_run:?}"

@@ -49,6 +49,7 @@
 
 /// A parsed matcher value.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum MatcherRule {
     /// Matches every payload.
     All,

@@ -193,7 +193,14 @@ than failing the fetch outright, and has its slug recorded in `target/corpus/.un
 record `corpus-check` consults so that repository's row can legitimately read `ABSENT` without
 failing the sweep. Any other absence — a repository the fetch never reached, or lost after a
 previous fetch — has no such record, and fails `corpus-check` instead of rendering as a quieter,
-shorter pass.
+shorter pass. Both lanes handle third-party code: `corpus-fetch` clones from 13 repositories nobody
+here controls and `corpus-check` runs `claudevs check` over what they ship. Today that stops short of
+executing it: no pinned repository ships a case file, established by searching the checkouts for
+`claudevs.toml`, `tests/*.yaml`, `tests/*.yml`, `_test.lua` and `test_*.lua` rather than read off the
+`test=Skipped` column, since `check.rs:164` also skips on a malformed marketplace or layout. A corpus
+plugin that did carry one would have its suite run, its
+Lua under `Policy::confined()` and any declared native suite through an unconfined shell. Repin only
+what you are willing to execute.
 
 The plugin suite has its own check for a different reason: `cargo make plugins` runs `airsl check`
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed

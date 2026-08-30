@@ -122,11 +122,11 @@ line, not copied.
 | `Captured` | `harness/spawn.rs:19` | 2 | All-public fields, no `Default`. |
 | `Project` | `harness/project.rs:44` | 2 | Plan gave `harness/project.rs:13`; current is 44 (plan 05 shifted this file substantially). **One field, private** (`dir: tempfile::TempDir`); constructed only via `Project::empty()` / `Project::from_fixture(...)`. Same already-privacy-closed situation as `Installed` — see §4. |
 | `Verdict` | `harness/verdict.rs:15` | 3 | Plan gave `harness/verdict.rs:13`; current is 15. No `#[non_exhaustive]` yet (unlike its sibling `Mismatch`, which already has it). |
-| `TModule` | `harness/t_module.rs:59` | **unclassified — raised, see §4** | Plan gave `harness/t_module.rs:58`; current is 59. |
+| `TModule` | `harness/t_module.rs:59` | **raised in §4, decided in §7** | Plan gave `harness/t_module.rs:58`; current is 59. |
 | `LuaFile` | `case/lua.rs:19` | 2 | Two public fields (`cases`, `scripted`), two `pub(crate)` fields (`engine`, `table`). Same already-privacy-closed situation as `Installed`/`Project` — see §4. |
 | `CaseFile` | `case/discover.rs:14` | 3 | No `Default`; produced only by `discover()`. |
-| `FixtureRef` | `case/model.rs:16` | **unclassified — raised, see §4** | |
-| `Invocation` | `case/model.rs:21` | **unclassified — raised, see §4** | |
+| `FixtureRef` | `case/model.rs:16` | **raised in §4, decided in §7** | |
+| `Invocation` | `case/model.rs:21` | **raised in §4, decided in §7** | |
 | `Decision` | `case/model.rs:32` | 3 | `#[derive(..., serde::Deserialize, serde::Serialize)]`, no `Default`. Deserialized as part of a case file's `expect:` block, never literal-constructed outside the crate in this tree. |
 | `Expectations` | `case/model.rs:48` | 4 | **Derives `Default`.** `#[cfg(test)]` code elsewhere in the crate already relies on `Expectations { exit: Some(0), ..Expectations::default() }` (matches Task 2 step 1's example), so this one is genuinely caller-constructed, unlike `CheckReport`/`WiringReport`/`Observed` above. |
 | `Step` | `case/model.rs:91` | 2 | All-public fields, no `Default`. |
@@ -151,7 +151,7 @@ Count: 44 rows, matching §1's derived baseline.
 
 Count: 7 rows, matching §1.
 
-## 4. The three unclassified types — raised, not decided
+## 4. The three unclassified types — raised here, decided in §7
 
 **`FixtureRef` (`case/model.rs:16`)** — `pub struct FixtureRef(pub String)`. Confirmed by
 reading the file and grepping for any validating `impl` (`grep -n 'FixtureRef'
@@ -218,10 +218,42 @@ nothing.
   the source, not by trusting the plan's "verify" label), 3 do not yet (`MatcherSupport`,
   `MatcherRule`, `Strictness`) and are Task 2's work.
 - Three types raised as fitting no bullet (`FixtureRef`, `Invocation`, `TModule`), each with the
-  reading above; none decided here.
+  reading above; none decided in that pass. §7 records where each was decided afterwards.
 - A related, non-identical finding: `Installed`, `Project` and `LuaFile` are bullet-2 by the
   rule's letter but already privacy-closed, so the attribute would be inert on them — worth
   Task 2's attention when picking a demonstration site for "prove the attribute bites."
 - `HookEvent` sits in `types/mod.rs` but is bullet 1 (gets the attribute), not bullet 5 (exempt)
   — Task 3's module-doc paragraph needs to account for it, since that paragraph is currently
   planned to describe every type in the file as exempt and `HookEvent` will not be.
+
+## 7. Decisions taken on the three raised types
+
+§4 raised these three rather than assigning them a bullet, which is what the spec's §7 closing line
+asks for. Each was then decided by the author, on the record, in `plans/06-closing.md`'s findings
+ledger — not silently inside a task. This section closes the loop so the audit and the tree agree.
+
+**`FixtureRef` (`case/model.rs`)** — decided as reading (b): a transparent wrapper, bullet 2. It
+carries `#[non_exhaustive]` in the tree today. The attribute is not decorative on a tuple struct: it
+closes the constructor to other crates, so downstream code can no longer write
+``let FixtureRef(name) = fixture;``. The diagnostic depends on how the type is named at the site,
+measured on the pinned 1.94.1 toolchain against a two-crate `rustc` reproduction: imported, the
+pattern is ``error[E0532]: cannot match against a tuple struct which contains private fields`` and
+construction is ``error[E0423]: cannot initialize a tuple struct which contains private fields``;
+named through its path, the pattern is ``error[E0603]: tuple struct constructor `FixtureRef` is
+private``. Field access through `.0` still compiles in every form, verified the same way. That consequence is now stated in the type's own doc
+comment rather than living only here.
+
+**`Invocation` (`case/model.rs`)** — decided to stay open and unattributed, permanently. It fails
+bullet 4 only for want of a `Default` derive, and closing it would withdraw literal construction from
+downstream callers without offering a route to replace it.
+
+**`TModule` (`harness/t_module.rs`)** — decided to stay open and unattributed, permanently. Every
+field is private, so external literal construction is already rejected; the attribute would change
+nothing an outside caller could observe, exactly as §4 and §5 describe.
+
+Both open types are named as deliberate exceptions in `crates/claudevs/src/types/mod.rs`'s module doc,
+so the published rustdoc says the same thing this section does. That doc previously described them as
+"pending a decision by the crate's maintainers"; it now states the decision, because there is one.
+
+Spec §7 is not amended. Its rule was followed — these were raised, not quietly assigned a bullet — and
+the author's decisions are recorded above and in the plan's ledger.

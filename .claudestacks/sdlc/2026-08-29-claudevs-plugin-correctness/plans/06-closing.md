@@ -914,18 +914,18 @@ second round closing a residual the first round's own fix left open.
 | 2 | 🔴 | `Makefile.toml:333` — `mkdir -p "$dest"` runs before the clone loop, so `corpus_root()`'s directory assert can never fire post-fetch even when every clone failed | fixed — `mkdir -p` moved inside the loop; every outcome logged to `.fetch-log`/`.unfetchable`; the lane exits 1 if the logged count disagrees with the manifest's known repository total |
 | 3 | 🔴 | `crates/claudevs/tests/corpus.rs:151-157` — the only test `corpus-check` runs counts rows, and `render_row` emits exactly one row per manifest root regardless of whether the clone exists, so a short corpus cannot be detected | fixed — a checkout-vs-root-presence assertion added; a residual survived the first round (empty-but-present checkouts still passed) and was closed in a second round, both directions verified locally |
 | 4 | 🔴 | `crates/claudevs/src/types/mod.rs:20` — "Every public type elsewhere in this crate is closed" is false; `Invocation` and `TModule` are public and open and named nowhere | fixed — doc now names both explicitly as open, unattributed, per the author's instruction |
-| 5 | 🟡 | `Makefile.toml:352` — an empty `slug` (e.g. a `[[repo]]` table reaching `sha` before `name`) makes `rm -rf "$repo"` resolve to `rm -rf target/corpus/`, widening to the whole corpus | open — author decision; not a live defect against the committed manifest, but the verification lives in the plan, not the code |
-| 6 | 🟡 | `crates/claudevs/tests/corpus.rs:126,130-134` — the row bakes in whether `claude` is on `PATH`, so the snapshot (once Task 7 lands) will move across machines even with no code change | open — author decision; a spec-level gap (spec §6's four-stage row) rather than something a code fix alone resolves |
-| 7 | 🟡 | `Makefile.toml:384-386` — the comment guards against a name-filter typo, which cargo already errors on; it misdiagnoses the real hole (finding 2) | open — author decision |
-| 8 | 🟡 | `crates/claudevs/tests/corpus/corpus.toml:31` — "This file is data, not a test. Nothing reads it yet." is stale; `corpus.rs` now reads it and three tests assert against it | open — author decision |
-| 9 | 🟡 | security — `corpus-check` executes code from 13 third-party repositories via `native/declared.rs:67`'s `run_shell` (unmitigated) and `case/lua.rs:46` (Lua, confined by `Policy::confined()` at `:89`/`:117`); nothing in the plan, the lane comment or `CLAUDE.md` says so | open — author decision |
-| 10 | 🔵 | `crates/claudevs/tests/corpus.rs:15-18` — no `#![expect(clippy::panic, …)]` yet; Task 7's comparison test will need one | open — carried forward to whoever lands Task 7 |
-| 11 | 🔵 | `crates/claudevs/tests/corpus.rs:154` — once Task 7 lands, `corpus-check` will run a full 156-root sweep twice (once per `#[ignore]`d test) | open — moot until Task 7 exists |
-| 12 | 🔵 | `crates/claudevs/tests/corpus.rs:139-144` — `Finding.line` is dropped from the rendered row, so two findings differing only by line number render identically | open — author decision; matches the plan's own format, not drift |
-| 13 | 🔵 | `crates/claudevs/tests/corpus.rs:29` — `Repo::branch` is deserialized and asserted non-empty but used by no code path (the fetch is by SHA) | open — disclosed as intentional; the assertion exists only to keep the field non-dead |
-| 14 | 🔵 | `crates/claudevs/src/case/model.rs:16-19` — `FixtureRef`'s doc comment for the bullet-2 call doesn't mention that downstream can no longer pattern-match `let FixtureRef(name) = …`, only `.0` | open — author decision |
+| 5 | 🟡 | `Makefile.toml:352` — an empty `slug` (e.g. a `[[repo]]` table reaching `sha` before `name`) makes `rm -rf "$repo"` resolve to `rm -rf target/corpus/`, widening to the whole corpus | fixed — `corpus-fetch` now validates each awk-extracted record before `repo` is computed, rejecting an empty `name`/`url`/`sha`/`slug` and a `slug` still holding `/`, `.` or `..`. The rejection reaches the lane through `set -e` on the pipeline plus a `.malformed` marker checked after the loop, because the `while read` body is a subshell. **The finding's stated trigger was wrong:** a `[[repo]]` table whose `sha` line precedes `name` does not yield an empty `slug` — the tab is IFS whitespace, so `read` collapses the leading empty fields and `name` absorbs the sha (measured: `slug=b819fe74…`, exit 0). The widening needs the values themselves empty — a blank `sha` ahead of `name`/`url`, which pre-fix gave `slug=`, `repo="$dest/"`, `rm -rf` of the whole destination, and exit 0. Both malformations now exit 1 |
+| 6 | 🟡 | `crates/claudevs/tests/corpus.rs:126,130-134` — the row bakes in whether `claude` is on `PATH`, so the snapshot (once Task 7 lands) will move across machines even with no code change | fixed — `require_claude_on_path()` asserts the binary resolves on `PATH` before the sweep runs, naming why (the snapshot records real `validate` verdicts, so without it all 156 rows would read `validate=Skipped`). Watched fail under a stripped `PATH`, green under the real one. The path is resolved, not spawned |
+| 7 | 🟡 | `Makefile.toml:384-386` — the comment guards against a name-filter typo, which cargo already errors on; it misdiagnoses the real hole (finding 2) | fixed — the claim was false and is now checked: a mistyped `-p` or `--test` name is a hard cargo failure at exit 101 (`error: package ID specification claudevs-nonexistent did not match any packages` / `error: no test target named nonexistent in claudevs package`), not a silent pass. The comment now names the real exit-0-having-run-nothing path (an unmatched name filter), states that the genuine silent-pass risk is an absent or short corpus, and describes the three guards in `tests/corpus.rs` without naming test functions |
+| 8 | 🟡 | `crates/claudevs/tests/corpus/corpus.toml:31` — "This file is data, not a test. Nothing reads it yet." is stale; `corpus.rs` now reads it and three tests assert against it | fixed — replaced with what actually reads the file and what those assertions cover |
+| 9 | 🟡 | security — `corpus-check` executes code from 13 third-party repositories via `native/declared.rs:67`'s `run_shell` (unmitigated) and `case/lua.rs:46` (Lua, confined by `Policy::confined()` at `:89`/`:117`); nothing in the plan, the lane comment or `CLAUDE.md` says so | fixed — disclosed in three places: `tests/corpus.rs`'s module doc, the `corpus-check` lane comment, and `CLAUDE.md`. Stated as the capability it is rather than as something happening: `native/declared.rs:66` hands each `run` string to `run_shell` (imported at `:20`) unconfined, Lua is confined by `Policy::confined()` at `case/lua.rs:91`/`:116`, and nothing executes today only because no pinned repository ships a case file — verified by searching the checkouts directly for `claudevs.toml`, `tests/*.yaml`/`.yml` and `_test.lua`/`test_*.lua` rather than inferred from the `Skipped` column, since `check.rs:164`'s arm also covers `Error::Marketplace` and `Error::Layout` |
+| 10 | 🔵 | `crates/claudevs/tests/corpus.rs:15-18` — no `#![expect(clippy::panic, …)]` yet; Task 7's comparison test will need one | closed — the attribute landed with Task 7 |
+| 11 | 🔵 | `crates/claudevs/tests/corpus.rs:154` — once Task 7 lands, `corpus-check` will run a full 156-root sweep twice (once per `#[ignore]`d test) | fixed — the two `#[ignore]`d tests merged into `the_sweep_covers_every_manifest_root_and_matches_the_committed_snapshot`, which sweeps once and makes every assertion in order: arity, corpus-not-short, no `ABSENT`-despite-checkout, then the snapshot. Shortness is checked before the snapshot so a short corpus reports what is missing rather than a 156-line diff. `corpus-check` now runs one sweep, 41s |
+| 12 | 🔵 | `crates/claudevs/tests/corpus.rs:139-144` — `Finding.line` is dropped from the rendered row, so two findings differing only by line number render identically | fixed — the row renders `{file}:{line}`, with `-` where a checker knows no line. Re-blessed; the diff moved exactly the three indented finding lines (`SKILL.md:69`, `hooks.json:-`, `optimize-prompt.py:-`) and no root row |
+| 13 | 🔵 | `crates/claudevs/tests/corpus.rs:29` — `Repo::branch` is deserialized and asserted non-empty but used by no code path (the fetch is by SHA) | fixed — the field now carries a doc comment saying what it records (the branch the pinned `sha` sat on, for a human repinning: twelve `main`, one `master`) and that `corpus-fetch` reads only `name`, `url` and `sha`. Field and assertion both kept |
+| 14 | 🔵 | `crates/claudevs/src/case/model.rs:16-19` — `FixtureRef`'s doc comment for the bullet-2 call doesn't mention that downstream can no longer pattern-match `let FixtureRef(name) = …`, only `.0` | fixed — the doc now states the consequence and its error text. **A first attempt at this row was wrong and is corrected here:** it quoted ``error[E0603]: tuple struct constructor `FixtureRef` is private`` as *the* diagnostic. That text is real but reaches only a caller who names the type through its path; the reproduction behind the claim had been run in that form alone, on rustc 1.91.1 from the ambient `PATH` rather than the 1.94.1 pinned by `rust-toolchain.toml`. Re-measured on 1.94.1: imported, `let FixtureRef(name) = …` is ``error[E0532]: cannot match against a tuple struct which contains private fields`` and `FixtureRef(s)` is ``error[E0423]: cannot initialize a tuple struct which contains private fields``; path-qualified, the pattern is the E0603 above. `.0` compiles in every form. The doc now gives all three, keyed to how the type is named |
 | 15 | 🔴 | plan 06 "Done when" #3 — "there is no third category"; `Invocation` and `TModule` are one | decided, not a gap — both stay unattributed permanently, not pending: `TModule` is already closed to external construction by field privacy, so `#[non_exhaustive]` would add nothing; `Invocation` fails the audit's bullet 4 only because it does not derive `Default`, a technicality of the rule's wording rather than a reason to close the type. `types/mod.rs`'s module doc already names both as open exceptions (see finding 4), so the published rustdoc is accurate as written and "Done when" #3 is satisfied by that documented exception, not violated by it |
-| 16 | 🟡 | spec §7 closing line — "raise it rather than deciding that type by hand"; `FixtureRef` was decided by hand | open — author decision; `surface-audit.md` still records it as "raised, not decided," so the audit and the tree disagree until reconciled |
+| 16 | 🟡 | spec §7 closing line — "raise it rather than deciding that type by hand"; `FixtureRef` was decided by hand | fixed — `surface-audit.md` gains a §7 recording where each of the three raised types was decided and why, and the three table rows now read `raised in §4, decided in §7`. Spec §7 is not amended: its rule was followed — all three were raised rather than quietly assigned a bullet — and the decisions are on the record. `types/mod.rs`'s module doc, which described the two open types as "pending a decision by the crate's maintainers", now states the decision |
 | 17 | 🟡 | spec §6 — "every fix is watched fail first"; the sweep's arity-only test had never been red and structurally could not be for the failure it was deployed against | fixed — see finding 3 |
 | 18 | 🟡 | plan 06 Task 6 — `snapshot_path()`'s absence is a disclosed, reasoned deviation, but nothing in the tree recorded that Task 7 is still outstanding | acknowledged — recorded in this ledger and in the Deviations section above |
 | 19 | 🟡 | plan 06 Task 5 — two tests not named by the plan were added; the manifest-integrity test is justified (gives dead fields a reader), the arity-only sweep test is finding 3/17 | acknowledged — no further action beyond finding 3/17 |
@@ -934,3 +934,55 @@ second round closing a residual the first round's own fix left open.
 
 Findings 4 and 15 are the same defect, cited under both a source line and the plan's own "Done when."
 Findings 3, 17 and 19 are the same test, cited from three angles.
+
+### Follow-up round — closing the rows left open
+
+The rows above that read `open — author decision` were carried, then closed in a later pass, together
+with the equivalent rows in `05-wiring-checkers.md`. Two independent reviews ran over that work.
+
+The first returned one blocking finding and it was the record's own: row 14 above had stated a
+verification whose result did not reproduce. A doc comment quoted
+``error[E0603]: tuple struct constructor `FixtureRef` is private`` as the diagnostic for a pattern
+match, and the reproduction behind it had been run on rustc 1.91.1 from the ambient `PATH` rather than
+the 1.94.1 that `rust-toolchain.toml` pins, and only in the path-qualified form. Re-measured on 1.94.1:
+imported, the pattern gives ``error[E0532]: cannot match against a tuple struct which contains private
+fields`` and construction gives ``error[E0423]: cannot initialize a tuple struct which contains private
+fields``; path-qualified, the pattern gives the E0603 above. `.0` compiles in every form. Row 14 now
+records all three. That a wrong claim survived being written, reviewed and recorded as verified is the
+finding worth keeping: a record of verification is a claim like any other.
+
+The same review found the round's own highest-severity fix — a guard stopping `corpus-fetch` from
+resolving `rm -rf "$repo"` to the destination root — pinned by nothing at all. Not in the gate, not in
+CI, no test referencing it. The shell body was moved to `scripts/corpus-fetch.sh` so it could be driven
+by ordinary tests, and `crates/claudevs/tests/corpus_fetch.rs` now pins both of the script's guards.
+Each was confirmed by deleting it and watching the suite fail:
+
+```
+$ cargo test -p claudevs --test corpus_fetch      # malformed-record guard removed
+the destination was emptied by a record that should have been rejected:
+.../corpus/.fetch-log: No such file or directory
+test result: FAILED. 1 passed; 1 failed
+
+$ cargo test -p claudevs --test corpus_fetch      # accounting check removed
+failures:
+    a_declared_table_the_extraction_misses_fails_the_accounting_check
+test result: FAILED. 3 passed; 1 failed
+
+$ cargo test -p claudevs --test corpus_fetch      # both restored
+test result: ok. 4 passed; 0 failed
+```
+
+The second review returned **no blocking findings** and verified all nine claimed closures against the
+pinned toolchain, including a recursive search of the thirteen checkouts — with a control proving the
+search could have found a case file — behind the claim that none ships one. Its two risk-level findings
+were acted on: a comment in `wiring/run.rs` still named a test the same change had deleted, and the
+accounting check above was the second unpinned guard. Its remaining risk and observation rows were
+recorded and left, per a stopping rule set at the start of that pass: blocking findings only, no third
+round.
+
+Both reviews are counted, not summarised from memory: across the two ledgers here and in
+`05-wiring-checkers.md` there are 41 finding rows, of which 19 concern the accuracy of something written
+— a comment, a doc string, a stale count, a claim in this record — against 9 concerning code that
+nothing would catch if it were removed. That distribution is why the guideline and agent definitions
+were amended afterwards rather than only the code.
+

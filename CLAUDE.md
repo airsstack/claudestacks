@@ -182,6 +182,19 @@ the policy and every suppression in `deny.toml`. It is its own job — invoking 
 directly, without cargo-make — because it compiles nothing and answers to a moving advisory
 database, so it can fail on a commit that changed nothing.
 
+A second pair answers the same question against plugins nobody here wrote. `cargo make corpus-fetch`
+clones the 13 pinned repositories in `crates/claudevs/tests/corpus/corpus.toml` into `target/corpus`
+— the only step in this repository that touches the network — and `cargo make corpus-check` sweeps
+every one of their 156 plugin roots, rendering one row per root. Neither joins `cargo make dod` or
+CI: the corpus is pinned by commit SHA rather than vendored, so `corpus-check` needs a prior
+`corpus-fetch` and cannot run on a bare checkout. Run both before a release. A repository that has
+since been deleted, made private, or force-pushed prints `UNFETCHABLE` to stderr, is skipped rather
+than failing the fetch outright, and has its slug recorded in `target/corpus/.unfetchable` — the
+record `corpus-check` consults so that repository's row can legitimately read `ABSENT` without
+failing the sweep. Any other absence — a repository the fetch never reached, or lost after a
+previous fetch — has no such record, and fails `corpus-check` instead of rendering as a quieter,
+shorter pass.
+
 The plugin suite has its own check for a different reason: `cargo make plugins` runs `airsl check`
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different

@@ -175,12 +175,20 @@ description = "claudevs check over the fixture plugin corpus, both directions"
 # still rejects bad-matcher-plugin on a machine that has `claude` installed:
 # exit 1, "hooks.PreToolUseX: Invalid key in record". A failing stage no
 # longer stops the run, so the wiring stage runs right after it and reports
-# its own FAIL for the same fixture (an unknown hook event and an
-# unparseable matcher regex) — both FAIL lines show up in one report. On the
-# CI runner, where `claude` is absent, validate reports itself skipped and
-# wiring's FAIL is the only one produced. Either way wiring FAILs, and that
-# is the stage this lane asserts — so the deterministic matcher checker is
-# exercised here and on CI alike, and a local pass is evidence for both.
+# its own FAIL for the same fixture — both FAIL lines show up in one report.
+# On the CI runner, where `claude` is absent, validate reports itself skipped
+# and wiring's FAIL is the only one produced. Either way wiring FAILs, and
+# that is the stage this lane asserts — so the deterministic wiring checkers
+# are exercised here and on CI alike, and a local pass is evidence for both.
+#
+# wiring's FAIL is now carried by `refs`, not `matchers`: the fixture's unknown
+# hook event and unparseable matcher regex are both warnings (a documented
+# event claudevs' catalogue may lag, and a matcher divergence claudevs cannot
+# prove the runtime would also reject), and a warning never fails a stage
+# (crates/claudevs/src/wiring/finding.rs). The fixture's `hooks.json` command
+# also references `${CLAUDE_PLUGIN_ROOT}/scripts/absent.sh`, a script that does
+# not exist — a genuine `refs` error — so wiring still FAILs for a reason that
+# is really a defect, on every machine.
 #
 # `root` is deliberately relative: `claudevs check` resolves `plugin_dir` to
 # an absolute path once, up front, and uses that single value for both the
@@ -301,6 +309,121 @@ expect_no_fail exec-args-plugin 0
 # fixtures would go green the day this routing check stopped reporting.
 expect_stage_fail matcher-routing-plugin 1 test
 '''
+
+[tasks.corpus-fetch]
+category = "Plugin suite"
+description = "Clone the pinned third-party plugin corpus into target/corpus"
+# The only step in this repository that touches the network. It is never a
+# dependency of `dod`, never runs in CI, and is run before a release rather
+# than on every commit — the corpus is pinned by commit SHA rather than
+# vendored, which keeps repository weight at zero (vendoring measured 19 MB
+# for all 156 roots) and keeps the published .crate clear of the crates.io
+# size ceiling. The cost of that choice is exactly this: a check nobody is
+# obliged to run guards by convention.
+#
+# A pinned SHA is re-fetchable while the commit stays reachable. A repository
+# that is deleted, made private, or force-pushed makes its row a record of
+# what was tested rather than something re-runnable. That is expected; report
+# such a row as unfetchable rather than repinning it silently.
+script_runner = "@shell"
+script = '''
+set -eu
+manifest="crates/claudevs/tests/corpus/corpus.toml"
+dest="target/corpus"
+log="$dest/.fetch-log"
+unfetchable="$dest/.unfetchable"
+
+# Stale markers from a previous, possibly-interrupted run must not vouch for
+# this one. `dest` itself is created lazily below, only once there is
+# something to write into it, so a run that clones nothing leaves no
+# directory behind for `corpus_root()` (tests/corpus.rs) to find.
+rm -f "$log" "$unfetchable"
+
+# There is no TOML parser in the shell, and the manifest does not need one:
+# every [[repo]] block carries name, url and sha on their own lines, in that
+# order, because the generator that wrote the file emits exactly that shape.
+# awk reduces it to `name<TAB>url<TAB>sha` and the loop below does the rest.
+awk -F'"' '
+  /^name = "/ { name = $2 }
+  /^url = "/  { url  = $2 }
+  /^sha = "/  { print name "\t" url "\t" $2 }
+' "$manifest" | while IFS="$(printf '\t')" read -r name url sha; do
+  mkdir -p "$dest"
+  slug=$(printf '%s' "$name" | tr '/' '_')
+  repo="$dest/$slug"
+
+  if [ -d "$repo/.git" ] && [ "$(git -C "$repo" rev-parse HEAD 2>/dev/null)" = "$sha" ]; then
+    printf 'ok    %s @ %s\n' "$name" "$sha"
+    printf '%s\n' "$name" >> "$log"
+    continue
+  fi
+
+  rm -rf "$repo"
+  mkdir -p "$repo"
+  git -C "$repo" init -q
+  git -C "$repo" remote add origin "$url"
+  # A pinned SHA is fetchable directly while the commit stays reachable. A
+  # repository that was deleted, made private, or force-pushed fails here,
+  # and that is the honest outcome: its row records what was tested rather
+  # than something re-runnable. Report it; do not repin it.
+  if git -C "$repo" fetch -q --depth 1 origin "$sha" 2>/dev/null; then
+    git -C "$repo" checkout -q FETCH_HEAD
+    printf 'fetched %s @ %s\n' "$name" "$sha"
+    printf '%s\n' "$name" >> "$log"
+  else
+    printf 'UNFETCHABLE %s @ %s (deleted, private, or force-pushed)\n' "$name" "$sha" >&2
+    rm -rf "$repo"
+    printf '%s\n' "$name" >> "$log"
+    printf '%s\n' "$slug" >> "$unfetchable"
+  fi
+done
+
+# `read`'s while loop above runs in a pipeline, so a POSIX shell forks it into
+# a subshell and any counter set inside it vanishes when the loop ends — the
+# log file is what survives. `total` is hardcoded rather than re-derived from
+# the same awk pass that fills the log: deriving it from the manifest would
+# let a format drift that makes awk match nothing shrink both sides together
+# and pass at 0 == 0, hiding the exact failure this check exists to catch.
+# 13 is the repository count `crates/claudevs/tests/corpus.rs` already
+# asserts against the same manifest; bump both together if the corpus grows.
+total=13
+logged=0
+if [ -f "$log" ]; then
+  logged=$(wc -l < "$log" | tr -d ' ')
+fi
+if [ "$logged" -ne "$total" ]; then
+  echo "corpus-fetch: manifest names $total repositories, accounted for $logged — some entry was neither cloned, cached, nor recorded unfetchable" >&2
+  exit 1
+fi
+'''
+
+[tasks.corpus-check]
+category = "Plugin suite"
+description = "Sweep the fetched third-party corpus and check it is not short (slow; needs corpus-fetch)"
+# Not a dependency of `dod` and not in CI, for the reason the corpus is
+# pinned rather than vendored: the clones are not in the repository, so this
+# lane cannot run on a checkout alone. It is run before a release.
+#
+# This is the second corpus, not a replacement for the first.
+# `cargo make claudevs-check` runs the hand-authored fixtures in
+# crates/claudevs/tests/fixtures/ in both directions and stays exactly as it
+# is: those fixtures pin the behaviour claudevs intends, and they are cheap
+# and unskippable. This one answers the different question — whether that
+# intent survives contact with plugins nobody here wrote.
+#
+# `--ignored` alone is not enough: `cargo test` exits 0 when a filter matches
+# nothing, so a typo'd binary or package name here would report success
+# having run zero tests. There is no flag that turns that into a failure, so
+# this lane is only as safe as the runner's own tests being unskippable when
+# asked for. Two guards in tests/corpus.rs carry that weight: `corpus_root()`
+# asserts `target/corpus` exists at all, and
+# `the_sweep_renders_one_row_per_manifest_root` additionally checks every
+# repository that carries a plugin root either has a checkout on disk or was
+# recorded unfetchable by `corpus-fetch`'s `.unfetchable` marker — closing the
+# gap where a corpus with nothing (or only part of it) cloned would still
+# render one row per manifest root and read as a clean pass.
+command = "cargo"
+args = ["test", "-p", "claudevs", "--test", "corpus", "--", "--ignored", "--nocapture"]
 
 [tasks.install-airsl]
 category = "Plugin suite"

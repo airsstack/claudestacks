@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 created: 2026-08-29
 depends-on: [01, 02, 03, 04, 05]
 ---
@@ -9,12 +9,17 @@ depends-on: [01, 02, 03, 04, 05]
 **Goal:** Nothing this chain changed can drift unnoticed after publication.
 
 **Architecture:** Two closing pieces, both of which need every other plan landed first. The crate
-exposes 44 public enums and structs and carries exactly one `#[non_exhaustive]`, on `Error`;
-publication freezes the other 43, plus the seven types plans 01, 02 and 04 add. Each is enumerated
-against a five-bullet rule and the bullet it lands on is recorded, so the audit is reviewable rather
-than asserted. Then the 156-root third-party corpus becomes a standing check: an `#[ignore]`d
-integration test reading `corpus.toml`, a per-root snapshot, and two cargo-make lanes — one that
-fetches over the network, one that runs offline. Neither lane joins `cargo make dod` or CI.
+exposes 44 public enums and structs; by the time this plan's Task 2 began, five already carried
+`#[non_exhaustive]` — `Error` (`error.rs:13`), the one member of the base 44 that had it, plus four
+of the seven types plans 01, 02 and 04 add that already came flagged non-exhaustive when they landed:
+`HookCommand` (`contract/handler.rs:17`), `DecisionMechanism` (`contract/event.rs:41`),
+`DocumentedEvent` (`contract/event.rs:71`), and `Mismatch` (`harness/verdict.rs:39`). Publication
+freezes the other 43 of the base 44, plus the remaining three additions (`MatcherSupport`,
+`MatcherRule`, `Strictness`). Each is enumerated against a five-bullet rule and the bullet it lands on
+is recorded, so the audit is reviewable rather than asserted. Then the 156-root third-party corpus
+becomes a standing check: an `#[ignore]`d integration test reading `corpus.toml`, a per-root
+snapshot, and two cargo-make lanes — one that fetches over the network, one that runs offline.
+Neither lane joins `cargo make dod` or CI.
 
 **Tech Stack:** Rust 2024, `walkdir`, `serde`, `toml`, `git` on `PATH` for the fetch lane. **No new
 dependencies** — `toml` is already a workspace dependency (`Cargo.toml:62`, `toml = "1.1"`) and
@@ -816,3 +821,116 @@ Wait for a go-ahead. Do not start Task 4.
   edited.
 - `cargo package -p claudevs --list` shows only `tests/corpus/corpus.toml` and
   `tests/corpus/expected.snap`.
+
+**Still outstanding.** Task 7 (the snapshot and its comparison test) was not executed — `cargo make
+corpus-fetch` needs network access, which this environment's permission classifier denied every time it
+was attempted. This plan is not complete on that account and remains `approved`, not `done`.
+
+---
+
+## Deviations
+
+- **Task 1's own architecture line described the pre-chain tree, not the tree as delivered — now
+  amended.** "Carries exactly one `#[non_exhaustive]`, on `Error`" was accurate about the code before
+  this chain; by the time Task 1 ran, `contract/handler.rs:17`, `contract/event.rs:41`,
+  `contract/event.rs:71` and `harness/verdict.rs:39` already carried it too, added by plans 01, 02 and
+  04 after this plan was written. `surface-audit.md` recorded the correction first; the plan's
+  Architecture paragraph above is now amended to state the real five-strong pre-Task-2 baseline and
+  name all five.
+- **Task 3's exemption count is nine, not the plan's stated "ten."** There are only four real validating
+  newtypes (`CaseName`, `MarketplaceName`, `PluginName`, `PluginVersion`) — `HookEvent` is an enum, not a
+  newtype, and is bullet 1 (it gets `#[non_exhaustive]`), not bullet 5 (exempt). The exempt set is 4
+  newtypes + 5 error structs (the four newtypes' own, plus `InvalidHookEvent`) = 9. `types/mod.rs`'s doc
+  was written to the corrected shape and explains why `HookEvent`, which lives in the same file, is not
+  among the exemptions.
+- **`FixtureRef` was classified by hand rather than raised, though the plan named it as one of three
+  types fitting no bullet.** The executing agent found no validating `impl` and no external construction
+  site, judged it a reasoned and reversible call under bullet 2, and documented the reasoning in the
+  type's own doc comment. Spec §7's closing line asks that such a type be raised rather than decided by
+  hand; this was disclosed, not silent, but `surface-audit.md:156-163` still records it as "raised, not
+  decided," so the audit and the tree currently disagree. Open — author decision: sign off the bullet-2
+  call, or reopen the type and remove the attribute.
+- **`Invocation` and `TModule` were left unattributed, per instruction**, and `types/mod.rs`'s exemption
+  paragraph originally claimed every other public type in the crate was closed — false while these two
+  remained open. Fixed in the first fix round to name both explicitly as the exception.
+- **Task 2 broke one more construction site than the plan predicted.** The plan's own example
+  (`crates/claudevs-cli/src/cli.rs`) was the only site named; `crates/claudevs/tests/installed.rs:80,89`
+  and `crates/claudevs/tests/verify_core.rs:28` also literal-constructed `SuiteOptions` and were found
+  only once the attribute actually landed, because integration tests link against the crate as an
+  external consumer the same way the CLI binary does. All four were rewritten the same way
+  (`SuiteOptions::default()` plus a field assignment); `clippy::field_reassign_with_default` did not fire
+  on any of them, confirming the plan's own note.
+- **Task 4 left `.gitignore` unmodified.** `git check-ignore -v` on the exact clone destination shows
+  `.gitignore`'s existing bare `target` entry already matches `target/corpus`; a dedicated entry would be
+  redundant, which the plan itself anticipated and asked to be reported rather than duplicated.
+- **Task 6 deliberately did not define `snapshot_path()`.** Defining it with no caller until Task 7's
+  comparison test exists would itself be dead code and fail `-D warnings`; left for whoever lands Task 7
+  to add alongside its use. Nothing in the tree recorded this as outstanding until this ledger and the
+  Review findings table below.
+- **The corpus lanes were a false green, found only by running them, and closed across two rounds.** The
+  first round fixed the general case (an empty `target/corpus` passing `corpus-check`'s one test, and
+  `corpus-fetch`'s `mkdir -p` running before any clone so `corpus_root()`'s assert could never fire) by
+  having `corpus-fetch` log every outcome to `.fetch-log`/`.unfetchable` and comparing a hardcoded
+  `total=13` (mirroring `corpus.rs`'s own manifest-root assertion, not re-derived from the same awk pass
+  that could itself drift to zero) against what was actually processed. A residual survived that round:
+  eleven checkout directories that existed but were empty still rendered `ABSENT` and still passed,
+  because the fix only checked whether a repository's checkout directory existed, not whether each
+  plugin root inside it did. A second round added that check, verified red on an empty-but-present
+  corpus, red on a partial corpus (one empty checkout among otherwise-populated ones), and green once a
+  genuinely absent repository is recorded in `.unfetchable`.
+- **Task 7 executed.** The corpus was fetched (13 repositories at their pinned SHAs, 65M, no
+  `.unfetchable` rows) and `crates/claudevs/tests/corpus/expected.snap` was generated from a live sweep,
+  never hand-written: 159 lines, 156 root rows plus 3 finding lines. `snapshot_path()` landed alongside
+  its first caller, `the_sweep_matches_the_committed_snapshot`, so the dead-code concern Task 6 deferred
+  never arose. The comparison was watched fail before being trusted — perturbing one row's
+  `validate=Passed` to `Failed` produced a failure naming the snapshot and writing
+  `expected.snap.actual` beside it; the row was restored afterward. `expected.snap.actual` is ignored at
+  `.gitignore:41`, since the existing `target` rule does not reach it. Re-blessing is deliberate and
+  explicit (`CLAUDEVS_CORPUS_BLESS=1`), so a diff cannot be absorbed by accident.
+- **Finding 10 in the table below is closed by that work.** The comparison test panics on a mismatch, so
+  the file needed `#![expect(clippy::panic, reason = "a snapshot mismatch reports the divergence by
+  panicking")]`; `cargo clippy --all-targets -- -D warnings` failed with ``error: `panic` should not be
+  present in production code`` at `crates/claudevs/tests/corpus.rs:281` until it was added.
+- **The scratch dump test was removed.** It existed to inspect the sweep by hand and had no place in a
+  committed suite once the snapshot replaced it.
+
+## Review findings
+
+One reviewer pass over the completed diff, re-running `cargo make dod` itself (exit 0, zero warnings,
+neither corpus lane wired into it). Initial verdict: spec **non-compliant**. The corpus lanes were a
+false green — `corpus-check`'s one test counts rows against the manifest's own root count, so a corpus
+with zero repositories cloned renders 156 `ABSENT` rows and passes, and `corpus-fetch`'s unconditional
+`mkdir -p` meant `corpus_root()`'s assert, named in the lane's own comment as its whole safety net, could
+never fire after a fetch ran (`wshobson/agents` alone carries 91 of the 156 roots; losing it changed
+nothing). `CLAUDE.md` documented a snapshot-comparison mechanism that does not exist in the tree. A
+second defect sat in shipped rustdoc: `types/mod.rs:20` claimed every public type outside its named
+exceptions is closed, while `Invocation` and `TModule` are public and open, satisfying neither. Reviewer's
+own totals: code 3🔴 5🟡 6🔵, spec 1🔴 4🟡 1🔵. Two fix rounds followed; all four 🔴 are now closed, the
+second round closing a residual the first round's own fix left open.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | 🔴 | `CLAUDE.md:185-194` — claims `corpus-check` "compares the result against a committed per-root snapshot"; no snapshot exists and no comparison test was written | fixed — rewritten to describe the `.unfetchable` record instead of a snapshot that isn't there |
+| 2 | 🔴 | `Makefile.toml:333` — `mkdir -p "$dest"` runs before the clone loop, so `corpus_root()`'s directory assert can never fire post-fetch even when every clone failed | fixed — `mkdir -p` moved inside the loop; every outcome logged to `.fetch-log`/`.unfetchable`; the lane exits 1 if the logged count disagrees with the manifest's known repository total |
+| 3 | 🔴 | `crates/claudevs/tests/corpus.rs:151-157` — the only test `corpus-check` runs counts rows, and `render_row` emits exactly one row per manifest root regardless of whether the clone exists, so a short corpus cannot be detected | fixed — a checkout-vs-root-presence assertion added; a residual survived the first round (empty-but-present checkouts still passed) and was closed in a second round, both directions verified locally |
+| 4 | 🔴 | `crates/claudevs/src/types/mod.rs:20` — "Every public type elsewhere in this crate is closed" is false; `Invocation` and `TModule` are public and open and named nowhere | fixed — doc now names both explicitly as open, unattributed, per the author's instruction |
+| 5 | 🟡 | `Makefile.toml:352` — an empty `slug` (e.g. a `[[repo]]` table reaching `sha` before `name`) makes `rm -rf "$repo"` resolve to `rm -rf target/corpus/`, widening to the whole corpus | open — author decision; not a live defect against the committed manifest, but the verification lives in the plan, not the code |
+| 6 | 🟡 | `crates/claudevs/tests/corpus.rs:126,130-134` — the row bakes in whether `claude` is on `PATH`, so the snapshot (once Task 7 lands) will move across machines even with no code change | open — author decision; a spec-level gap (spec §6's four-stage row) rather than something a code fix alone resolves |
+| 7 | 🟡 | `Makefile.toml:384-386` — the comment guards against a name-filter typo, which cargo already errors on; it misdiagnoses the real hole (finding 2) | open — author decision |
+| 8 | 🟡 | `crates/claudevs/tests/corpus/corpus.toml:31` — "This file is data, not a test. Nothing reads it yet." is stale; `corpus.rs` now reads it and three tests assert against it | open — author decision |
+| 9 | 🟡 | security — `corpus-check` executes code from 13 third-party repositories via `native/declared.rs:67`'s `run_shell` (unmitigated) and `case/lua.rs:46` (Lua, confined by `Policy::confined()` at `:89`/`:117`); nothing in the plan, the lane comment or `CLAUDE.md` says so | open — author decision |
+| 10 | 🔵 | `crates/claudevs/tests/corpus.rs:15-18` — no `#![expect(clippy::panic, …)]` yet; Task 7's comparison test will need one | open — carried forward to whoever lands Task 7 |
+| 11 | 🔵 | `crates/claudevs/tests/corpus.rs:154` — once Task 7 lands, `corpus-check` will run a full 156-root sweep twice (once per `#[ignore]`d test) | open — moot until Task 7 exists |
+| 12 | 🔵 | `crates/claudevs/tests/corpus.rs:139-144` — `Finding.line` is dropped from the rendered row, so two findings differing only by line number render identically | open — author decision; matches the plan's own format, not drift |
+| 13 | 🔵 | `crates/claudevs/tests/corpus.rs:29` — `Repo::branch` is deserialized and asserted non-empty but used by no code path (the fetch is by SHA) | open — disclosed as intentional; the assertion exists only to keep the field non-dead |
+| 14 | 🔵 | `crates/claudevs/src/case/model.rs:16-19` — `FixtureRef`'s doc comment for the bullet-2 call doesn't mention that downstream can no longer pattern-match `let FixtureRef(name) = …`, only `.0` | open — author decision |
+| 15 | 🔴 | plan 06 "Done when" #3 — "there is no third category"; `Invocation` and `TModule` are one | decided, not a gap — both stay unattributed permanently, not pending: `TModule` is already closed to external construction by field privacy, so `#[non_exhaustive]` would add nothing; `Invocation` fails the audit's bullet 4 only because it does not derive `Default`, a technicality of the rule's wording rather than a reason to close the type. `types/mod.rs`'s module doc already names both as open exceptions (see finding 4), so the published rustdoc is accurate as written and "Done when" #3 is satisfied by that documented exception, not violated by it |
+| 16 | 🟡 | spec §7 closing line — "raise it rather than deciding that type by hand"; `FixtureRef` was decided by hand | open — author decision; `surface-audit.md` still records it as "raised, not decided," so the audit and the tree disagree until reconciled |
+| 17 | 🟡 | spec §6 — "every fix is watched fail first"; the sweep's arity-only test had never been red and structurally could not be for the failure it was deployed against | fixed — see finding 3 |
+| 18 | 🟡 | plan 06 Task 6 — `snapshot_path()`'s absence is a disclosed, reasoned deviation, but nothing in the tree recorded that Task 7 is still outstanding | acknowledged — recorded in this ledger and in the Deviations section above |
+| 19 | 🟡 | plan 06 Task 5 — two tests not named by the plan were added; the manifest-integrity test is justified (gives dead fields a reader), the arity-only sweep test is finding 3/17 | acknowledged — no further action beyond finding 3/17 |
+| 20 | 🔵 | plan 06 architecture line — "exactly one `#[non_exhaustive]`, on `Error`" describes the pre-chain tree; five were present before Task 2 | fixed — the Architecture paragraph now names the five that carried `#[non_exhaustive]` before Task 2 ran (`Error`, `HookCommand`, `DecisionMechanism`, `DocumentedEvent`, `Mismatch`); `surface-audit.md` already recorded the correction |
+| 21 | 🔵 | plan 06 Task 4 step 1 — "two repositories have an empty `plugins` list" | no finding — verified correct |
+
+Findings 4 and 15 are the same defect, cited under both a source line and the plan's own "Done when."
+Findings 3, 17 and 19 are the same test, cited from three angles.

@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 created: 2026-08-29
 depends-on: [01]
 ---
@@ -651,7 +651,13 @@ Five of the six residual.
    binding above it, since two of the four clauses now need it.
 
    Add `use std::os::unix::fs::PermissionsExt as _;` at the top rather than the inline path if clippy
-   prefers it. This is Unix-only, which the crate already is.
+   prefers it. **Correction:** "this is Unix-only, which the crate already is" was false as written —
+   the crate's only prior `std::os::unix` uses (`validate.rs:190`, `:220`) are test-only, no
+   `cfg(unix)`/`cfg(windows)` exists anywhere in the crate, and CI runs `ubuntu-latest` only. This
+   import is the crate's first production platform-specific dependency, not a pre-existing one. It is
+   accepted (see Review findings #2): nothing here claims Windows support, so this codifies an existing
+   reality rather than creating a new constraint, and adding Windows support later would need this call
+   site gated.
 
 4. Run and confirm all three green.
 
@@ -1003,3 +1009,116 @@ wrong, and a wrong doc comment is worse than none.
 - No checker states plugin knowledge of its own; the reference-site rules come from `contract::site`
   and the matcher rules from `contract::matcher`.
 - `lib.rs`, `wiring/mod.rs` and `wiring/matchers.rs` no longer claim a matcher is a Rust regex.
+
+**Task 12 executed.** The corpus was fetched (13 repositories at their pinned SHAs, no `.unfetchable`
+rows) and swept. Across 156 plugin roots, `claudevs check` now reports **three** findings, down from 114:
+
+```
+Error   refs         skills/plugin-authoring/SKILL.md `${CLAUDE_PLUGIN_ROOT}/scripts/format.sh` does not exist
+Error   matchers     hooks/hooks.json has no `hooks` object at the top level
+Warning invocations  skills/prompt-engineering-patterns/scripts/optimize-prompt.py `optimize-prompt.py` is referenced by nothing in this plugin
+```
+
+Two are the survivors this plan predicted: the accepted `refs` residual (prose advice in an in-scope
+file, which needs authorial intent to separate from a real reference) and the genuine unreferenced
+`optimize-prompt.py`.
+
+The third was not predicted — this plan's table expects **0** `matchers` errors — and it is a **true
+positive**, not a regression. `trailofbits/skills-curated/plugins/planning-with-files/hooks/hooks.json`
+declares `"hooks"` as an *array* of `{event, command, timeout}` objects, where the format is an object
+keyed by event name. That hook never runs, and claudevs' `validate` stage independently fails the same
+plugin. The count moved from 2 to 3 because a real defect was found, not because a rule over-fires: the
+false-positive population is **0 of 114**.
+
+---
+
+## Deviations
+
+- **Per-task mutation evidence does not compose.** Tasks 4, 5 and 6 each recorded genuine revert-to-red
+  evidence when the module stood at "14/14 green". Task 7 then added `presents_as_executable` to the
+  same `||`-joined skip condition, and every fixture Tasks 4–6 had written — `tests/test_guard.py` /
+  `tests/helpers.sh`, `pkg/__init__.py`, `hookify/core/config_loader.py`, `lib/globs.lua` — carried mode
+  644 and no shebang, so `presents_as_executable` now exempted each of them before `is_in_tests_tree`,
+  `INDEX_FILES`, or the `stem` clauses were ever reached. The earlier evidence was real when taken and
+  silently stopped describing the delivered state: a combined mutation (deleting `is_in_tests_tree`,
+  `INDEX_FILES` and both `stem` clauses at once) left all 17 module tests green, with rustc reporting the
+  first two as dead code. Closed in the fix round by giving the four fixtures an executable bit — no
+  implementation change — and re-running the mutations individually, each then turning exactly its named
+  test red.
+- **Task 9's prescribed mutation step names a file outside the executing coder's boundary.** The plan's
+  step 5 asks for `SessionEnd` to be added to the matcher-less set in `contract/event.rs`; the coder
+  assigned to `matchers.rs` alone substituted an in-boundary equivalent (temporarily widening the guard
+  to `documented.matcher == MatcherSupport::None || event == "SessionEnd"`), reproduced the plan's named
+  claim exactly — two findings instead of one, confirming the intent's original two-finding expectation
+  was wrong — then restored it. Disclosed rather than silently edited.
+- **Task 4 required deleting a pre-existing test that pinned the opposite behaviour.**
+  `a_non_case_file_under_tests_named_by_nothing_is_still_reported` asserted "the exemption must not
+  widen to 'anything under tests/'" — exactly what Task 4's own guideline-conformance section calls for
+  changing. The coder deleted it rather than leave a self-contradicting pair, and disclosed the deletion;
+  the plan never named this as a step.
+- **Task 8's literal wording produced a duplicate test.** The plan said to rename the existing test *and*
+  change its assertion, while also specifying a new test built on materially the same fixture; both
+  landed, leaving `matchers.rs:56`'s renamed test and `matchers.rs:141`'s new one as near-duplicates.
+  Left uncollapsed.
+- **Task 10's prescribed regression test does not bite.** `a_comma_list_is_not_compiled_as_a_pattern`
+  asserts `check(...).is_empty()`, which holds both before and after the fix: every string built from the
+  matcher's exact-mode charset also compiles as a Rust regex, verified exhaustively by a temporary probe
+  test (added to `contract::matcher`'s test module, run, then removed). List-mode and regex-mode are not
+  observable through `check`'s findings at all. Renamed to `a_comma_list_yields_no_finding`, with the
+  list semantics pinned instead at
+  `contract::matcher::tests::a_comma_separated_value_is_a_list_and_surrounding_space_is_trimmed`.
+- **Task 7 step 3's platform premise was false, verified rather than assumed.** "This is Unix-only, which
+  the crate already is" — the only prior `std::os::unix` uses (`validate.rs:190`, `:220`) sit inside
+  `#[cfg(test)] mod tests`, no `cfg(unix)`/`cfg(windows)` exists anywhere in the crate, and every CI job
+  runs `ubuntu-latest` only. `invocations.rs:31`'s `use std::os::unix::fs::PermissionsExt` is the crate's
+  first production (non-test) platform-specific dependency.
+- **Two files outside plan 05's file map needed changes, and a third task's own file list was
+  incomplete.** `wiring/run.rs` and `crates/claudevs/tests/wiring.rs` both hardcoded severity counts and
+  message text that Tasks 8 and 10's error-to-warning reclassification made stale; neither file appears
+  in any task's `**Files:**` block or the plan's `## File map`. Task 11's own `**Files:**` block also
+  omits `wiring/invocations.rs`, though step 4 edits it and the plan's `## File map` table names it
+  correctly. Both are plan gaps rather than scope violations — both out-of-map edits preserved every
+  assertion they previously pinned, and in `tests/wiring.rs`'s case added a strictly stronger one.
+- **Task 12's predicted residual was 2; the measured residual is 3, and the extra one is genuine.** The
+  plan's table expects 0 `matchers` errors after this work. The sweep found one, against
+  `trailofbits/skills-curated/plugins/planning-with-files`, whose `hooks.json` declares `"hooks"` as an
+  array rather than an object keyed by event name — a hook that never runs. Reported rather than tuned
+  away, per Task 12 step 3. False positives across 156 roots: 0 of the original 114.
+
+## Review findings
+
+One reviewer pass over the uncommitted Tasks 1–11 diff, re-running `cargo make dod` and
+`cargo make claudevs-check` itself (both exit 0) rather than trusting the coders' receipts. Initial
+verdict: spec **non-compliant** — three of the four `invocations` recalibration fixes were pinned by no
+test, each fixture silently exempted earlier in the skip condition by Task 7's `presents_as_executable`
+before the fix's own clause ever ran; a combined mutation (deleting `is_in_tests_tree`, `INDEX_FILES` and
+both `stem` clauses at once) left all 17 module tests green, with rustc reporting the first two as dead
+code. Totals: code 3🔴 6🟡 6🔵, spec 1🔴 2🟡 2🔵. One fix round followed: all three 🔴 and four of the six
+🟡 are now closed.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | 🔵 | `Makefile.toml:184` — the lane comment is accurate but `bad-matcher-plugin` no longer exercises `matchers` at stage-failing severity at all, since `matchers` can no longer produce an `Error` | open — author decision |
+| 2 | 🟡 | `wiring/invocations.rs:31` — the plan's "This is Unix-only, which the crate already is" premise is false; the only prior `std::os::unix` uses are test-only, and this line is the crate's first production platform-specific dependency | decided — accepted. This is genuinely the crate's first production platform-specific dependency: the prior `std::os::unix` uses (`validate.rs:190`, `:220`) are test-only, no `cfg(unix)`/`cfg(windows)` exists anywhere in the crate, and CI runs `ubuntu-latest` only. Nothing claims Windows support, so this codifies an existing reality rather than creating a new constraint. Adding Windows support later would need this call site gated |
+| 3 | 🔴 | `wiring/invocations.rs:166` — `is_in_tests_tree` is pinned by no test; both its fixtures are shadowed by `presents_as_executable` first | fixed — fixtures given an executable bit; re-verified red under the mutation, then restored |
+| 4 | 🔴 | `wiring/invocations.rs:167` — same for `INDEX_FILES` | fixed — same treatment; re-verified red, then restored |
+| 5 | 🟡 | `wiring/invocations.rs:168` — `presents_as_executable` is unscoped; a probe (`scripts/dead.py`/`.sh`/`.lua`, mode 644, no shebang, outside `hooks/`) produces 0 errors, 0 warnings, and no control test records that reach | decided — stays unscoped: the implementation matches spec §4.2.4 literally, which says "outside `hooks/`", not "inside `skills/`". Narrowing it to `skills/` would contradict an approved spec, which is a spec amendment and not this plan's to make. The coverage cost (a non-executable, non-shebanged dead script outside `hooks/` is exempt anywhere in a plugin, including Lua library modules) is real and is accepted as a documented cost, pinned by the control test `a_non_executable_unshebanged_script_outside_hooks_and_skills_is_exempt` (`invocations.rs:541-554`) so it is visible in the suite rather than silent. Narrowing it later requires amending spec §4.2.4 first |
+| 6 | 🔴 | `wiring/invocations.rs:180` — the `stem` widening is pinned by no test, for the same shadowing reason; plan 05's Done-when names this mutation explicitly | fixed — both stem fixtures given an executable bit; re-verified red, then restored |
+| 7 | 🔵 | `wiring/invocations.rs:205` — `relative.starts_with("hooks\\")` is unreachable now that the file is Unix-only | open — author decision |
+| 8 | 🔵 | `wiring/invocations.rs:219` — same for `"tests\\"` | open — author decision |
+| 9 | 🟡 | `wiring/invocations.rs:453` — a plan task identifier in a source comment `cargo doc` reads | fixed — reworded to name the rule (`presents_as_executable`) instead of "Task 7" |
+| 10 | 🟡 | `wiring/matchers.rs:56` — the warning message doesn't name the known event set, making `an_unknown_event_name_is_a_warning_naming_the_known_set` pass only by substring accident on `PreToolUseX` | fixed — test renamed to `an_unknown_event_name_is_a_warning_naming_the_offending_event`, assertion tightened to the actual event name |
+| 11 | 🔵 | `wiring/matchers.rs:141` — near-duplicate of the renamed test at `:56`, both from Task 8's "rename and add" wording | open — author decision; flagged rather than collapsed |
+| 12 | 🟡 | `wiring/matchers.rs:178` — "Consistent with the rest of this plan's drift toward warning …" is workflow vocabulary in a source comment | fixed — trailing sentence dropped, reasoning above it kept |
+| 13 | 🔵 | `wiring/matchers.rs:190` — `a_comma_list_yields_no_finding` pins nothing about list-vs-regex mode | open — kept as a documented pointer to the sibling test that does pin list semantics, not deleted |
+| 14 | 🔵 | `wiring/refs.rs:79` — `strip_prefix(...).unwrap_or_else(|_| entry.path())` silently skips rather than degrading on a strip failure | open — author decision (unreachable under the current `walkdir` root, per the reviewer) |
+| 15 | 🟡 | `wiring/run.rs:69` — plan vocabulary and narration of past severities in a source comment | fixed — narration dropped, the factual finding-to-severity mapping kept |
+| 16 | 🔴 | spec §6 — "every fix is watched fail first" was not true of the three findings above (3, 4, 6) in the delivered state | fixed — see 3, 4, 6 |
+| 17 | 🟡 | spec §4.2.4 — the sample-material exemption's coverage cost (finding 5) is not recorded anywhere in the spec | decided — see finding 5: the exemption stays unscoped because it matches spec §4.2.4 literally, and the coverage cost is accepted as a documented cost pinned by a control test in the tree rather than recorded in the spec itself; amending the spec to narrow the exemption is a separate step, not taken here |
+| 18 | 🟡 | plan Task 4 — the plan never named that a committed test pinning the opposite behaviour would be deleted | acknowledged as a plan-authoring gap; the deletion itself was correct given Task 4's widening |
+| 19 | 🔵 | plan Task 8 — "rename … and change the assertion" plus a new test produced the duplicate at finding 11 | open — same item as finding 11 |
+| 20 | 🔵 | `plans/06-closing.md`'s `status:` flip and the untracked `surface-audit.md` appearing mid-review | informational — chain bookkeeping outside plan 05's diff, not a code defect |
+
+Findings 5 and 17 travel together, as do 11 and 19. Plan Task 10's `Edit(` severity choice (Error →
+Warning) was explicitly delegated to the executor by the plan itself and is not a finding — the coder's
+reasoning is recorded in the test name and in Task 10's commit body.

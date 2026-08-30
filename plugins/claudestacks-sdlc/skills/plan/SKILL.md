@@ -235,8 +235,9 @@ it again when the author asks for changes — revise and present.
 
 Rounds beyond the first return progressively smaller findings about the plan's internal
 reasoning, while the defects that actually reach code are wrong external facts and
-compile-level details. The first no round can catch, because every criterion but one
-compares documents to each other — grounding against the artifact is what replaces them.
+compile-level details. The first no round can catch, because every criterion but the two
+grounding ones compares documents to each other — grounding against the artifact, and
+against a run, is what replaces them.
 The second the compiler catches in seconds. A plan set that would need a second round
 needs rewriting, not re-reviewing.
 
@@ -270,7 +271,7 @@ than the report that reviewed it was not.
 
 The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
 § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
-and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
+the two that ground the set's claims outside it, and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
 rather than waiting for the agent to find them — a plan that reaches the reviewer full
 of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can
 act on, apply that same file's criteria inline yourself and tell the user the review ran

@@ -64,8 +64,15 @@ Cite every finding by artifact section — `spec.md §4`, `plans/02-foo.md Task 
 with no location is not actionable. Report every tier, nits included: completeness is your
 job, triage belongs to the skill and the user.
 
+The verdict line states the blocking set exactly — its count, or `none` when there is no
+🔴. That set is the stopping condition the calling skill closes the round on, so getting it
+right matters more than any single finding below it. Coming back with 🟡 and 🔵 under
+`none` blocking is a normal, passing review; say nothing that reads as "another round would
+help".
+
 If the draft is clean, say so in one line and report nothing further. Never invent findings
-to justify the spawn.
+to justify the spawn, and never inflate a nit to 🔴 to look thorough — a padded blocking set
+holds the artifact for nothing.
 
 ## Boundaries
 

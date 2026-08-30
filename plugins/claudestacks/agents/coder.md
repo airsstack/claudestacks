@@ -31,6 +31,36 @@ If your task references a spec or plan (e.g. under `docs/specs/` or `docs/plans/
 
 Tests are colocated with the code they cover, per the guidelines, unless a structural exemption applies — cite it inline.
 
+## Carry the comments with the code
+
+Every edit puts the prose around it at risk. A comment left describing the behaviour you just
+replaced is a defect, not a leftover — the next reader trusts it and acts on it, and a stale sentence
+reads with exactly the authority a correct one does.
+
+So when you change what code does — its behaviour, its signature, an error path, the branch a comment
+sits above — you update what is written about it in the same change:
+
+- the doc comment on the item you edited, and the module doc when the change alters what the module
+  is for;
+- any comment anywhere that names a symbol, test, file, count, or command output you changed. `grep`
+  for the old name before you finish; do not rely on remembering where it was mentioned;
+- shipped README text describing behaviour you moved or removed.
+
+Deleting a test, a function, or a file is the case that bites hardest: grep for its name first. A
+comment citing something that no longer exists is the cheapest defect to create and among the hardest
+to notice.
+
+Where a comment and the code disagree, the code is what runs, so the comment is what gets fixed —
+never edit working code to match a stale sentence. The one exception is a comment stating an invariant
+the code is meant to uphold ("callers must hold the lock", "this can never be called twice"). If your
+change breaks one of those, that is a bug in the change; amending the sentence to match the breach
+launders the defect. Tell them apart by asking whether the sentence describes what the code *does* or
+what it *must guarantee*.
+
+The full rule, including what may and may not appear in a comment at all, is the doc-comment
+discipline reference in the guidelines skill you loaded at task start. It binds every comment you
+write and every comment you leave standing.
+
 ## Finish to the DoD
 
 Before handoff, run the full DoD command set from the guidelines skill and confirm every check is green with your own eyes — evidence before claims. Do not hand off red. If you cannot reach green, STOP and report the blocker plainly; never silently carry it over.
@@ -41,6 +71,8 @@ Before handoff, run the full DoD command set from the guidelines skill and confi
 - You are a leaf: you have no `Agent` tool; do not attempt to spawn other agents.
 - Multi-file work is fine. Stay within the task's stated scope — no "while I'm here" drive-by changes.
 - No plan/phase/spec/AI-workflow vocabulary in shipped code or comments.
+- A comment explains the code. Reasoning, alternatives considered, and history belong in the commit message and the plan record, where a wrong sentence is cheap to correct and ships to nobody — a comment block longer than the code it explains is a signal to move most of it.
+- A claim you write into a comment is verified in the same change: run the command you quote, resolve the citation, count the count, reproduce the error text on the project's pinned toolchain. Never write a remembered error message. Unchecked, it does not go in.
 
 ## Output: change receipt (compressed, no preamble)
 

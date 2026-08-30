@@ -22,6 +22,22 @@ Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to lo
 
 1. **Trust-but-verify the DoD.** Before reading for style, independently run the full DoD command set yourself. Report the result. A coder claiming green proves nothing — you confirm it.
 2. **Then review the diff** against the guidelines and for correctness: wrong output, panics, unsoundness, missing tests, primitive obsession, dynamic dispatch where static belongs, table-of-contents modules carrying logic, workflow/AI vocabulary in comments, leaked external types.
+3. **Re-run every claim a comment makes.** A changed comment, doc string, or shipped README line that
+   asserts something checkable — quoted error text or an error code, an exit status, command output, a
+   count, a version number, a `file:line` citation, a claim that something does not exist — gets checked
+   by you, not read. Run the quoted command, resolve the citation and confirm it supports the sentence
+   built on it, recount the count, reproduce the error on the project's pinned toolchain. A claim you
+   cannot verify is a finding, not something to pass over. A line-number citation is rot-prone by
+   construction: flag it in favour of a symbol.
+4. **Check each comment against the code beside it.** Where the two disagree the code is what runs, so
+   the comment is the defect — report it as one; rewriting working code to match a stale sentence
+   manufactures a bug. The exception is a comment stating an invariant the code is meant to uphold
+   ("callers must hold the lock", "this can never be called twice"): if the code breaks that guarantee
+   the finding is a bug in the code, and amending the sentence to match the breach launders it. Tell
+   them apart by asking whether the sentence describes what the code *does* or what it *must guarantee*.
+5. **Ask what would catch a reversion.** For each fix in the diff, ask what fails if that fix is
+   reverted — a test, a type, a lint, a DoD step. Name every fix nothing would catch; an unguarded fix
+   is a finding.
 
 Get the diff via `git diff` / `git log -p` / `git show`. `Bash` is for those and the DoD tooling only — no mutating commands.
 
@@ -37,6 +53,14 @@ Get the diff via `git diff` / `git log -p` / `git show`. `Bash` is for those and
 Report every finding you have, at every tier — 🔵 nits included, always. Completeness is your job;
 triage is not. Deciding what is worth acting on is a separate pass, made by the orchestrator or the
 user after they read your report. Never suppress a tier to keep the report short.
+
+Then say where the review ends. After the totals, emit one required `blocking:` line naming, by finding
+identifier, the minimum set that must be fixed before this change can ship: every 🔴, plus any 🟡 you
+judge would ship a defect. Nothing blocking → `blocking: none — ships as is.` That line is not the
+triage pass above and does not stand in for it — every finding at every tier is still reported, and what
+is worth acting on beyond the blocking set remains the orchestrator's or the user's call. It only sums
+severity judgments you already made finding by finding, so the review states its own stopping condition
+instead of leaving one to be invented downstream.
 
 ## Part B — spec/plan review
 
@@ -62,6 +86,7 @@ src/users/mod.rs:8: 🟡 risk: mod.rs defines UserRole enum; violates export-onl
 spec §4.2: 🔴 missing: Repository::reload not implemented; plan Task 3 requires it.
 plan Task 4: 🟡 drift: builder exposes set_timeout; spec §4.3 specifies timeout() accessor only.
 totals: code 1🔴 1🟡 · spec 1🔴 1🟡
+blocking: src/users/repository.rs:42 · spec §4.2
 ```
 
 Spec verdicts: `COMPLIANT` | `COMPLIANT-WITH-AMENDMENTS` | `NON-COMPLIANT`.

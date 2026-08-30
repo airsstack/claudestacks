@@ -26,10 +26,26 @@ name with no plan number, ask which plan, offering the chain's `approved` plans 
 
 Read the plan's **frontmatter only** — not its body — before anything else:
 
-- `status` other than `approved` — refuse. Name the file, its current state, and the
-  command that advances it (`draft` → the `plan` skill's approval gate; `executing` → you
-  are presumably resuming, so continue rather than refuse; `done` or `superseded` → the work
-  already happened or was replaced, so a new round is a new plan).
+- `approved` — proceed.
+- `executing` — you are presumably resuming. Continue rather than refuse.
+- `draft` — **the instruction to execute is the approval.** A user who names a plan and asks
+  for it to run has done the thing the approval gate exists to capture, so do not refuse and
+  do not send them to another skill to say it a second time. Flip
+  `draft → approved → executing` yourself and state plainly, in one line, that you did:
+  which plan, that it was `draft`, and that executing it is being recorded as its approval.
+  Then carry on. Two exceptions where you stop and ask first: the plan carries an unresolved
+  marker its own author left for the reader (a `TODO`, an open question, a `TBD`), or the
+  reference you were given was a whole chain rather than one named plan — a blanket "execute
+  this chain" is not approval of a specific draft nobody has read.
+- `done` or `superseded` — do not silently re-run it. The work already happened or was
+  replaced, so re-executing would repeat commits or contradict the plan that replaced it.
+  But do not dead-end either: follow-up work on a finished plan — fixing findings its own
+  review recorded, hardening something it left thin — is genuinely new work rather than a
+  re-execution, and it has a home. Say which of the two you are looking at, and route it:
+  a genuine new round of construction is a new plan through the `plan` skill; ad-hoc
+  follow-up goes to the `claudestacks:orchestrate` skill, which drives the same agents under
+  the same disciplines without requiring a plan file. Naming the destination is part of the
+  refusal; a bare "refused" leaves the work to be orchestrated by hand.
 - `depends-on` names a plan that is not yet `done` — warn and ask before proceeding. The
   dependency may be irrelevant to the tasks about to run, so this is the user's call, not an
   automatic block.
@@ -234,6 +250,14 @@ A verification that cannot change what you do next is not a verification. Skip i
 - If the fix round leaves something genuinely unresolved, that is an escalation to the user,
   not a second review. Say what is unresolved and ask.
 
+What closes the batch is the **blocking set** being empty — each finding that must be
+addressed before commit either fixed or put to the user — not the report being empty. The
+report is not expected to come back empty, and a reviewer that keeps reporting nits after
+the blocking findings are gone is doing its job, not signalling that work remains. Read the
+verdict, not the length. Close on the set the reviewer itself names as blocking; if its
+report does not name one, ask for it explicitly rather than inferring the boundary from the
+finding list.
+
 Rounds beyond the first return progressively smaller findings about code the compiler has
 already accepted, while the defects that actually matter are wrong premises — which no
 review round can catch, because a reviewer checks the diff against the plan and a wrong plan
@@ -276,12 +300,25 @@ Before flipping the plan to `done`, append three sections to the plan file, in t
    where`. On the inline-degraded path, write `inline execution, no independent reviewer`
    plus anything the verifications surfaced. This is what keeps findings durable past the
    session; `distill` reads it later, across chains, to catch a mistake recurring.
+
+   Where a line records a finding as fixed *and verified*, it carries the command that
+   showed it and that command's real output, from the run that happened. A stated result
+   that does not reproduce is a false green — it reads as evidence and is not — so a fix
+   whose verification you cannot reproduce goes into the record as unverified, named as
+   such, rather than as fixed.
 2. **`## Probe results`** — one line per throwaway test that was run: the claim, the command,
    and the real output, at full precision. Mark any that came out against the plan. This is
    the record that a premise was checked rather than assumed, and it is what a later reader
    needs to know which claims are still only plausible.
 3. **`## Deviations`** — a dated entry for every departure from the plan as written, what
    changed and why. Omit only if execution followed the plan exactly.
+
+Those three sections are where the run's *reasoning* goes: why a premise turned out wrong,
+what was weighed and rejected, what a deviation cost. Not into source comments. A comment
+explains the code beside it; reasoning parked there ships to every future reader and is
+wrong the first time the code moves, while the same sentence in the record is cheap to
+correct and reaches exactly the person who needs it. When a coder returns a fix wrapped in
+a paragraph of justification, that paragraph belongs here.
 
 Then wait. The user decides whether to commit, merge, or open a pull request. Do not
 auto-commit, do not auto-merge, do not auto-push — the commit gate belongs to the user, and

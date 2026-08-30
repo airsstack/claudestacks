@@ -137,6 +137,7 @@ written as an empty list — when nothing seeded the artifact.
 | spec `approved → superseded` | user requests a redesign; old file renamed per §4, new `spec.md` written | `design` |
 | plan `— → draft` | file written | `plan` |
 | plan `draft → approved` | user approves at the plan review gate | `plan` |
+| plan `draft → approved` | user names the plan and asks for it to be executed — the instruction is the approval, so the gate is satisfied rather than bypassed | `execute` |
 | plan `approved → executing` | execution starts task 1 | `execute` |
 | plan `executing → done` | every task verified and the user accepts the completion report | `execute` |
 | plan `→ superseded` | re-planning replaces it | `plan` |

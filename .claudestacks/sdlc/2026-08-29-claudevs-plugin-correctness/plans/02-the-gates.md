@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 created: 2026-08-29
 ---
 
@@ -38,8 +38,9 @@ crates/claudevs/src/validate.rs      — [modify] Strictness parameter; --strict
 crates/claudevs/src/lib.rs           — [modify] export Strictness
 crates/claudevs/src/doctor.rs        — [modify] its delegate call site, which the new signature breaks
 crates/claudevs/src/check.rs         — [modify] drop three early returns; thread strictness through run
-crates/claudevs-cli/src/cli.rs       — [modify] `--strict` flag on the Check subcommand
+crates/claudevs-cli/src/cli.rs       — [modify] its check::run call site, then the `--strict` flag
 crates/claudevs/src/suite.rs         — [modify] select before loading, so one bad case file fails alone
+Makefile.toml                        — [modify] the claudevs-check lane's expectations and its comment
 ```
 
 | File | Tasks |
@@ -47,9 +48,10 @@ crates/claudevs/src/suite.rs         — [modify] select before loading, so one 
 | `validate.rs` | 1, 2 |
 | `lib.rs` | 2 |
 | `doctor.rs` | 2 |
-| `check.rs` | 3, 4 |
-| `cli.rs` | 5 |
+| `check.rs` | 2, 3, 4 |
+| `cli.rs` | 4, 5 |
 | `suite.rs` | 6 |
+| `Makefile.toml` | 7 |
 
 ---
 
@@ -144,8 +146,16 @@ plugins, none of which had a defect that would stop them working.
 
    ```
    $ cargo test -p claudevs --lib validate
-   error[E0433]: failed to resolve: use of undeclared type `Strictness`
+   error[E0433]: failed to resolve: could not find `Strictness` in `super`
+      --> crates/claudevs/src/validate.rs
+       |
+       |             super::Strictness::Strict,
+       |                    ^^^^^^^^^^ could not find `Strictness` in `super`
    ```
+
+   E0433 quotes the path segment as written, so a `super::` path reports "could not find X in `super`",
+   naming `super` itself rather than the module it resolves to. A second error for `run_program`'s
+   arity (`E0061`) appears alongside it; either is the red you are looking for.
 
 4. Implement. Add the type above `PROGRAM` in `validate.rs`:
 
@@ -224,30 +234,47 @@ plugins, none of which had a defect that would stop them working.
 
 ---
 
-## Task 2 — Export `Strictness`, and fix the caller Task 1 broke
+## Task 2 — Export `Strictness`, and fix the callers Task 1 broke
 
-`validate::run` has a second caller besides `check`. Task 1's signature change is a type error there
-the moment it lands.
+`validate::run` has two callers that pass it as a bare function item — `check::run` and
+`doctor::run`. Task 1's signature change is a type error at both the moment it lands.
 
 **Files:**
 - Modify `crates/claudevs/src/lib.rs`
 - Modify `crates/claudevs/src/doctor.rs`
+- Modify `crates/claudevs/src/check.rs`
 
 **Steps:**
 
-1. Build and read the error. It is the only one:
+1. Build and read the errors. There are exactly two, one per call site:
 
    ```
    $ cargo build -p claudevs
-   error[E0631]: type mismatch in function arguments
+   error[E0593]: function is expected to take 1 argument, but it takes 2 arguments
+      --> crates/claudevs/src/check.rs:69:26
+       |
+    69 |     run_with(plugin_dir, crate::validate::run)
+       |     -------- ^^^^^^^^^^^^^^^^^^^^ expected function that takes 1 argument
+       |     |
+       |     required by a bound introduced by this call
+       |
+   note: required by a bound in `run_with`
+
+   error[E0593]: function is expected to take 1 argument, but it takes 2 arguments
       --> crates/claudevs/src/doctor.rs:81:26
        |
     81 |     run_with(plugin_dir, crate::validate::run)
-       |     -------------------- ^^^^^^^^^^^^^^^^^^^^ expected due to this
+       |     -------- ^^^^^^^^^^^^^^^^^^^^ expected function that takes 1 argument
+       |     |
+       |     required by a bound introduced by this call
        |
-       = note: expected function signature `fn(&Path) -> _`
-                  found function signature `fn(&Path, Strictness) -> _`
+   note: required by a bound in `run_with`
+
+   error: could not compile `claudevs` (lib) due to 2 previous errors
    ```
+
+   E0593 is the arity code. E0631 — "type mismatch in function arguments" — is the same-arity case
+   and is not what this produces; do not match on it.
 
    `crates/claudevs/src/doctor.rs:78-81` is:
 
@@ -278,20 +305,43 @@ the moment it lands.
    flag and gains nothing from one; widening its signature would push the choice out to a caller who
    has no basis for making it.
 
-3. Add to the `pub use validate::…` line in `crates/claudevs/src/lib.rs:35`:
+3. Fix `crates/claudevs/src/check.rs:68-70` the same way, so the crate compiles again at this
+   commit. `check::run_with` keeps its one-argument delegate bound; only the closure changes:
+
+   ```rust
+   pub fn run(plugin_dir: &Path) -> Result<CheckReport> {
+       run_with(plugin_dir, |dir| {
+           crate::validate::run(dir, crate::validate::Strictness::Lenient)
+       })
+   }
+   ```
+
+   This is a stopgap that keeps this commit coherent on its own, not the final shape. Task 4
+   replaces it with a `Strictness` parameter threaded through `check::run`, and Task 5 wires that
+   to the CLI flag. Do not widen `check::run`'s signature here — that is Task 4's work, and doing
+   it now would leave Task 4 with nothing to do and its test with nothing to prove.
+
+4. Add to the `pub use validate::…` line in `crates/claudevs/src/lib.rs:35`:
 
    ```rust
    pub use validate::{Strictness, Validation};
    ```
 
-4. Run the doc gate — a new public item with no doc comment fails it:
+5. Confirm the crate is whole again — this is the property this task exists to restore:
+
+   ```
+   $ cargo build -p claudevs
+       Finished `dev` profile [unoptimized + debuginfo] target(s)
+   ```
+
+6. Run the doc gate — a new public item with no doc comment fails it:
 
    ```
    $ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
        Generated .../target/doc/claudevs/index.html
    ```
 
-5. Commit `feat(claudevs): export the validate strictness selector`.
+7. Commit `feat(claudevs): export the validate strictness selector`.
 
 ---
 
@@ -320,7 +370,7 @@ the moment it lands.
    #[test]
    fn a_failing_first_stage_does_not_hide_the_three_that_follow() {
        let plugin = PathBuf::from("tests/fixtures/minimal-plugin");
-       let report = super::run_with(&plugin, Strictness::Lenient, |_, _| Validation::Failed {
+       let report = super::run_with(&plugin, |_| Validation::Failed {
            output: String::from("✘ Validation failed"),
        })
        .unwrap();
@@ -333,10 +383,12 @@ the moment it lands.
    `run_with` is private but the test module is inside `check.rs`, so `super::run_with` reaches it. The
    fixture path is relative to the crate root, which is where `cargo test -p claudevs` runs.
 
-   `run_with` does not take a strictness argument until Task 4. Write this test against the
-   two-argument form now (`super::run_with(&plugin, |_| Validation::Failed { … })`) and let Task 4
-   widen it along with every other call — or do Task 4 first and write it as shown. Either order
-   works; do not leave the test half-migrated.
+   This is the **two-argument** form, which is what `check.rs:83` has today —
+   `fn run_with(plugin_dir: &Path, validate: impl Fn(&Path) -> Validation) -> Result<CheckReport>`.
+   Task 3 runs before Task 4 so that each commit is coherent on its own: this one fixes the
+   truncation against the signature that exists, and Task 4 widens this call along with every other
+   one when it adds the strictness parameter. Do not write the three-argument form here — nothing
+   defines it yet.
 
 3. Run and confirm failure:
 
@@ -351,9 +403,25 @@ the moment it lands.
    That red is the defect: one failed stage and the other three never ran.
 
 4. Delete all three `if !report.all_clear() { return Ok(report); }` blocks. The function becomes a
-   straight-line push of four stages. Update the `run_with` doc comment to say the pipeline runs every
-   stage and the report aggregates — the current comment does not claim otherwise, but read it and make
-   sure it still tells the truth.
+   straight-line push of four stages.
+
+   Then rewrite the three doc comments that assert the behaviour you just removed. `cargo doc` cannot
+   catch a doc comment that is merely untrue, so nothing downstream will find these — they are listed
+   here because they are the whole of the debt:
+
+   - `crates/claudevs/src/check.rs:3-6`, the module doc, reads "Four stages in order — delegated
+     manifest validation, static wiring, the case suite, the case suite again from the simulated
+     install layout — **stopping at the first failure, because a plugin whose wiring is broken has
+     nothing to learn from a suite run.**" Drop the clause from "stopping" onward and say the four
+     stages all run and the report aggregates their results.
+   - `crates/claudevs/src/check.rs:28-29`, on `StageStatus::Failed`, reads "Something wrong; **the
+     pipeline stops here.**" It becomes: something wrong; the remaining stages still run.
+   - `run_with`'s own doc comment DOES claim truncation — it reads "would otherwise turn the first
+     stage red and truncate every pipeline under test." Drop the "and truncate" clause; the rest of
+     the sentence stays true once the returns are gone.
+
+   Per the `doc-comment-discipline` bullet above, none of these may name a plan, a phase, or this
+   workflow — say what the code does and why.
 
 5. Run and confirm green:
 
@@ -363,8 +431,31 @@ the moment it lands.
    test result: ok. N passed; 0 failed
    ```
 
-   Some existing tests in this module may assert a stage count of 1 or 2 on a failing pipeline. Those
-   assertions encoded the truncation; update each to the full four, and say so in the commit body.
+   One existing test in this module encoded the truncation, and its **name** encodes it too:
+   `wiring_failing_stops_the_pipeline_before_the_suite_runs` at `crates/claudevs/src/check.rs:212-219`.
+
+   ```rust
+   #[test]
+   fn wiring_failing_stops_the_pipeline_before_the_suite_runs() {
+       let report = run_with(&fixture("escape-plugin"), delegate_passes).unwrap();
+       let names: Vec<&str> = report.stages.iter().map(|s| s.name).collect();
+       assert_eq!(names, vec!["validate", "wiring"], "{report:?}");
+       assert_eq!(report.stages[1].status, StageStatus::Failed);
+       assert!(!report.all_clear());
+   }
+   ```
+
+   Rename it to `wiring_failing_is_reported_without_stopping_the_stages_that_follow` and widen the
+   first assertion to `vec!["validate", "wiring", "test", "test --installed"]`. The other two
+   assertions — the `Failed` status at index 1 and `!all_clear()` — stay exactly as they are; they are
+   what still has to hold. Editing only the assertion would leave a test whose name says the opposite
+   of what it now proves.
+
+   `a_dead_file_warning_does_not_stop_the_pipeline` (`check.rs:222`) asserts
+   `report.stages.len() > 2` and survives unchanged. It is the only other test in the module that
+   touches stage count.
+
+   Say the rename and the widened assertion in the commit body.
 
 6. Commit `fix(claudevs): run every check stage instead of stopping at the first failure`.
 
@@ -374,6 +465,7 @@ the moment it lands.
 
 **Files:**
 - Modify `crates/claudevs/src/check.rs`
+- Modify `crates/claudevs-cli/src/cli.rs` — its one call site, so the workspace still builds
 
 **Steps:**
 
@@ -473,15 +565,29 @@ the moment it lands.
 
    Restore it.
 
-6. Run and confirm green, then the whole crate — `check::run`'s signature changed and every caller
-   must be updated:
+6. Fix the one caller outside this crate, in the same commit. `check::run` is public, and
+   `crates/claudevs-cli/src/cli.rs:150` is `match claudevs::check::run(path) {`. Leave it and this
+   commit ships a workspace that does not compile.
+
+   Change that one line, and nothing else in the file:
+
+   ```rust
+   match claudevs::check::run(path, claudevs::Strictness::Lenient) {
+   ```
+
+   `Lenient` is the value that preserves today's behaviour exactly — `check` has no `--strict` flag
+   until Task 5, which replaces this literal with the flag-derived value. `run_check`'s own signature
+   does not change here, so its caller at `cli.rs:77` is untouched.
+
+7. Run and confirm green. Use the **workspace** form, not `-p claudevs`: a crate-scoped run passes
+   while `claudevs-cli` is broken, which is exactly the failure this step exists to catch.
 
    ```
-   $ cargo test -p claudevs --all-targets
+   $ cargo test --workspace --all-targets
    test result: ok. N passed; 0 failed
    ```
 
-7. Commit `feat(claudevs): let a caller ask the check pipeline for a strict validate`.
+8. Commit `feat(claudevs): let a caller ask the check pipeline for a strict validate`.
 
 ---
 
@@ -682,16 +788,17 @@ the moment it lands.
    ``` `expect.output` only accepts "none", got `banana` ```. Confirm that is still the message before
    relying on it.
 
-   Adjust the case-file directory and naming to whatever `crate::case::discover` actually looks for —
-   read `crates/claudevs/src/case/discover.rs` before writing the fixture, rather than assuming
-   `tests/cases/*.yaml`.
+   `tests/cases/*.yaml` is the right place for these fixtures and needs no adjusting:
+   `crates/claudevs/src/case/discover.rs:26-46` walks all of `<plugin>/tests` with
+   `WalkDir::new(&root).sort_by_file_name()`, skipping only what `under_fixtures` excludes
+   (`tests/fixtures/`), and classifies every remaining file by extension.
 
 3. Run and confirm failure:
 
    ```
    $ cargo test -p claudevs --lib suite::tests::one_unloadable_case_file
    ---- suite::tests::one_unloadable_case_file_does_not_take_its_valid_sibling_down stdout ----
-   called `Result::unwrap()` on an `Err` value: Case { ... `expect.output` only accepts "none", got `banana` }
+   called `Result::unwrap()` on an `Err` value: CaseLoad { path: ".../tests/cases/b-broken.yaml", reason: "`expect.output` only accepts \"none\", got `banana`" }
    ```
 
 4. Implement. Replace the `Yaml` arm so a load failure becomes an outcome:
@@ -721,15 +828,36 @@ the moment it lands.
    }
    ```
 
-   Filtering on the file stem rather than the loaded `case.name` is a behaviour change: today a case
-   whose `name:` differs from its filename is filtered by the former. Check whether the loader derives
-   the name from the stem — read `crates/claudevs/src/case/yaml.rs` — and if it does not, keep the
-   post-load filter for the success path and use the stem only for the failure path, so no existing
-   filter behaviour changes.
+   Filtering on the file stem rather than the loaded `case.name` changes nothing, because the two can
+   never differ. `crates/claudevs/src/case/yaml.rs:15` states it — "The case name is the file stem" —
+   and `:32-36` is where it happens: the loader takes `path.file_stem()` and builds
+   `CaseName::new(stem)`. `RawCase` (`crates/claudevs/src/case/model.rs:150-175`) carries no `name:`
+   field at all, so there is no way for a case to be called anything else. Write the single filter
+   shown above; do not add a second one for the success path.
 
    The `Verdict::Fail(Vec<String>)` shape used here is the current one. Plan 04 replaces it with a
    typed `Mismatch` enum; that plan carries the migration of this call site, so write it against the
    shape that exists now.
+
+   **The `CaseFile::Lua` arm keeps its `?`, deliberately.** `crates/claudevs/src/suite.rs:85-92` is
+
+   ```rust
+   CaseFile::Lua(path) => {
+       outcomes.extend(crate::case::run_lua_file(
+           plugin_dir,
+           &fixtures_root,
+           &path,
+           options,
+       )?);
+   }
+   ```
+
+   and `discover` classifies both extensions, so an unloadable `.lua` file still ends the whole run.
+   That is the same defect on the other path. It is out of scope here because the spec cites the YAML
+   arm specifically (`suite.rs:80-81`) and because the fix is not the same shape: `run_lua_file`
+   returns *many* outcomes from one file and does its own selection internally, so "one failed case
+   named for its file" has to be decided differently there. Do not widen this task to cover it, and do
+   not leave it unrecorded — no sibling plan owns it either.
 
 5. Run and confirm green:
 
@@ -749,7 +877,8 @@ the moment it lands.
 ## Task 7 — Definition of Done and the fixture corpus
 
 **Files:**
-- No source changes; this task verifies.
+- Modify `Makefile.toml` — the `claudevs-check` lane's expectations and the comment block at `:174-182`
+- No Rust source changes; the rest of this task verifies.
 
 **Steps:**
 
@@ -804,5 +933,73 @@ the moment it lands.
   with.
 - A failing stage produces a four-stage report.
 - Tasks 1, 3 and 6 were each watched go red before they went green.
-- `check.rs:145-149` and `check.rs:172-175` are **unchanged**. A malformed `plugin.json` is still
+- `check.rs:144-149` and `check.rs:172-175` are **unchanged**. A malformed `plugin.json` is still
   `Failed`, not `Skipped` — that reasoning is sound and this plan does not touch it.
+- The `CaseFile::Lua` arm at `suite.rs:85-92` still aborts the run on an unloadable file. That is a
+  stated deferral, not an oversight, and no plan in this chain owns it yet.
+
+---
+
+## Review findings
+
+One review pass over the complete diff, after all seven tasks landed. The reviewer re-ran the gate
+itself rather than reading anyone's receipt. Verdict: plan-compliant, spec-compliant, **0 blocking**,
+6 risk, 9 nit. Every finding is dispositioned below — a finding reported and then quietly dropped is
+the failure this table exists to prevent.
+
+| # | Tier | Finding | Disposition |
+|---|---|---|---|
+| 1 | 🟡 | `suite.rs:87` — the select-before-load reorder is untested; moving the guard back keeps every test green | applied — added a test with an unloadable-but-unselected case file, mutation watched red |
+| 2 | 🟡 | `cli.rs:81` — the `bool` → `Strictness` mapping is untested; swapping the arms leaves the workspace green | applied — extracted `strictness_from_flag`, both directions asserted, swap watched red |
+| 3 | 🟢 | `cli.rs:269` — test named for "defaults to lenient" asserts only the clap `bool` | applied — renamed to `..._defaults_to_absent`; the real claim is now finding 2's test |
+| 4 | 🟡 | `README.md:22` — still says `check` stops "at the first failing stage" | applied |
+| 5 | 🟡 | `README.md:62` — still says the delegate runs `--strict`; the new flag is undocumented | applied — corrected, and `--strict` documented alongside `--json` |
+| 6 | 🟡 | `Makefile.toml:288` — `"validate\|wiring"` is weaker than achievable; deleting the matcher checker keeps the lane green locally | applied — pinned to `wiring`, which FAILs on every machine; `expect_stage_fail_either` removed as now-dead |
+| 7 | 🟡 | `Makefile.toml:181` — comment asserts a property the lane never checked | applied — true as written once finding 6 landed |
+| 8 | 🟡 | `Makefile.toml:346` — `dod-crate`'s fifth step is an unguarded `cargo test --doc`, so the crate-scoped gate cannot complete on any binary-only member | **declined** — pre-existing, outside this diff, and not this plan's to fix. Own it in a separate chain |
+| 9 | 🟡 | `check.rs:104` — `check` now executes a plugin's own hook commands even after validate and wiring have declared it defective | **declined** — spec §5 mandates the non-truncating pipeline, so this is the specified behaviour, not a defect. Recorded because the widened exposure is documented nowhere |
+| 10 | 🟢 | `suite.rs:86` — a stem-less file yields `String::new()` as a case name, bypassing `CaseName` validation | **declined** — pre-existing, beyond this plan's scope |
+| 11 | 🟢 | `validate.rs:49` — `Default` derived on `Strictness` and never used | **declined** — the plan specifies that derive |
+| 12 | 🟢 | `check.rs:210`, `:322` — hardcoded fixture paths beside a `fixture()` helper that anchors on `CARGO_MANIFEST_DIR` | **declined** — cosmetic |
+| 13 | 🟢 | `check.rs:211` — `super::` qualification on items already imported | **declined** — cosmetic |
+| 14 | 🟢 | `validate.rs:180` — recorder-script setup duplicated across two tests | **declined** — cosmetic |
+| 15 | 🟢 | `validate.rs:202` — matches `--strict` anywhere in the joined argv, so flag position is unchecked | **declined** — cosmetic |
+| 16 | 🟢 | `validate.rs:215` — log path interpolated unquoted into a shell redirect; a temp dir with a space fails obscurely | **declined** — latent only under a path shape this repo does not produce |
+| 17 | 🟢 | `validate.rs:230` — bare `assert!` with no message, unlike its sibling | **declined** — cosmetic |
+| 18 | 🟡 | plan Task 3 step 4 under-scoped the doc debt: it named three doc comments as "the whole of it" while `README.md:22` and `:62` carried the same two false claims and no task owned them | applied — findings 4 and 5 close it; the plan text is corrected above |
+
+## Probe results
+
+Each claim the plan asserted about something it did not itself create, and the throwaway test that
+settled it. Two came out against the plan.
+
+| Claim | How it was tested | Result |
+|---|---|---|
+| `.unwrap()` in the new tests trips the workspace `unwrap_used = "deny"` lint | `rg` for `expect(clippy` across the five target files; `ls clippy.toml` | **Held against the worry.** All five carry `#![expect(clippy::unwrap_used, …)]` inside `mod tests` (`validate.rs:95`, `doctor.rs:189`, `check.rs:183`, `cli.rs:191`, `suite.rs:287`). No `clippy.toml` exists |
+| E0433 for `super::Strictness` names the resolved module, so the message reads `` in `validate` `` | Standalone repro: `rustc --test --edition 2024` over a file with `mod validate { mod tests { super::Strictness::Strict } }` | **Against the plan.** rustc quotes the path segment as written: ``could not find `Strictness` in `super` `` |
+| `doctor.rs` is the only call site Task 1 breaks | `cargo build -p claudevs` after Task 1 landed | **Against the plan.** Two E0593s — `check.rs:69` and `doctor.rs:81`, both `run_with(plugin_dir, crate::validate::run)` |
+| The spec enumerates the broken call sites, so this omission is a spec defect too | `rg` for `validate::run`, `Strictness`, `doctor::run` in `spec.md`, with `rg -c strict` as the control that the search works | **Held.** Control returns 7; all three targets return 0. The spec never names call sites, so this was plan-level only |
+| `run_with`'s doc comment does not claim truncation | `git diff -- crates/claudevs/src/check.rs` grepped for `truncate` | **Against the plan.** `-/// the first stage red and truncate every pipeline under test.` |
+| Pinning the fixture assertion to `wiring` is machine-independent | `env PATH=/usr/bin:/bin ./target/debug/claudevs check …/bad-matcher-plugin` | **Held.** With `claude` absent, validate skips and `FAIL wiring` still appears — so `wiring` FAILs in both environments |
+| The strengthened assertion actually discriminates rather than passing vacuously | Repointed it at `test`, a stage that only ever skips, and re-ran the lane | **Held.** Lane exits 1; reverted, lane green again |
+| `check.rs`'s two must-not-change regions survived | `git diff` grepped for `Error::Manifest`, `Validation::Failed`, "three skippable conditions" | **Held.** Absent from the diff; a malformed `plugin.json` still classifies `Failed` |
+
+## Deviations
+
+- **Task 2 was amended mid-execution** to fix `check.rs:69` as well as `doctor.rs:81`, and gained
+  `check.rs` in its file list. As originally written its commit would have left the crate
+  uncompilable until Task 4. The stopgap closure it installs is superseded wholesale by Task 4.
+- **Three expected-output blocks were wrong** and are corrected in the task text above: Task 1's
+  E0433 message, Task 3's claim about the `run_with` doc comment, and Task 6's panic variant
+  (`Case { … }` → `CaseLoad { path, reason }`).
+- **Task 7 needed less than the plan predicted.** The plan expected the fixture lane's stage and
+  exit-code assertions to need updating for a non-truncating pipeline; in reality only the prose
+  comments were stale — `expect_stage_fail_either` already tolerated two FAIL lines. The lane's
+  assertion was nonetheless strengthened afterwards, as review finding 6.
+- **Verification ran crate-scoped, not workspace-wide, during the tasks**, because the machine this
+  executed on is resource-constrained. The unscoped `cargo make dod` was run once at the end and is
+  green; that is the gate of record.
+- **`cargo make dod-crate claudevs-cli` cannot pass** — see review finding 8. Crate-scoped
+  verification of the CLI used the five DoD commands with `-p` instead.
+- **Task 6 ran in parallel** with the Task 1→2 chain; the two touch disjoint files and share no
+  symbols. Tasks 3, 4, 5 and 7 were sequential, and the four review fixes ran three-way parallel.

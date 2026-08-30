@@ -249,6 +249,25 @@ The agent returns a verdict summary plus that path. Route off the summary; read 
 `<detail>` only when you must act on a finding. Fix every finding in the drafts
 yourself. The agent never edits a plan, never flips a `status`, and never commits.
 
+**Every finding gets a disposition, and the author sees it.** Not only the blocking ones.
+Build a table as you work the report — one row per finding, at every tier, naming which
+plan it lands in:
+
+| # | Plan | Tier | Finding | Disposition |
+|---|---|---|---|---|
+| 1 | 03 | 🔴 | <one line> | applied |
+| 2 | 02 | 🟡 | <one line> | declined — <reason> |
+
+Carry it to the approval gate below. A finding you decided not to act on is the author's
+call to confirm, not yours to make silently — `artifact-review.md` assigns completeness to
+the reviewer and the decision to this skill *and the user*.
+
+Work the tiers in order but do not stop at the end of 🔴. The risk tier is where a dropped
+finding hides: nothing about the plan looks unfinished afterwards, and a plan whose only
+findings were non-blocking never gets reopened at all. Check the file mtimes against the
+report's if you are unsure whether a plan was revisited after the review — a plan older
+than the report that reviewed it was not.
+
 The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
 § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
 and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
@@ -259,7 +278,9 @@ inline; never skip the review for want of the agent.
 
 ## Approval gate
 
-Each plan gets its own approval: present it, ask the user to read and approve. Only on
+Each plan gets its own approval: present it, ask the user to read and approve, and show the
+rows of the disposition table that belong to that plan in the same message — including the
+declined ones. An approval given without sight of them is not an approval of them. Only on
 explicit approval, flip that plan's frontmatter `status: draft → approved` as the last step of
 the interaction that reviews it — do not flip a plan the user has not yet seen.
 

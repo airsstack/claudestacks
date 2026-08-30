@@ -44,8 +44,15 @@ question at a time, never a battery.
   plans are visibly parallelizable across worktrees. Writes: `draft → approved` per plan.
 - **`execute`** — an `approved` plan, referenced as `<chain>/<NN>`, becomes a reviewed,
   verified diff. Refuses a plan that isn't `approved`; warns if a `depends-on` plan isn't
-  `done` yet. Appends durable `## Review findings` and `## Deviations` sections to the plan
-  before flipping it `done`; rolls the intent up to `done` once every sibling plan is
+  `done` yet. Cuts the plan's tasks into batches of genuinely independent work and runs
+  each batch as parallel `coder` spawns, with subagent detail kept on disk through the
+  main plugin's context-handoff protocol. Every fact a task asserts about something it
+  does not create is proven first — a symbol lookup for structure, a throwaway test that
+  is actually run for behaviour — because the plan is not evidence for itself. One review
+  spawn and one fix round per batch, deliberately: extra rounds find shrinking code
+  findings while the defects that matter are wrong premises no review can catch. Appends
+  durable `## Review findings`, `## Probe results` and `## Deviations` sections to the
+  plan before flipping it `done`; rolls the intent up to `done` once every sibling plan is
   `done` or `superseded` with at least one `done`.
 - **`distill`** (loop) — scans `## Review findings` across chains for a finding recurring in
   two or more chains, and proposes a concrete, minimal config edit per finding — accept /
@@ -97,8 +104,8 @@ the six above; nothing here uses a `commands/` directory.
 
 ## Agents
 
-Two leaf agents ship under `agents/`, namespaced `claudestacks-sdlc:<name>`. Neither
-declares the `Agent` tool, so neither can spawn anything: the skill on the main thread
+Three leaf agents ship under `agents/`, namespaced `claudestacks-sdlc:<name>`. None
+declares the `Agent` tool, so none can spawn anything: the skill on the main thread
 does every spawn, receives every report, and holds every user gate. No agent flips an
 artifact `status` and no agent commits — `references/artifact-chain.md` §7.3 keeps both
 where they were.
@@ -112,10 +119,19 @@ where they were.
   against its upstream authority and the criteria in `references/artifact-review.md`.
   Report-only, severity-tagged. `design` and `plan` spawn it in place of self-reviewing
   an artifact they just wrote themselves.
+- **`task-briefer`** (sonnet · low) — mechanical brief extractor over one plan file. In
+  `ledger` mode it returns a row per task (number, title, files, verifications); in
+  `brief` mode it writes one task's content verbatim to a handoff file and returns only
+  the summary, plus a list of every fact that task asserts about something it does not
+  itself create. It never checks whether an asserted fact is true — that is the
+  orchestrator's call. `execute` spawns it so a plan of tens of kilobytes never enters
+  the main thread's context.
 
 The read-heavy locating steps in `design` and `plan` reuse `claudestacks:explorer` from
-the main plugin. That is a cross-plugin dependency, so it degrades: if the agent does not
-resolve, the skill does the work inline and says the agent was unavailable.
+the main plugin, and `execute` reuses `claudestacks:coder`, `claudestacks:explorer` and
+`claudestacks:reviewer` for its per-batch pipeline. Those are cross-plugin dependencies,
+so they degrade: if an agent does not resolve, the skill does the work inline and says
+which agent was unavailable.
 
 ## Attribution
 

@@ -185,6 +185,21 @@ is visible.
    `<detail>` only when you must act on a finding. Fix the draft yourself — the agent
    never edits it, never flips a `status`, and never commits.
 
+   **Every finding gets a disposition, and the author sees it.** Not only the blocking
+   ones. Build a table as you work the report — one row per finding, at every tier:
+
+   | # | Tier | Finding | Disposition |
+   |---|---|---|---|
+   | 1 | 🔴 | <one line> | applied |
+   | 2 | 🟡 | <one line> | declined — <reason> |
+
+   Carry that table to the approval gate in step 10. A finding you decided not to act on
+   is the author's call to confirm, not yours to make silently: `artifact-review.md`
+   assigns completeness to the reviewer and the decision to this skill *and the user*.
+   Work the tiers in order but do not stop at the end of 🔴 — the risk tier is where a
+   quietly-dropped finding hides, because nothing about the draft looks unfinished
+   afterwards.
+
    The criteria it applies live in
    `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md` § *Reviewing a draft spec*. If
    the agent does not resolve, or returns nothing you can act on, apply that same file's
@@ -192,7 +207,9 @@ is visible.
    review for want of the agent.
 
 10. **User review gate.** Ask the user to read the spec file you just wrote and give
-   explicit approval. This is a mandatory stop, not a formality. If they request
+   explicit approval, and show them step 9's disposition table in the same message. An
+   approval given without sight of the declined findings is not an approval of them.
+   This is a mandatory stop, not a formality. If they request
    changes — small clarifications or significant redesigns — revise the spec and present
    it again. **Do not re-spawn the reviewer**; step 9 has already run and runs once per
    spec. Only on explicit

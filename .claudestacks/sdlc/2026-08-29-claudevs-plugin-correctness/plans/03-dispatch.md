@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 created: 2026-08-29
 depends-on: [01, 02]
 ---
@@ -212,7 +212,7 @@ what makes the pair falsifiable: one handler whose output comes from `command`, 
    fn a_handler_type_claudevs_does_not_model_is_skipped_not_collected() {
        let dir = plugin(
            r#"{"hooks":{"SessionStart":[{"hooks":[
-                {"type":"prompt","prompt":"summarise"},
+                {"type":"prompt","prompt":"summarise","command":"leaked"},
                 {"type":"command","command":"true"}
               ]}]}}"#,
        );
@@ -285,6 +285,12 @@ what makes the pair falsifiable: one handler whose output comes from `command`, 
 
 9. **See it fail.** Change `from_entry` back to `entry.get("command").and_then(Value::as_str).map(|c|
    HookCommand::Shell(c.to_owned()))` and confirm both new tests go red. Restore it.
+
+   The prompt entry in step 2 carries a `command` key on purpose. Without one, the naive extractor
+   skips it for want of a command rather than for its type, so
+   `a_handler_type_claudevs_does_not_model_is_skipped_not_collected` stays green under the mutation
+   and pins nothing. With `"command":"leaked"` present, the naive extractor collects
+   `[Shell("leaked"), Shell("true")]` and the test bites.
 
 10. Commit `feat(claudevs): read a hooks.json handler as a typed shell or exec command`.
 
@@ -1194,8 +1200,14 @@ plan would otherwise break and leave broken. Read it before doing anything else 
    ```
 
 7. **See it fail.** Put `run_shell(&handler.display(), …)` back in place of `run_handler` and confirm
-   `a_lua_hook_call_runs_an_exec_handler_with_its_arguments` goes red with empty stdout. Restore it.
-   That is the `args` defect, reproduced on the path that would have kept it.
+   the mutation is caught. Restore it. That is the `args` defect, reproduced on the path that would
+   have kept it.
+
+   **`a_lua_hook_call_runs_an_exec_handler_with_its_arguments` does not catch it.** That test
+   exercises `resolve_ref` only, so reverting the `install_hook` call site to `run_shell` leaves it
+   green — the step above over-predicted, and a test that stays green under the exact mutation it
+   names pins nothing. Catching this needs a test that drives the real `t.hook()` Lua path through a
+   confined `airsl` engine, end to end, rather than the resolution helper on its own.
 
 8. Run the Lua suite, which is what actually exercises this module end to end:
 
@@ -1261,3 +1273,50 @@ plan would otherwise break and leave broken. Read it before doing anything else 
 - `cargo make plugins` is green.
 - `hooks_file.rs` states no plugin knowledge of its own; every contract fact it uses comes from
   `crate::contract`.
+
+---
+
+## Review findings
+
+One reviewer pass over the completed diff. Verdict: spec compliant with amendments; the gate green,
+re-run by the reviewer rather than taken on the coders' word. Totals: code 2🔴 7🟡 6🔵, spec 1🔴 2🟡 2🔵.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | 🔴 | `describe_groups` guards on `groups.is_empty()`, so an event whose groups declare no modeled handler renders `wires: ` and ends mid-sentence | fixed — guards on the rendered list; reads `wires: nothing declared` |
+| 2 | 🔴 | the test pinning that message is satisfied by the format string's own literal `wires:`, and its fixture is exactly the shape that renders nothing | fixed — asserts the interpolated tail, renamed to what it tests, watched red against the reverted fix |
+| 3 | 🟡 | a matcher Rust's `regex` cannot compile (lookahead, backreference) silently excludes its group, and the failure blames the payload | deferred to plan 05, which owns matcher semantics and the checker's engine-naming warning (spec §4.3); latent — no plugin in the 156-root corpus triggers it |
+| 4 | 🟡 | `Error::HookResolution` is overloaded, so a malformed `hooks.json` degraded into N identical per-case failures while a *missing* one still aborted the run | fixed inside `suite.rs`; `error.rs` untouched |
+| 5 | 🟡 | `resolve`'s `# Errors` section describes errors it no longer returns | fixed |
+| 6 | 🟡 | workflow vocabulary in shipped source (`doc-comment-discipline`) | fixed; a full-file grep found no other instance |
+| 7 | 🟡 | a stale self-referencing line range and gate narration in a source comment | fixed |
+| 8 | 🟡 | `an_exec_handler_does_not_tokenize_its_arguments` did not pin non-tokenization | fixed — `args: ["a; echo b"]`, watched fail as `left: "a\nb"` under shell routing |
+| 9 | 🟡 | the test-local `engine_for` stated a reason that was not the reason, and forks the engine wiring | doc fixed; the fork stands — reducing it needs `case/lua.rs`, outside this plan |
+| 10 | 🔵 | `commands_for` has no production caller left | open — resolving it is an export decision in `harness/mod.rs` |
+| 11 | 🔵 | `path` names a path but holds a key | fixed |
+| 12 | 🔵 | the payload is serialized and immediately re-parsed | fixed |
+| 13 | 🔵 | `an_unanchored_regex_matcher_reaches_a_longer_tool_name` asserts only `is_ok()` | fixed |
+| 14 | 🔵 | an entry with no `type` key is now skipped where the pre-diff loop collected it | declined — `type` is required by the documented handler shape, so skipping it is the contract, not a regression |
+| 15 | 🔵 | a `payload_raw` case bypasses matcher routing entirely | open — a behavioural question about what `payload_raw` means, not a tidy-up; changing routing semantics needs its own decision |
+
+Spec §3.3's 🔴 is closed by finding 1. Spec §2.2's 🟡 travels with finding 3 to plan 05.
+
+## Deviations
+
+- **Three of this plan's prescribed tests pinned nothing, and each was found only by running the
+  mutation it named.** Task 2 step 9 predicted both new tests go red under the naive extractor; only
+  one did, because the prompt-entry fixture carried no `command` key and was skipped for the wrong
+  reason. Task 7 step 7 named a test that stays green when the real `install_hook` call site is
+  reverted, because it exercises `resolve_ref` alone. Task 6's regression test was satisfied by a
+  literal in the format string. All three are corrected in the plan text above, and the reviewer
+  found a fourth of the same class in `spawn.rs`. The lesson is the plan's own: a prescribed mutation
+  check is a claim, and writing one into a plan does not make the test bite.
+- **A latent false green was found in the crate's own test suite.** `suite.rs`'s fixture declared
+  `matcher: "Write"` while its cases sent `tool_name: "Edit"` — the very defect class this chain
+  exists to remove, sitting in the tests. Fixed to `"Edit|Write"`.
+- **Task 6 step 5 specified `"nothing"`; the implementation returns `"nothing declared"`.** Harmless,
+  but the test's `contains("declared") || contains("wires")` disjunction was written to tolerate
+  either, which is part of why it pinned nothing.
+- **The plan's `#![expect(clippy::panic, …)]` prediction for `suite.rs` was wrong** — the module still
+  declares `unwrap_used` only and the gate is green; `panic!` already sat in that module beforehand.
+- **Finding 9's engine fork and findings 10 and 15 are left open**, each recorded above with why.

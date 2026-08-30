@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 created: 2026-08-29
 depends-on: [01, 02, 03]
 ---
@@ -1449,3 +1449,60 @@ Wait for a go-ahead. Do not start Task 4.
   passing one does not.
 - No new assertion vocabulary was added to the case model. An `output: none` for scripts belongs to the
   adoption chain.
+
+---
+
+## Deviations
+
+- **Task 1's mutation check was over-predicted.** Step 6 claims removing the hook-kind guard turns
+  three of the four new tests red; it turns two red. The flow-step check is a separate code path this
+  same task adds, so the guard named in step 6 does not govern it. The test is sound — the prediction
+  was not.
+- **Task 2's `write_file` signature could not be used as written.** The plan's draft takes `PathBuf`
+  by value, which clippy's `needless_pass_by_value` rejects under `-D warnings`. It takes `&Path`, and
+  both call sites pass `&root.join(…)`. Required by the gate, not a design choice.
+- **Task 2's second mutation went red for a different reason than predicted.** Verified and recorded
+  in the handoff rather than accepted on the plan's word.
+- **Task 5's mutation check is the first in this chain to match its prediction exactly** in both
+  directions.
+- **Task 7 could not leave `report/render.rs` compiling without a stopgap.** `Verdict::Fail`'s move to
+  `Vec<Mismatch>` broke rendering, and `Mismatch` has no `Display`, so `render_human` printed
+  `{mismatch:?}` and the module's one test assertion was adjusted to match the Debug output. Task 8
+  replaced both — the placeholder with `render_mismatch`, and the accommodated assertion with one that
+  pins the real sentence. Neither survived into the final tree.
+- **Task 9's tests were written but never executed by the coder that wrote them.** Adding
+  `CaseOutcome.payload` / `.handler` broke three struct literals in `report/render.rs` with `E0063`,
+  and that file belonged to the concurrently-running Task 8, so the coder correctly stopped rather
+  than reaching outside its scope. The three literals were given `payload: None, handler: None` once
+  Task 8 finished; the four tests then ran green.
+- **Task 3's paired control matched its prediction exactly**, failing on the missing guard output when
+  `guard.sh` was renamed away.
+- **Running Tasks 8 and 9 concurrently was a scheduling error on the orchestrator's part.** Their file
+  sets are disjoint, but Task 9 adds fields to a struct Task 8's tests construct — the batching rule
+  covers files, and this pair shared a symbol rather than a file. It cost one blocked task.
+
+## Review findings
+
+One reviewer pass over the completed diff, re-running the gate itself rather than trusting the
+coders' receipts. Initial verdict: spec **non-compliant** on one dropped requirement, everything else
+compliant with amendments. Totals: code 2🔴 10🟡 10🔵, spec 1🔴 0🟡 3🔵. Both 🔴 are now closed.
+
+| # | Sev | Finding | Disposition |
+|---|---|---|---|
+| 1 | 🔴 | `Project::empty()`'s commit inherits the developer's **global** git config, so `commit.gpgsign = true` aborts every `claudevs test` at exit 2 and takes the crate's own suite to `242 passed; 27 failed`. `core.hooksPath` and `init.templateDir` reach the same code | fixed — `git()` sets `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1` on every child; break reproduced first, fix proved under the same hostile config, regression test re-execs in a child process rather than mutating env |
+| 2 | 🔴 | spec §3.6 requires payload and handler "printed beside the mismatch"; `render_human` printed neither, though Task 9 populated both fields | fixed — rendered, with five tests watched red first |
+| 3 | 🟡 | `UnexpectedOutput` rendered `the hook emitted None` — the common case for a `PreToolUse` gate with no `additionalContext` | fixed |
+| 4 | 🟡 | a `verdict.rs` field doc claimed something the code never does | fixed |
+| 5 | 🟡 | a `payload_raw` case's reporting | fixed |
+| 6 | 🟡 | the failure most determined by the payload was the one not carrying it | fixed |
+| 7 | 🟡 | `"block"` accepted as a decision value on fields that do not take it | fixed, and grounded the right way — the coder curled `hooks.md` rather than reasoning from plausibility, and found `permissionDecision` and `decision.behavior` never accept `"block"`; only the top-level `decision` field does |
+| 8 | 🟡 | the module doc's "four documented mechanisms" claim was inaccurate | fixed |
+| 9 | 🟡 | the `payload`/`handler` invariant is held by convention, not by the type | open — encoding it would change `CaseOutcome`'s public JSON shape; recorded as a trade-off rather than decided unilaterally |
+| 10 | 🟡 | the handler's display form in a `payload_raw` report | open — needs `contract/handler.rs`, outside this plan |
+| 11 | 🟡 | nothing pinned that context injection reads the *catalogue* rather than a second hardcoded list | fixed — new test proven by making that exact substitution and watching it go red |
+| 12 | 🟡 | the module doc described half of what `project.rs` does | fixed |
+| 13, 22 | 🔵 | `empty()` no longer builds an empty project; three `git` subprocesses per run | declined — a public API rename and a correctness-risking plumbing rewrite, neither warranted here |
+| 14, 16, 17 | 🔵 | rendering nits | declined — each needs a file outside the fixer's scope, a new dependency, or a frozen-API decision |
+| 15, 18, 19, 20, 21 | 🔵 | assorted nits | fixed |
+
+Findings 9 and 10 join plan 03's open list. Nothing else is outstanding.

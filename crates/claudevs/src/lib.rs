@@ -33,5 +33,5 @@ pub use report::{
     render_human, render_json, render_wiring_human,
 };
 pub use suite::{CaseOutcome, SuiteOptions, SuiteReport, run_case, run_suite, run_suite_installed};
-pub use validate::Validation;
+pub use validate::{Strictness, Validation};
 pub use wiring::{Finding, Severity, WiringReport};

@@ -19,12 +19,14 @@ println!("{}", claudevs::render_human(&report));
 | --- | --- |
 | `test [PATH]` | Runs every discovered case plus the native suites declared in `claudevs.toml`. |
 | `test --installed [PATH]` | The same cases against a throwaway copy of the plugin in the shape it has once installed, so a path that resolves only in the checkout fails here. |
-| `check [PATH]` | The gate: delegated manifest validation, then wiring, then `test`, then `test --installed` — stopping at the first failing stage. |
+| `check [PATH]` | The gate: delegated manifest validation, then wiring, then `test`, then `test --installed` — all four stages run and report even when an earlier one fails. |
 | `doctor [PATH]` | Names what this environment can and cannot do, one line per probe. |
 | `migrate <case.yaml>` | Mechanical conversion of a YAML case to its data-Lua form. |
 
 Every command that produces a report — `test`, `check`, `doctor` — takes
 `--json` for the machine-readable form. `migrate` writes Lua, so it does not.
+`check` also takes `--strict`, which passes `--strict` through to the
+delegated validation stage; see below for what that changes.
 
 Exit codes read the same way everywhere: `0` when nothing was wrong, `1` for
 verdict failures or findings, `2` when claudevs itself could not run. What
@@ -59,10 +61,15 @@ anything in the plugin.
 
 ## The validation stage and its absence
 
-`check`'s first stage shells out to `claude plugin validate --strict` rather
-than reimplementing manifest validation. The binary is not a requirement: when
-it cannot be run, that stage reports itself skipped with the reason, and the
-three deterministic stages still gate. `doctor` names the same gap directly.
+`check`'s first stage shells out to `claude plugin validate` rather than
+reimplementing manifest validation. By default it runs without `--strict`: a
+plugin whose only defect is, say, a missing `author` field still works, and a
+gate that stops on that finding never reaches the three deterministic stages
+that would find a real defect. `check --strict` passes `--strict` through to
+the delegate, so the same findings it already reports as warnings fail the
+stage instead. The binary is not a requirement either way: when it cannot be
+run, that stage reports itself skipped with the reason, and the three
+deterministic stages still gate. `doctor` names the same gap directly.
 
 A skip always means the *environment* is missing something — no `claude`, no
 marketplace manifest above the plugin to key an install path by, no case files

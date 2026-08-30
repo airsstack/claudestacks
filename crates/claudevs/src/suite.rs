@@ -77,9 +77,25 @@ pub fn run_suite(plugin_dir: &Path, options: &SuiteOptions) -> Result<SuiteRepor
     for file in discover(plugin_dir)? {
         match file {
             CaseFile::Yaml(path) => {
-                let case = crate::case::load_yaml_case(&path)?;
-                if selected(options, case.name.as_str()) {
-                    outcomes.push(run_case(plugin_dir, &fixtures_root, &case)?);
+                // The case name a filter matches against is the file stem, because a
+                // file that does not load has no name of its own — and selection must
+                // happen before loading, or one unloadable file decides the fate of
+                // every case the user actually asked for.
+                let stem = path
+                    .file_stem()
+                    .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+                if !selected(options, &stem) {
+                    continue;
+                }
+                match crate::case::load_yaml_case(&path) {
+                    Ok(case) => outcomes.push(run_case(plugin_dir, &fixtures_root, &case)?),
+                    Err(error) => outcomes.push(CaseOutcome {
+                        name: stem,
+                        verdict: Verdict::Fail(vec![format!(
+                            "load: {} could not be loaded: {error}",
+                            path.display()
+                        )]),
+                    }),
                 }
             }
             CaseFile::Lua(path) => {
@@ -424,5 +440,74 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.outcomes.len(), 1);
+    }
+
+    #[test]
+    fn an_unselected_unloadable_case_file_is_never_loaded_and_the_run_still_succeeds() {
+        // The filter excludes this file's stem, so a correct run must never
+        // attempt to load it — the file's YAML is broken on purpose, and if
+        // loading were attempted the run would abort instead of succeeding.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("tests")).unwrap();
+        std::fs::write(
+            dir.path().join("tests/broken.yaml"),
+            "event: PreToolUse\nexpct: {}\n",
+        )
+        .unwrap();
+
+        let report = run_suite(
+            dir.path(),
+            &SuiteOptions {
+                case_filter: Some(String::from("keeper")),
+            },
+        )
+        .unwrap();
+        assert!(report.outcomes.is_empty(), "{report:?}");
+        assert!(report.all_green(), "{report:?}");
+    }
+
+    #[test]
+    fn one_unloadable_case_file_does_not_take_its_valid_sibling_down() {
+        let dir = tempfile::tempdir().unwrap();
+        let plugin = dir.path();
+        std::fs::create_dir_all(plugin.join(".claude-plugin")).unwrap();
+        std::fs::write(
+            plugin.join(".claude-plugin/plugin.json"),
+            r#"{"name":"p","version":"0.1.0"}"#,
+        )
+        .unwrap();
+        std::fs::create_dir_all(plugin.join("hooks")).unwrap();
+        std::fs::write(
+            plugin.join("hooks/hooks.json"),
+            r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"true"}]}]}}"#,
+        )
+        .unwrap();
+        std::fs::create_dir_all(plugin.join("tests/cases")).unwrap();
+        std::fs::write(
+            plugin.join("tests/cases/a-valid.yaml"),
+            "event: SessionStart\nexpect:\n  exit: 0\n",
+        )
+        .unwrap();
+        std::fs::write(
+            plugin.join("tests/cases/b-broken.yaml"),
+            "event: SessionStart\nexpect:\n  output: banana\n",
+        )
+        .unwrap();
+
+        let report = super::run_suite(plugin, &super::SuiteOptions::default()).unwrap();
+        let names: Vec<&str> = report.outcomes.iter().map(|o| o.name.as_str()).collect();
+        assert_eq!(names.len(), 2, "{names:?}");
+        assert!(names.contains(&"a-valid"));
+        assert!(
+            matches!(
+                report
+                    .outcomes
+                    .iter()
+                    .find(|o| o.name == "b-broken")
+                    .map(|o| &o.verdict),
+                Some(crate::harness::Verdict::Fail(_)),
+            ),
+            "the unloadable case is one failed case, not the death of the run"
+        );
     }
 }

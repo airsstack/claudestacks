@@ -76,9 +76,14 @@ impl Diagnosis {
 }
 
 /// Diagnoses the environment around the plugin at `plugin_dir`.
+///
+/// The delegate runs lenient. `doctor` asks whether the binary is reachable
+/// at all, and a plugin's style warnings are not part of that answer.
 #[must_use]
 pub fn run(plugin_dir: &Path) -> Diagnosis {
-    run_with(plugin_dir, crate::validate::run)
+    run_with(plugin_dir, |dir| {
+        crate::validate::run(dir, crate::validate::Strictness::Lenient)
+    })
 }
 
 /// The diagnosis, with the validation delegate supplied by the caller.

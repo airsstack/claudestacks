@@ -6,7 +6,8 @@
 //! - [`refs`] — does every `${CLAUDE_PLUGIN_ROOT}/…` reference resolve, and
 //!   does any of them leave the plugin root?
 //! - [`invocations`] — is any script in the plugin named by nothing else in it?
-//! - [`matchers`] — does hooks.json declare known events and compiling regexes?
+//! - [`matchers`] — does hooks.json declare documented events, with matchers
+//!   the events accept and claudevs can evaluate?
 //!
 //! Responsibilities: the re-exported [`Finding`], [`Severity`],
 //! [`WiringReport`], [`FencedCommand`], [`parse_fenced`] and [`run`], which

@@ -5,9 +5,10 @@
 //! Claude Code runtime would, and a report over the verdicts. The `claudevs-cli`
 //! crate is the thin binary over this library.
 //!
-//! Wiring's matcher check compiles each hooks.json `matcher` with the `regex`
-//! crate, which has no lookaround and no backreferences; a pattern relying on
-//! either is reported as a finding even where the runtime would accept it.
+//! Wiring's matcher check evaluates each hooks.json `matcher` in the two modes
+//! the reference defines rather than compiling it as a Rust regex; a pattern
+//! Rust cannot compile is reported as a warning naming the divergence, not as
+//! an error against the plugin.
 
 mod error;
 mod native;

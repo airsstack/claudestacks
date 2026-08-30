@@ -6,6 +6,12 @@
 //! command strings and skill, agent and command markdown alike — because a
 //! reference is a reference wherever it is written. Files that are not valid
 //! UTF-8 hold no references to find and are skipped.
+//!
+//! Fenced code blocks are skipped here and read by the `invocations` checker,
+//! which is not a contradiction. This checker asks "does this path exist?",
+//! and an example path inside a fence is not claiming to. That checker asks
+//! "is this file referenced by anything?", and a command inside a fence is
+//! evidence that it is. Two questions of the same text, two right answers.
 
 use std::path::Path;
 use std::sync::LazyLock;
@@ -39,9 +45,8 @@ pub(super) fn occurrences(text: &str) -> Vec<Occurrence> {
     for (index, line) in text.lines().enumerate() {
         for capture in REFERENCE.captures_iter(line) {
             let tail = capture.name("tail").map_or("", |m| m.as_str());
-            let target = tail
+            let target = crate::contract::site::reference_extent(tail)
                 .trim_start_matches('/')
-                .trim_end_matches(['.', ',', ';', ':', ')'])
                 .to_owned();
             found.push(Occurrence {
                 line: index + 1,
@@ -69,18 +74,21 @@ pub fn check(plugin_dir: &Path) -> Result<Vec<Finding>> {
         if !entry.file_type().is_file() {
             continue;
         }
+        let relative = entry
+            .path()
+            .strip_prefix(plugin_dir)
+            .unwrap_or_else(|_| entry.path());
+        if !crate::contract::site::is_loaded_file(relative) {
+            continue;
+        }
         let Ok(text) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
-        let file = entry
-            .path()
-            .strip_prefix(plugin_dir)
-            .unwrap_or_else(|_| entry.path())
-            .display()
-            .to_string();
+        let file = relative.display().to_string();
+        let fenced = crate::contract::site::fenced_lines(&text);
 
         for occurrence in occurrences(&text) {
-            if occurrence.target.is_empty() {
+            if occurrence.target.is_empty() || fenced.contains(&occurrence.line) {
                 continue;
             }
             if let Some(message) = fault(plugin_dir, &occurrence.target) {
@@ -188,5 +196,79 @@ mod tests {
     fn a_bare_reference_with_no_path_after_it_is_not_a_finding() {
         let dir = plugin("cd ${CLAUDE_PLUGIN_ROOT} && ls\n");
         assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_reference_inside_a_fence_is_not_a_finding() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("skills/authoring")).unwrap();
+        std::fs::write(
+            dir.path().join("skills/authoring/SKILL.md"),
+            "Declare a hook like this:\n\
+             ```json\n\
+             {\"command\": \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.sh\"}\n\
+             ```\n",
+        )
+        .unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_reference_outside_a_fence_is_still_a_finding() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("skills/authoring")).unwrap();
+        std::fs::write(
+            dir.path().join("skills/authoring/SKILL.md"),
+            "Run ${CLAUDE_PLUGIN_ROOT}/scripts/validate.sh before shipping.\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+    }
+
+    #[test]
+    fn a_plugins_own_changelog_is_not_wiring() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("CHANGELOG.md"),
+            "Removed ${CLAUDE_PLUGIN_ROOT}/scripts/old.sh in 2.0.\n",
+        )
+        .unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_reference_inside_a_hook_script_is_wiring() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hooks")).unwrap();
+        std::fs::write(
+            dir.path().join("hooks/guard.sh"),
+            "#!/bin/sh\nexec ${CLAUDE_PLUGIN_ROOT}/scripts/missing.sh\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+    }
+
+    #[test]
+    fn a_tool_argument_matcher_is_not_part_of_the_referenced_path() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("commands")).unwrap();
+        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        std::fs::write(
+            dir.path().join("scripts/setup-ralph-loop.sh"),
+            "#!/bin/sh\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("commands/ralph.md"),
+            "---\nallowed-tools: [\"Bash(${CLAUDE_PLUGIN_ROOT}/scripts/setup-ralph-loop.sh:*)\"]\n---\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert!(
+            findings.is_empty(),
+            "the script exists; `:*` is a tool-argument matcher, not part of the path: {findings:?}"
+        );
     }
 }

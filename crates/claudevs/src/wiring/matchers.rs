@@ -1,18 +1,19 @@
-//! The `matchers` checker: hooks.json declares known events and compiling
-//! matcher regexes.
+//! The `matchers` checker: hooks.json declares documented events, and the
+//! matchers written against them are ones the event accepts and claudevs can
+//! evaluate.
 //!
-//! The matcher is compiled with the `regex` crate, which has no lookaround and
-//! no backreferences. Whether the Claude Code runtime accepts a wider flavour
-//! is not established here, so a matcher using such a construct would be
-//! reported although the runtime may run it; the finding says which engine
-//! rejected the pattern.
+//! An event name not in [`crate::contract::event`]'s catalogue is a warning
+//! rather than an error — the catalogue can lag a Claude Code release, and
+//! using a newer event is not a defect. A matcher written on an event that
+//! takes none is a warning naming the runtime's silent-ignore behaviour. A
+//! matcher's own well-formedness is judged by [`crate::contract::matcher`],
+//! which knows the exact-match and pattern modes the reference defines; this
+//! checker no longer compiles a matcher as a Rust regex on its own authority.
 
 use std::path::Path;
-use std::str::FromStr as _;
 
 use serde_json::Value;
 
-use crate::types::HookEvent;
 use crate::wiring::{Finding, Severity};
 
 /// The file this checker reads, relative to the plugin root.
@@ -31,27 +32,57 @@ pub fn check(plugin_dir: &Path) -> crate::error::Result<Vec<Finding>> {
     };
     let value: Value = match serde_json::from_str(&text) {
         Ok(value) => value,
-        Err(error) => return Ok(vec![finding(format!("is not JSON: {error}"))]),
+        Err(error) => {
+            return Ok(vec![finding(
+                Severity::Error,
+                format!("is not JSON: {error}"),
+            )]);
+        }
     };
     let Some(events) = value.get("hooks").and_then(Value::as_object) else {
-        return Ok(vec![finding(String::from(
-            "has no `hooks` object at the top level",
-        ))]);
+        return Ok(vec![finding(
+            Severity::Error,
+            String::from("has no `hooks` object at the top level"),
+        )]);
     };
 
     let mut findings = Vec::new();
     for (event, groups) in events {
-        if let Err(error) = HookEvent::from_str(event) {
-            findings.push(finding(error.to_string()));
+        let documented = crate::contract::event::lookup(event);
+        if documented.is_none() {
+            findings.push(finding(
+                Severity::Warning,
+                format!(
+                    "`{event}` is not an event this version of claudevs knows about; \
+                     it may be newer than the catalogue"
+                ),
+            ));
         }
         for group in groups.as_array().into_iter().flatten() {
             let Some(matcher) = group.get("matcher").and_then(Value::as_str) else {
                 continue;
             };
-            if let Err(error) = regex::Regex::new(matcher) {
-                findings.push(finding(format!(
-                    "matcher `{matcher}` does not compile as a regex: {error}"
-                )));
+            if let Some(documented) = documented
+                && documented.matcher == crate::contract::event::MatcherSupport::None
+            {
+                findings.push(finding(
+                    Severity::Warning,
+                    format!(
+                        "`{event}` takes no matcher, so `{matcher}` is silently ignored by \
+                         the runtime"
+                    ),
+                ));
+            }
+            if let crate::contract::matcher::MatcherRule::Unsupported { value, reason } =
+                crate::contract::matcher::parse(event, matcher)
+            {
+                findings.push(finding(
+                    Severity::Warning,
+                    format!(
+                        "claudevs cannot evaluate matcher `{value}` ({reason}), so it cannot \
+                         tell whether the runtime accepts it"
+                    ),
+                ));
             }
         }
     }
@@ -59,9 +90,9 @@ pub fn check(plugin_dir: &Path) -> crate::error::Result<Vec<Finding>> {
 }
 
 /// One finding against the hooks file.
-fn finding(message: String) -> Finding {
+fn finding(severity: Severity, message: String) -> Finding {
     Finding {
-        severity: Severity::Error,
+        severity,
         checker: "matchers",
         file: String::from(HOOKS_FILE),
         line: None,
@@ -92,22 +123,95 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_event_name_is_an_error_naming_the_known_set() {
+    fn an_unknown_event_name_is_a_warning_naming_the_offending_event() {
         let dir = plugin(r#"{"hooks":{"PreToolUseX":[{"hooks":[]}]}}"#);
         let findings = check(dir.path()).unwrap();
         assert_eq!(findings.len(), 1, "{findings:?}");
-        assert_eq!(findings[0].severity, Severity::Error);
-        assert!(findings[0].message.contains("PreToolUse"), "{findings:?}");
+        assert_eq!(findings[0].severity, Severity::Warning);
+        assert!(findings[0].message.contains("PreToolUseX"), "{findings:?}");
     }
 
     #[test]
-    fn a_matcher_that_does_not_compile_is_an_error() {
+    fn a_documented_event_claudevs_cannot_simulate_is_not_a_finding() {
+        let dir = plugin(r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"true"}]}]}}"#);
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_event_name_the_catalogue_does_not_know_is_a_warning_not_an_error() {
+        let dir = plugin(r#"{"hooks":{"PreToolUseX":[{"hooks":[]}]}}"#);
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(findings[0].severity, Severity::Warning);
+    }
+
+    #[test]
+    fn a_matcher_on_an_event_that_takes_none_is_a_warning() {
+        let dir = plugin(
+            r#"{"hooks":{
+                 "UserPromptSubmit":[{"matcher":"Edit","hooks":[{"type":"command","command":"true"}]}],
+                 "SessionEnd":[{"matcher":"clear","hooks":[{"type":"command","command":"true"}]}]
+               }}"#,
+        );
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(
+            findings.len(),
+            1,
+            "SessionEnd does take a matcher; only UserPromptSubmit's is ignored: {findings:?}"
+        );
+        assert_eq!(findings[0].severity, Severity::Warning);
+        assert!(
+            findings[0].message.contains("UserPromptSubmit"),
+            "{findings:?}"
+        );
+        assert!(findings[0].message.contains("ignored"), "{findings:?}");
+    }
+
+    #[test]
+    fn a_matcher_rust_cannot_compile_is_a_warning_not_proof_the_plugin_is_broken() {
+        // `Edit(` contains `(`, so it is regex-mode, and Rust's `regex` crate
+        // rejects the unclosed group. An unclosed group is invalid in
+        // JavaScript too, so this particular value probably *is* broken —
+        // but claudevs has no JavaScript engine to confirm that, only Rust's
+        // narrower one, so it reports what it can prove (a divergence it
+        // cannot resolve) rather than asserting the plugin is wrong outright.
         let dir = plugin(
             r#"{"hooks":{"PreToolUse":[{"matcher":"Edit(","hooks":[{"type":"command","command":"true"}]}]}}"#,
         );
         let findings = check(dir.path()).unwrap();
         assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(findings[0].severity, Severity::Warning);
         assert!(findings[0].message.contains("Edit("), "{findings:?}");
+    }
+
+    #[test]
+    fn a_comma_list_yields_no_finding() {
+        // This does not distinguish list-mode from regex-mode: every
+        // character `crate::contract::matcher::is_exact_mode_char` admits
+        // also compiles as a Rust regex, so `"Edit, Write"` produced no
+        // finding under the old `regex::Regex::new` path too. The list
+        // semantics themselves — that it splits into two exact alternatives
+        // rather than matching the literal substring `"Edit, Write"` — are
+        // pinned in `crate::contract::matcher`'s
+        // `a_comma_separated_value_is_a_list_and_surrounding_space_is_trimmed`.
+        let dir = plugin(
+            r#"{"hooks":{"PreToolUse":[{"matcher":"Edit, Write","hooks":[{"type":"command","command":"true"}]}]}}"#,
+        );
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_pattern_rust_rejects_and_javascript_accepts_is_a_warning_naming_the_engine() {
+        let dir = plugin(
+            r#"{"hooks":{"PreToolUse":[{"matcher":"(?<=Edit)Write","hooks":[{"type":"command","command":"true"}]}]}}"#,
+        );
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert_eq!(
+            findings[0].severity,
+            Severity::Warning,
+            "a plugin whose pattern the runtime accepts must not be failed: {findings:?}"
+        );
     }
 
     #[test]

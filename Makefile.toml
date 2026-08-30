@@ -278,6 +278,28 @@ expect_no_fail minimal-plugin 0
 expect_no_fail dead-script-plugin 0
 expect_stage_fail escape-plugin 1 wiring
 expect_stage_fail bad-matcher-plugin 1 wiring
+
+# project-branch-plugin is the paired control for the default project: its
+# one PreToolUse hook only speaks when the payload names a file that exists
+# inside a project carrying a manifest, which is exactly what the default
+# fixtureless project (Project::empty()) now provides. A bare temp directory
+# would take the hook's silent branch and this case would pass whether the
+# hook worked or not.
+expect_no_fail project-branch-plugin 0
+
+# exec-args-plugin is the paired control for `args`-carrying exec handlers: one
+# SessionStart case whose output comes from `command`, one whose output comes
+# only from `args`. Both must pass, or the exec dispatch path has regressed.
+expect_no_fail exec-args-plugin 0
+
+# matcher-routing-plugin is a must-fail fixture on purpose: its two PreToolUse
+# cases target different matcher groups, and the second asserts the `Edit`
+# group's output against a `Bash` payload — a case the runtime would never
+# route there. It FAILs at `test` (and `test --installed`, for the same
+# reason): both stages actually run the case suite, unlike `wiring`, which is
+# static and cannot see a payload/matcher mismatch. A corpus of only-passing
+# fixtures would go green the day this routing check stopped reporting.
+expect_stage_fail matcher-routing-plugin 1 test
 '''
 
 [tasks.install-airsl]

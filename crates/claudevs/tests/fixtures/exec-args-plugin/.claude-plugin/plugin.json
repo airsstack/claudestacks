@@ -1,0 +1,5 @@
+{
+  "name": "exec-args-plugin",
+  "version": "0.1.0",
+  "description": "Two SessionStart handlers: one shell, one exec whose output lives only in args."
+}

@@ -1,0 +1,5 @@
+{
+  "name": "project-branch-plugin",
+  "version": "0.1.0",
+  "description": "A PreToolUse hook that only speaks when it finds a real project."
+}

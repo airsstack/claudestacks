@@ -1,0 +1,6 @@
+event: PreToolUse
+hook: edit-group-ran
+payload:
+  tool_name: Bash
+expect:
+  stdout_contains: edit-group-ran

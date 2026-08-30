@@ -1,0 +1,4 @@
+event: SessionStart
+hook: shell-control-ran
+expect:
+  stdout_contains: shell-control-ran

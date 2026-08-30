@@ -4,14 +4,28 @@ Guidance for Claude Code when working in this repository.
 
 ## Never assert what you have not checked
 
-Every factual claim about the official SDKs, the `claude` binary, or this codebase must come from
-something you opened in the current task. Not memory, not inference, not plausibility.
+Every factual claim you state must come from something you opened in the current task. Not memory,
+not inference, not plausibility.
+
+That covers the official SDKs, the `claude` binary, and this codebase. It covers equally: what a
+review report said, what a past commit did, why something is in the state it is in, and what you
+yourself did earlier in the session. A claim about process is still a claim. A claim about your own
+work is still a claim.
 
 - **Cite it or drop it.** A behavioural claim carries a `file:line` or byte offset you actually read.
   If you cannot cite it, go read it or write "not verified" — never state it flatly.
 - **A subagent's recommendation is not a fact.** Research agents mix findings with advice. Promoting
   "you should gate on X" into "the SDK gates on X" is fabrication even though a report said it.
   Verify the underlying claim yourself before it enters a spec, a doc, or code.
+- **A causal story is not evidence.** Seeing an effect and naming its cause is a hypothesis, and it
+  stays one until you open the thing that would show it. Explaining *why* something went wrong is
+  where this breaks most often, because a plausible cause arrives instantly and checking it takes a
+  `grep`. Run the `grep`. If you have not, say "I have not checked why" — that is a complete and
+  useful answer, and a wrong cause is not.
+- **Your own past actions need evidence too.** What you did an hour ago is memory. `git log`, file
+  mtimes, the review report, the transcript on disk — open one before saying what happened. This
+  applies hardest when you are accounting for a mistake: the reconstruction that flatters the
+  narrative is the one that arrives first.
 - **Absence needs a search that could have found it.** "X does not exist" names the exact command run
   and why it would have hit. Confirm the method works by finding a sibling you know is present.
 - **A passing test proves nothing until you have seen it fail.** Break the fix, watch it go red.
@@ -36,6 +50,15 @@ decision-control table exists" when it sits at `hooks.md:1011-1025`, and no ment
 and `StopFailure` use a narrower matcher character set. The last one shipped as a real bug. One
 `curl` of the 316,753-byte page answered all four by grep.
 
+It recurs on process claims, where nothing looks like research so nothing gets checked. Asked why a
+defect had reached a committed plan, this session answered "four review rounds ran and none flagged
+it" — stated flatly, no report opened. One `grep` of the round-4 report found the finding present at
+`plan-set-04.md:51`, filed 🟡 risk (tier headers at `:21`, `:41`, `:57`); `02-the-gates.md`'s mtime
+showed it was last touched 92 minutes *before* that report was written, while every sibling plan was
+edited after it. The reviewer had done its job and the finding was dropped at the fix step, which is
+a different failure with a different fix. The invented cause sent the author hunting a broken
+reviewer for two exchanges.
+
 ## How to answer
 
 **High-level overview only. Detail on request.**
@@ -58,6 +81,10 @@ take. Evidence appears only where the author cannot act without it.
 
 Bad news goes first and plainly. If something is still wrong, unverified, or unfinished, that is the
 first sentence, not a caveat at the end.
+
+Brevity is not licence to skip the check. A short wrong answer wastes the author exactly as much as a
+long one, and reads as more confident. When the check has not been run, the honest short answer names
+what is unverified — never a confident sentence standing in for the work.
 
 Sound like a person wrote it. Vary sentence length. Skip formulaic openers, restating the question back,
 and announcing the structure before you use it. Bullets are for things that are genuinely a list; prose

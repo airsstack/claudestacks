@@ -19,6 +19,7 @@ use crate::types::{MarketplaceName, PluginName, PluginVersion};
 
 /// What a plugin's own manifest contributes to its install path.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct PluginManifest {
     /// The plugin's name.
     pub name: PluginName,

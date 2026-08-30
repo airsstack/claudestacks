@@ -4,34 +4,87 @@ Guidance for Claude Code when working in this repository.
 
 ## Never assert what you have not checked
 
-Every factual claim about the official SDKs, the `claude` binary, or this codebase must come from
-something you opened in the current task. Not memory, not inference, not plausibility.
+Every factual claim you state must come from something you opened in the current task. Not memory,
+not inference, not plausibility.
+
+That covers the official SDKs, the `claude` binary, and this codebase. It covers equally: what a
+review report said, what a past commit did, why something is in the state it is in, and what you
+yourself did earlier in the session. A claim about process is still a claim. A claim about your own
+work is still a claim.
 
 - **Cite it or drop it.** A behavioural claim carries a `file:line` or byte offset you actually read.
   If you cannot cite it, go read it or write "not verified" — never state it flatly.
 - **A subagent's recommendation is not a fact.** Research agents mix findings with advice. Promoting
   "you should gate on X" into "the SDK gates on X" is fabrication even though a report said it.
   Verify the underlying claim yourself before it enters a spec, a doc, or code.
+- **A causal story is not evidence.** Seeing an effect and naming its cause is a hypothesis, and it
+  stays one until you open the thing that would show it. Explaining *why* something went wrong is
+  where this breaks most often, because a plausible cause arrives instantly and checking it takes a
+  `grep`. Run the `grep`. If you have not, say "I have not checked why" — that is a complete and
+  useful answer, and a wrong cause is not.
+- **Your own past actions need evidence too.** What you did an hour ago is memory. `git log`, file
+  mtimes, the review report, the transcript on disk — open one before saying what happened. This
+  applies hardest when you are accounting for a mistake: the reconstruction that flatters the
+  narrative is the one that arrives first.
 - **Absence needs a search that could have found it.** "X does not exist" names the exact command run
   and why it would have hit. Confirm the method works by finding a sibling you know is present.
 - **A passing test proves nothing until you have seen it fail.** Break the fix, watch it go red.
 - **Prefer the shipped artifact** — `sdk.d.ts`/`sdk.mjs`, the Python sdist, the binary — over
   documentation about them, and documentation over recollection.
+- **Get the artifact into a local file, then grep it.** For the Claude Code docs that means
+  `curl -sS -L 'https://code.claude.com/docs/en/<page>.md' -o <scratch>/<page>.md`. **Never WebFetch
+  these URLs.** WebFetch truncates the page and hands the remainder to a summarizing model, which
+  invents plausible content past the cutoff without erroring — three fetches of the same section
+  returned `session_start_reason`, then `resume_reason`, then a decision table that does not exist.
+  A summary of the artifact is not the artifact.
+- **A review pass cannot validate a premise nobody checked.** Reviewers — human or agent — check
+  internal consistency and conformance to an upstream document. They do not re-derive external facts,
+  so repeated rounds raise confidence in a false premise without ever testing it. Ground every
+  external claim against the artifact *before* it becomes the authority downstream work builds on.
 
 This has produced real defects: wrong claims reached committed docs, and a workstream was scoped out
-entirely on an unverified negative.
+entirely on an unverified negative. The claudevs plugin-correctness spec was researched through
+WebFetch and survived four `artifact-reviewer` rounds carrying four wrong facts about the hooks
+reference — 31 events instead of 33, three stdout-as-context events instead of four, "no per-event
+decision-control table exists" when it sits at `hooks.md:1011-1025`, and no mention that `FileChanged`
+and `StopFailure` use a narrower matcher character set. The last one shipped as a real bug. One
+`curl` of the 316,753-byte page answered all four by grep.
+
+It recurs on process claims, where nothing looks like research so nothing gets checked. Asked why a
+defect had reached a committed plan, this session answered "four review rounds ran and none flagged
+it" — stated flatly, no report opened. One `grep` of the round-4 report found the finding present at
+`plan-set-04.md:51`, filed 🟡 risk (tier headers at `:21`, `:41`, `:57`); `02-the-gates.md`'s mtime
+showed it was last touched 92 minutes *before* that report was written, while every sibling plan was
+edited after it. The reviewer had done its job and the finding was dropped at the fix step, which is
+a different failure with a different fix. The invented cause sent the author hunting a broken
+reviewer for two exchanges.
 
 ## How to answer
 
-Answer the question asked, then stop. Default to a few sentences. Direct and precise — say the thing,
-do not build up to it.
+**High-level overview only. Detail on request.**
 
-Lead with the outcome: the first sentence says what happened or what you found; detail follows for
-whoever wants it.
+Default to three or four sentences. State the outcome, the state of the work, and what needs a
+decision. Then stop and let the author ask.
 
-Be descriptive, not exhaustive. Give the finding and what it means for the work. Do not narrate the
+Hold back, unless asked: tables of findings, per-item verdicts, citation lists, commit-by-commit
+accounts, what each subagent reported, methodology, and any explanation of how a conclusion was
+reached. One line naming the count is enough — "five spec claims were wrong, three now fixed" beats
+five rows of evidence. The author will ask for the table if they want it.
+
+A long reply about work that turned out to be wrong is worse than a short one. Volume of evidence is
+not a substitute for the result being right, and presenting it as though it were wastes the reader
+twice.
+
+Lead with the outcome: the first sentence says what happened or what you found. Do not narrate the
 process — no account of what you searched, read, or ruled out, no recap of steps the author watched you
-take. Evidence appears where it changes the answer, not as a receipt attached to every claim.
+take. Evidence appears only where the author cannot act without it.
+
+Bad news goes first and plainly. If something is still wrong, unverified, or unfinished, that is the
+first sentence, not a caveat at the end.
+
+Brevity is not licence to skip the check. A short wrong answer wastes the author exactly as much as a
+long one, and reads as more confident. When the check has not been run, the honest short answer names
+what is unverified — never a confident sentence standing in for the work.
 
 Sound like a person wrote it. Vary sentence length. Skip formulaic openers, restating the question back,
 and announcing the structure before you use it. Bullets are for things that are genuinely a list; prose
@@ -129,6 +182,26 @@ the policy and every suppression in `deny.toml`. It is its own job — invoking 
 directly, without cargo-make — because it compiles nothing and answers to a moving advisory
 database, so it can fail on a commit that changed nothing.
 
+A second pair answers the same question against plugins nobody here wrote. `cargo make corpus-fetch`
+clones the 13 pinned repositories in `crates/claudevs/tests/corpus/corpus.toml` into `target/corpus`
+— the only step in this repository that touches the network — and `cargo make corpus-check` sweeps
+every one of their 156 plugin roots, rendering one row per root. Neither joins `cargo make dod` or
+CI: the corpus is pinned by commit SHA rather than vendored, so `corpus-check` needs a prior
+`corpus-fetch` and cannot run on a bare checkout. Run both before a release. A repository that has
+since been deleted, made private, or force-pushed prints `UNFETCHABLE` to stderr, is skipped rather
+than failing the fetch outright, and has its slug recorded in `target/corpus/.unfetchable` — the
+record `corpus-check` consults so that repository's row can legitimately read `ABSENT` without
+failing the sweep. Any other absence — a repository the fetch never reached, or lost after a
+previous fetch — has no such record, and fails `corpus-check` instead of rendering as a quieter,
+shorter pass. Both lanes handle third-party code: `corpus-fetch` clones from 13 repositories nobody
+here controls and `corpus-check` runs `claudevs check` over what they ship. Today that stops short of
+executing it: no pinned repository ships a case file, established by searching the checkouts for
+`claudevs.toml`, `tests/*.yaml`, `tests/*.yml`, `_test.lua` and `test_*.lua` rather than read off the
+`test=Skipped` column, since `check.rs:164` also skips on a malformed marketplace or layout. A corpus
+plugin that did carry one would have its suite run, its
+Lua under `Policy::confined()` and any declared native suite through an unconfined shell. Repin only
+what you are willing to execute.
+
 The plugin suite has its own check for a different reason: `cargo make plugins` runs `airsl check`
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different
@@ -173,6 +246,22 @@ ships a README under `plugins/<name>/README.md`.
 Two plugins from the previous suite did not come across: the Open Knowledge Format toolkit, whose
 `knowledge/` bundle was never migrated, and the plugin-development cache-sync hook, which has no
 replacement here.
+
+### When execution disproves the spec
+
+Executing a plan is the first time a spec's claims meet the artifact they describe, so this is where
+a wrong premise surfaces. When it does, the code fix is only half the work — the other half is that
+the chain now lies to whoever executes the next plan.
+
+Stop and put it to the author as its own question: *the spec's premise is disproven, amend now or
+after this plan?* Do not fold it into a question about the implementation and read the answer as
+covering both — approving a code change is not approving the record. Sibling plans were written
+against the old text and cannot see the commit that corrected it; a commit body is not where the next
+plan's author looks.
+
+Superseding an approved spec belongs to the `design` skill (rename to `spec-superseded-YYYY-MM-DD.md`,
+flip its status, write a fresh draft), and the author authorizes it. "Not without asking" means
+*asking*, not carrying on quietly.
 
 ## Before re-deriving, query the stores
 

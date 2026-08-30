@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "echo shell-control-ran" },
+          { "type": "command", "command": "sh", "args": ["-c", "echo exec-args-ran"] }
+        ]
+      }
+    ]
+  }
+}

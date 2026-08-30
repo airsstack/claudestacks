@@ -138,10 +138,12 @@ closing commit task]
 
 Provenance keys per `artifact-chain.md` §6 may also appear in a plan's frontmatter.
 
-Once `execute` runs this plan, it appends two more sections directly to the file —
-`## Review findings` (durable reviewer output) and `## Deviations` (departures from the
-plan) — before flipping it `done`. Neither is authored by the `plan` skill; both are
-appended by `execute`.
+Once `execute` runs this plan, it appends three more sections directly to the file, in
+this order — `## Review findings` (durable reviewer output), `## Probe results` (each
+throwaway test run to prove a claim the task asserted but did not create: the claim, the
+command, its real output, and whether it came out against the plan), and `## Deviations`
+(departures from the plan) — before flipping it `done`. None is authored by the `plan`
+skill; all three are appended by `execute`.
 
 ---
 

@@ -63,7 +63,12 @@ mod tests {
             "{report:?}"
         );
         assert!(!report.all_clear());
-        assert_eq!(report.counts(), (3, 1));
+        // One error: `refs` on the missing `hooks/absent.sh`. Three warnings:
+        // `invocations` on the unreferenced `orphan.sh`, `matchers` on the
+        // unknown `Nope` event, and `matchers` on the `Edit(` matcher Rust
+        // cannot compile. Both warning severities are pinned by their own
+        // tests in `matchers.rs`.
+        assert_eq!(report.counts(), (1, 3));
         assert!(
             report
                 .findings

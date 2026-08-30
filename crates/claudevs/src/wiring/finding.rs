@@ -8,6 +8,7 @@
 /// How serious a wiring observation is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Severity {
     /// Fails the wiring stage.
     Error,
@@ -17,6 +18,7 @@ pub enum Severity {
 
 /// One thing a checker found.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct Finding {
     /// Whether this fails the stage.
     pub severity: Severity,
@@ -32,6 +34,7 @@ pub struct Finding {
 
 /// Everything the checkers found, in checker order.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct WiringReport {
     /// The findings.
     pub findings: Vec<Finding>,

@@ -1,0 +1,6 @@
+{
+  "name": "hooks-array-plugin",
+  "version": "0.1.0",
+  "description": "claudevs negative fixture: hooks.json puts an array at the top-level `hooks` key instead of an object keyed by event name, a shape found in third-party plugins in the wild",
+  "author": { "name": "rstlix0x0" }
+}

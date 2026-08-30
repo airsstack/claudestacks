@@ -12,7 +12,23 @@ use std::collections::BTreeMap;
 use crate::types::{CaseName, HookEvent};
 
 /// A named fixture directory under `tests/fixtures/`.
+///
+/// Not a validated newtype — the field is `pub` and unvalidated, so this is a
+/// transparent wrapper a caller only ever reads back (from a loaded [`Case`]
+/// or [`Step`]), never builds from a literal. `#[non_exhaustive]` documents
+/// that read-only contract.
+///
+/// On a tuple struct the attribute also closes the constructor to other
+/// crates, so downstream code can neither build one nor destructure it. Which
+/// diagnostic that produces depends on how the type is named at the site.
+/// With it imported, `let FixtureRef(name) = fixture;` is
+/// `error[E0532]: cannot match against a tuple struct which contains private
+/// fields` and `FixtureRef(s)` is `error[E0423]: cannot initialize a tuple
+/// struct which contains private fields`; named through its path, the same
+/// pattern is instead ``error[E0603]: tuple struct constructor `FixtureRef`
+/// is private``. Reading the name through `.0` stays available in every form.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
 pub struct FixtureRef(pub String);
 
 /// A command to spawn: argv plus environment overrides.
@@ -29,6 +45,7 @@ pub struct Invocation {
 /// The decision a hook communicates about a tool call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Decision {
     /// The call may proceed.
     Allow,
@@ -45,6 +62,7 @@ pub enum Decision {
 /// translation from an observed run into that meaning.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Expectations {
     /// Exact exit code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +106,7 @@ impl Expectations {
 /// One step of a flow.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Step {
     /// A command to run (absent for a pure fixture-overlay step).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,6 +121,7 @@ pub struct Step {
 
 /// What kind of case this is.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CaseKind {
     /// Spawn one hook with a payload on stdin.
     Hook {
@@ -128,6 +148,7 @@ pub enum CaseKind {
 
 /// A fully-validated test case.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Case {
     /// Reporting identity.
     pub name: CaseName,
@@ -147,6 +168,7 @@ pub struct Case {
 /// concept.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RawCase {
     /// Hook kind: the event name.
     #[serde(default)]
@@ -177,6 +199,7 @@ pub struct RawCase {
 /// `project:` accepts `fixture: name` (mapping) or a bare fixture name.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum ProjectField {
     /// `project: { fixture: rust-repo }`
     Tagged {
@@ -186,6 +209,10 @@ pub enum ProjectField {
     /// `project: rust-repo`
     Bare(FixtureRef),
 }
+
+/// Why `expect.output` cannot be asserted outside a hook case.
+const OUTPUT_IS_A_HOOK_ASSERTION: &str = "`expect.output` is a hook assertion: only a hook observation records whether \
+     anything was emitted, so this expectation could never fail here";
 
 impl Case {
     /// Validates a [`RawCase`] into a [`Case`].
@@ -228,12 +255,33 @@ impl Case {
             CaseKind::Flow { steps }
         };
 
-        if let Some(output) = &raw.expect.output
-            && output != "none"
-        {
-            return Err(format!(
-                "`expect.output` only accepts \"none\", got `{output}`"
-            ));
+        if let Some(output) = &raw.expect.output {
+            if output != "none" {
+                return Err(format!(
+                    "`expect.output` only accepts \"none\", got `{output}`"
+                ));
+            }
+            if !matches!(kind, CaseKind::Hook { .. }) {
+                return Err(String::from(OUTPUT_IS_A_HOOK_ASSERTION));
+            }
+        }
+        if let CaseKind::Flow { steps } = &kind {
+            for (index, step) in steps.iter().enumerate() {
+                let Some(expect) = &step.expect else {
+                    continue;
+                };
+                match expect.output.as_deref() {
+                    None => {}
+                    Some("none") => {
+                        return Err(format!("flow step {index}: {OUTPUT_IS_A_HOOK_ASSERTION}"));
+                    }
+                    Some(other) => {
+                        return Err(format!(
+                            "flow step {index}: `expect.output` only accepts \"none\", got `{other}`"
+                        ));
+                    }
+                }
+            }
         }
 
         Ok(Self {
@@ -334,6 +382,66 @@ mod tests {
                 "event": "SessionStart", "expect": { "output": "verbose" }
             }))
             .is_err()
+        );
+    }
+
+    #[test]
+    fn output_none_is_accepted_on_a_hook_case() {
+        let parsed = case(serde_json::json!({
+            "event": "PreToolUse",
+            "expect": { "output": "none" }
+        }));
+        assert!(parsed.is_ok(), "{parsed:?}");
+    }
+
+    #[test]
+    fn output_none_is_refused_on_a_script_case_because_it_could_never_fail() {
+        let error = case(serde_json::json!({
+            "invocation": { "argv": ["true"] },
+            "expect": { "output": "none" }
+        }))
+        .unwrap_err();
+        assert!(error.contains("output"), "{error}");
+        assert!(error.contains("hook"), "{error}");
+    }
+
+    #[test]
+    fn output_none_is_refused_on_a_flow_case_for_the_same_reason() {
+        let error = case(serde_json::json!({
+            "steps": [{ "run": { "argv": ["true"] } }],
+            "expect": { "output": "none" }
+        }))
+        .unwrap_err();
+        assert!(error.contains("output"), "{error}");
+    }
+
+    #[test]
+    fn output_none_is_refused_inside_a_flow_step_too() {
+        let error = case(serde_json::json!({
+            "steps": [{
+                "run": { "argv": ["true"] },
+                "expect": { "output": "none" }
+            }]
+        }))
+        .unwrap_err();
+        assert!(error.contains("output"), "{error}");
+    }
+
+    #[test]
+    fn the_refusal_names_the_offending_steps_own_index() {
+        let error = case(serde_json::json!({
+            "steps": [
+                { "run": { "argv": ["true"] } },
+                {
+                    "run": { "argv": ["true"] },
+                    "expect": { "output": "none" }
+                }
+            ]
+        }))
+        .unwrap_err();
+        assert!(
+            error.contains("flow step 1"),
+            "the offender is the second step (index 1): {error}"
         );
     }
 }

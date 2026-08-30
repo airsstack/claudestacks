@@ -11,6 +11,7 @@ use crate::error::{Error, Result};
 
 /// A discovered case file.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CaseFile {
     /// A single-case YAML file.
     Yaml(PathBuf),

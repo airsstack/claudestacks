@@ -1,0 +1,4 @@
+event: SessionStart
+hook: exec-args-ran
+expect:
+  stdout_contains: exec-args-ran

@@ -46,6 +46,9 @@ pub(crate) enum Command {
     },
     /// Validate, check wiring, then run the suite in both layouts.
     Check {
+        /// Fail on the delegate's warnings as well as its errors.
+        #[arg(long)]
+        strict: bool,
         /// Emit the machine-readable report instead of the human one.
         #[arg(long)]
         json: bool,
@@ -74,14 +77,29 @@ pub(crate) fn run(cli: Cli) -> i32 {
             path,
         } => run_test(case, installed, json, &path),
         Command::Migrate { write, file } => run_migrate(write, &file),
-        Command::Check { json, path } => run_check(json, &path),
+        Command::Check { strict, json, path } => {
+            run_check(strictness_from_flag(strict), json, &path)
+        }
         Command::Doctor { json, path } => run_doctor(json, &path),
+    }
+}
+
+/// Maps the `--strict` clap flag to the `claudevs` strictness level.
+///
+/// Absent, `check` resolves to [`claudevs::Strictness::Lenient`]; present, it
+/// resolves to [`claudevs::Strictness::Strict`].
+const fn strictness_from_flag(strict: bool) -> claudevs::Strictness {
+    if strict {
+        claudevs::Strictness::Strict
+    } else {
+        claudevs::Strictness::Lenient
     }
 }
 
 /// `claudevs test`.
 fn run_test(case: Option<String>, installed: bool, json: bool, path: &std::path::Path) -> i32 {
-    let options = claudevs::SuiteOptions { case_filter: case };
+    let mut options = claudevs::SuiteOptions::default();
+    options.case_filter = case;
     let outcome = if installed {
         claudevs::run_suite_installed(path, &options)
     } else {
@@ -146,8 +164,8 @@ fn run_migrate(write: bool, file: &std::path::Path) -> i32 {
 }
 
 /// `claudevs check`.
-fn run_check(json: bool, path: &std::path::Path) -> i32 {
-    match claudevs::check::run(path) {
+fn run_check(strictness: claudevs::Strictness, json: bool, path: &std::path::Path) -> i32 {
+    match claudevs::check::run(path, strictness) {
         Ok(report) => {
             if json {
                 match claudevs::render_json(&report) {
@@ -196,7 +214,7 @@ mod tests {
 
     use clap::Parser as _;
 
-    use super::{Cli, Command};
+    use super::{Cli, Command, strictness_from_flag};
 
     #[test]
     fn test_defaults_to_the_current_directory() {
@@ -248,11 +266,33 @@ mod tests {
         // two dispatch arms — or renaming the flag — leaves the suite green.
         let Cli { command } =
             Cli::try_parse_from(["claudevs", "check", "--json", "some/plugin"]).unwrap();
-        let Command::Check { json, path } = command else {
+        let Command::Check { json, path, .. } = command else {
             panic!("expected check");
         };
         assert!(json);
         assert_eq!(path, std::path::Path::new("some/plugin"));
+    }
+
+    #[test]
+    fn check_accepts_a_strict_flag_and_defaults_to_absent() {
+        let Cli { command } =
+            Cli::try_parse_from(["claudevs", "check", "--strict", "some/plugin"]).unwrap();
+        let Command::Check { strict, .. } = command else {
+            panic!("expected a check command");
+        };
+        assert!(strict);
+
+        let Cli { command } = Cli::try_parse_from(["claudevs", "check", "some/plugin"]).unwrap();
+        let Command::Check { strict, .. } = command else {
+            panic!("expected a check command");
+        };
+        assert!(!strict, "the strict flag is absent unless asked");
+    }
+
+    #[test]
+    fn strictness_from_flag_maps_both_directions() {
+        assert_eq!(strictness_from_flag(false), claudevs::Strictness::Lenient);
+        assert_eq!(strictness_from_flag(true), claudevs::Strictness::Strict);
     }
 
     #[test]

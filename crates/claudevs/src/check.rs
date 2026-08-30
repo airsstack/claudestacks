@@ -1,9 +1,8 @@
 //! `claudevs check`: the one gate a plugin passes or fails.
 //!
 //! Four stages in order — delegated manifest validation, static wiring, the case
-//! suite, the case suite again from the simulated install layout — stopping at
-//! the first failure, because a plugin whose wiring is broken has nothing to
-//! learn from a suite run.
+//! suite, the case suite again from the simulated install layout — and the
+//! report aggregates all four outcomes.
 //!
 //! Two things are deliberately *not* failures: a stage that cannot run for want
 //! of an environment (`claude` absent, no marketplace to key an install path by,
@@ -17,15 +16,16 @@ use std::path::Path;
 use crate::error::{Error, Result};
 use crate::report::{render_human, render_wiring_human};
 use crate::suite::SuiteOptions;
-use crate::validate::Validation;
+use crate::validate::{Strictness, Validation};
 
 /// How one stage ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum StageStatus {
     /// Nothing wrong.
     Passed,
-    /// Something wrong; the pipeline stops here.
+    /// Something wrong; the remaining stages still run.
     Failed,
     /// Could not run in this environment; the pipeline continues.
     Skipped,
@@ -33,6 +33,7 @@ pub enum StageStatus {
 
 /// One stage's outcome.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct Stage {
     /// The stage name, as it appears in the summary.
     pub name: &'static str,
@@ -44,6 +45,7 @@ pub struct Stage {
 
 /// Every stage that ran, in order.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct CheckReport {
     /// The stages.
     pub stages: Vec<Stage>,
@@ -65,8 +67,8 @@ impl CheckReport {
 ///
 /// Only conditions that stop claudevs itself: an unwalkable plugin directory, an
 /// unloadable case file. A failing plugin is a report, not an error.
-pub fn run(plugin_dir: &Path) -> Result<CheckReport> {
-    run_with(plugin_dir, crate::validate::run)
+pub fn run(plugin_dir: &Path, strictness: Strictness) -> Result<CheckReport> {
+    run_with(plugin_dir, strictness, crate::validate::run)
 }
 
 /// The pipeline, with the validation delegate supplied by the caller.
@@ -75,18 +77,21 @@ pub fn run(plugin_dir: &Path) -> Result<CheckReport> {
 /// program name: it is the one stage that leaves the machine, so pinning it is
 /// what keeps a test asserting claudevs' own behaviour instead of the installed
 /// `claude` binary's. A release that tightens `--strict` would otherwise turn
-/// the first stage red and truncate every pipeline under test.
+/// the first stage red in every pipeline under test.
 ///
 /// # Errors
 ///
 /// Same conditions as [`run`].
-fn run_with(plugin_dir: &Path, validate: impl Fn(&Path) -> Validation) -> Result<CheckReport> {
+fn run_with(
+    plugin_dir: &Path,
+    strictness: Strictness,
+    validate: impl Fn(&Path, Strictness) -> Validation,
+) -> Result<CheckReport> {
     let mut report = CheckReport::default();
 
-    report.stages.push(validation_stage(validate(plugin_dir)));
-    if !report.all_clear() {
-        return Ok(report);
-    }
+    report
+        .stages
+        .push(validation_stage(validate(plugin_dir, strictness)));
 
     let wiring = crate::wiring::run(plugin_dir)?;
     report.stages.push(Stage {
@@ -98,18 +103,12 @@ fn run_with(plugin_dir: &Path, validate: impl Fn(&Path) -> Validation) -> Result
         },
         detail: render_wiring_human(&wiring),
     });
-    if !report.all_clear() {
-        return Ok(report);
-    }
 
     let options = SuiteOptions::default();
     report.stages.push(suite_stage(
         "test",
         crate::suite::run_suite(plugin_dir, &options),
     )?);
-    if !report.all_clear() {
-        return Ok(report);
-    }
 
     report.stages.push(suite_stage(
         "test --installed",
@@ -186,18 +185,18 @@ mod tests {
 
     use super::{StageStatus, run_with, suite_stage};
     use crate::error::Error;
-    use crate::validate::Validation;
+    use crate::validate::{Strictness, Validation};
 
     /// A delegate that always passes, so a stage order assertion is about the
     /// pipeline rather than about the `claude` binary installed on this machine.
-    fn delegate_passes(_: &std::path::Path) -> Validation {
+    fn delegate_passes(_: &std::path::Path, _: Strictness) -> Validation {
         Validation::Passed {
             output: String::from("✔ Validation passed\n"),
         }
     }
 
     /// A delegate that is absent, as on CI.
-    fn delegate_absent(_: &std::path::Path) -> Validation {
+    fn delegate_absent(_: &std::path::Path, _: Strictness) -> Validation {
         Validation::Unavailable {
             reason: String::from("cannot run `claude`: No such file or directory (os error 2)"),
         }
@@ -210,17 +209,43 @@ mod tests {
     }
 
     #[test]
-    fn wiring_failing_stops_the_pipeline_before_the_suite_runs() {
-        let report = run_with(&fixture("escape-plugin"), delegate_passes).unwrap();
+    fn a_failing_first_stage_does_not_hide_the_three_that_follow() {
+        let plugin = PathBuf::from("tests/fixtures/minimal-plugin");
+        let report = super::run_with(&plugin, Strictness::Lenient, |_, _| Validation::Failed {
+            output: String::from("✘ Validation failed"),
+        })
+        .unwrap();
         let names: Vec<&str> = report.stages.iter().map(|s| s.name).collect();
-        assert_eq!(names, vec!["validate", "wiring"], "{report:?}");
+        assert_eq!(names, ["validate", "wiring", "test", "test --installed"]);
+        assert_eq!(report.stages[0].status, super::StageStatus::Failed);
+    }
+
+    #[test]
+    fn wiring_failing_is_reported_without_stopping_the_stages_that_follow() {
+        let report = run_with(
+            &fixture("escape-plugin"),
+            Strictness::Lenient,
+            delegate_passes,
+        )
+        .unwrap();
+        let names: Vec<&str> = report.stages.iter().map(|s| s.name).collect();
+        assert_eq!(
+            names,
+            vec!["validate", "wiring", "test", "test --installed"],
+            "{report:?}"
+        );
         assert_eq!(report.stages[1].status, StageStatus::Failed);
         assert!(!report.all_clear());
     }
 
     #[test]
     fn a_dead_file_warning_does_not_stop_the_pipeline() {
-        let report = run_with(&fixture("dead-script-plugin"), delegate_passes).unwrap();
+        let report = run_with(
+            &fixture("dead-script-plugin"),
+            Strictness::Lenient,
+            delegate_passes,
+        )
+        .unwrap();
         let wiring = report.stages.iter().find(|s| s.name == "wiring").unwrap();
         assert_eq!(wiring.status, StageStatus::Passed);
         assert!(
@@ -231,7 +256,12 @@ mod tests {
 
     #[test]
     fn every_stage_runs_for_the_exemplar_and_the_check_is_clear() {
-        let report = run_with(&fixture("minimal-plugin"), delegate_passes).unwrap();
+        let report = run_with(
+            &fixture("minimal-plugin"),
+            Strictness::Lenient,
+            delegate_passes,
+        )
+        .unwrap();
         let names: Vec<&str> = report.stages.iter().map(|s| s.name).collect();
         assert_eq!(
             names,
@@ -261,7 +291,12 @@ mod tests {
         // as on CI, so `validate` skips too — asserting that *some* stage
         // skipped would hold with the whole environment-gap arm of
         // `suite_stage` deleted.
-        let report = run_with(&fixture("dead-script-plugin"), delegate_absent).unwrap();
+        let report = run_with(
+            &fixture("dead-script-plugin"),
+            Strictness::Lenient,
+            delegate_absent,
+        )
+        .unwrap();
         let suite = report.stages.iter().find(|s| s.name == "test").unwrap();
         assert_eq!(suite.status, StageStatus::Skipped, "{report:?}");
         assert!(suite.detail.contains("no case files found"), "{report:?}");
@@ -283,6 +318,29 @@ mod tests {
         .unwrap();
         assert_eq!(stage.status, StageStatus::Failed);
         assert!(stage.detail.contains("no `version` field"), "{stage:?}");
+    }
+
+    #[test]
+    fn the_pipeline_hands_the_delegate_the_strictness_it_was_given() {
+        let plugin = PathBuf::from("tests/fixtures/minimal-plugin");
+        let seen = std::cell::RefCell::new(Vec::new());
+
+        let _ = super::run_with(&plugin, Strictness::Strict, |_, strictness| {
+            seen.borrow_mut().push(strictness);
+            Validation::Passed {
+                output: String::new(),
+            }
+        });
+        assert_eq!(seen.borrow().as_slice(), [Strictness::Strict]);
+
+        seen.borrow_mut().clear();
+        let _ = super::run_with(&plugin, Strictness::Lenient, |_, strictness| {
+            seen.borrow_mut().push(strictness);
+            Validation::Passed {
+                output: String::new(),
+            }
+        });
+        assert_eq!(seen.borrow().as_slice(), [Strictness::Lenient]);
     }
 
     #[test]

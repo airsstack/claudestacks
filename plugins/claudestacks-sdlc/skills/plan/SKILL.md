@@ -89,6 +89,28 @@ sentence without an "and". If a plan's goal sentence needs an "and", split it in
 plans. Tasks are not objectives — three tasks implementing parts of one feature belong in one
 plan.
 
+## Re-verify the spec's external claims before they become code
+
+A plan turns the spec's prose into constants, exhaustive matches, expected test values and literal
+lists — the exact forms that are painful to correct once written. **This is the last gate before
+someone writes code, and the spec is not a trustworthy source for facts about outside systems.**
+
+Before writing a task that encodes such a fact, check it against the artifact — not against the spec
+that supplied it. Fetch documentation as raw source into a local file and grep it (`curl -sS -L
+'<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"`); never through a summarizing fetch tool, which
+truncates long pages and invents plausible content past the cutoff. Prefer the shipped artifact —
+type declarations, the binary's `--help` — over documentation about it.
+
+Every count, exhaustive list, field name, and negative existence claim that reaches a task carries a
+citation to what you read: `<file>:<line>`. **Check exhaustive lists for completeness, not just for
+correctness** — a list where every entry is right but three entries are missing reads as verified and
+is not. Where a fact already lives in a type the plan is building, have the task read it from there
+rather than restating it; a second copy in a task is a copy that drifts.
+
+When the artifact contradicts the spec, do not quietly plan around it. Stop, tell the author which
+claim failed and what the artifact says, and fix the spec — a plan that faithfully implements a wrong
+spec still produces wrong code, and the sibling plans are still quoting the same wrong text.
+
 ## File structure first
 
 Before defining tasks, map the file changes, one sentence of responsibility each. Prefer a new
@@ -205,8 +227,19 @@ report: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
 
 Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives
 its brief as literal text and runs no shell over it, so an unexpanded variable would
-reach it as a filename. `<NN>` starts at `01` and increments on each re-review of a
-revised set.
+reach it as a filename. The report is always `01`.
+
+**Exactly one review round over the set. Never a second.** Fix the findings and take the
+plans to the author. Do not re-spawn the reviewer over the revised set, and do not spawn
+it again when the author asks for changes — revise and present.
+
+Rounds beyond the first return progressively smaller findings about the plan's internal
+reasoning, while the defects that actually reach code are wrong external facts and
+compile-level details. The first no round can catch, because every criterion but the two
+grounding ones compares documents to each other — grounding against the artifact, and
+against a run, is what replaces them.
+The second the compiler catches in seconds. A plan set that would need a second round
+needs rewriting, not re-reviewing.
 
 One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
 requirement satisfied in plan `03` is covered even though plan `01` says nothing about
@@ -217,9 +250,28 @@ The agent returns a verdict summary plus that path. Route off the summary; read 
 `<detail>` only when you must act on a finding. Fix every finding in the drafts
 yourself. The agent never edits a plan, never flips a `status`, and never commits.
 
+**Every finding gets a disposition, and the author sees it.** Not only the blocking ones.
+Build a table as you work the report — one row per finding, at every tier, naming which
+plan it lands in:
+
+| # | Plan | Tier | Finding | Disposition |
+|---|---|---|---|---|
+| 1 | 03 | 🔴 | <one line> | applied |
+| 2 | 02 | 🟡 | <one line> | declined — <reason> |
+
+Carry it to the approval gate below. A finding you decided not to act on is the author's
+call to confirm, not yours to make silently — `artifact-review.md` assigns completeness to
+the reviewer and the decision to this skill *and the user*.
+
+Work the tiers in order but do not stop at the end of 🔴. The risk tier is where a dropped
+finding hides: nothing about the plan looks unfinished afterwards, and a plan whose only
+findings were non-blocking never gets reopened at all. Check the file mtimes against the
+report's if you are unsure whether a plan was revisited after the review — a plan older
+than the report that reviewed it was not.
+
 The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
 § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
-and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
+the two that ground the set's claims outside it, and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
 rather than waiting for the agent to find them — a plan that reaches the reviewer full
 of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can
 act on, apply that same file's criteria inline yourself and tell the user the review ran
@@ -227,7 +279,9 @@ inline; never skip the review for want of the agent.
 
 ## Approval gate
 
-Each plan gets its own approval: present it, ask the user to read and approve. Only on
+Each plan gets its own approval: present it, ask the user to read and approve, and show the
+rows of the disposition table that belong to that plan in the same message — including the
+declined ones. An approval given without sight of them is not an approval of them. Only on
 explicit approval, flip that plan's frontmatter `status: draft → approved` as the last step of
 the interaction that reviews it — do not flip a plan the user has not yet seen.
 

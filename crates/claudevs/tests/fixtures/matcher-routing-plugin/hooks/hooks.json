@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [{ "type": "command", "command": "echo edit-group-ran" }]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "echo bash-group-ran" }]
+      }
+    ]
+  }
+}

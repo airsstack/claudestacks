@@ -5,9 +5,10 @@
 //! Claude Code runtime would, and a report over the verdicts. The `claudevs-cli`
 //! crate is the thin binary over this library.
 //!
-//! Wiring's matcher check compiles each hooks.json `matcher` with the `regex`
-//! crate, which has no lookaround and no backreferences; a pattern relying on
-//! either is reported as a finding even where the runtime would accept it.
+//! Wiring's matcher check evaluates each hooks.json `matcher` in the two modes
+//! the reference defines rather than compiling it as a Rust regex; a pattern
+//! Rust cannot compile is reported as a warning naming the divergence, not as
+//! an error against the plugin.
 
 mod error;
 mod native;
@@ -16,6 +17,7 @@ mod suite;
 
 pub mod case;
 pub mod check;
+pub mod contract;
 pub mod doctor;
 pub mod harness;
 pub mod layout;
@@ -26,11 +28,12 @@ pub mod wiring;
 pub use check::{CheckReport, Stage, StageStatus};
 pub use doctor::{Diagnosis, Probe, ProbeStatus};
 pub use error::{Error, Result};
+pub use harness::{Mismatch, Verdict};
 pub use native::NativeOutcome;
 pub use report::{
     Report, check_exit_code, doctor_exit_code, exit_code, render_check_human, render_doctor_human,
     render_human, render_json, render_wiring_human,
 };
 pub use suite::{CaseOutcome, SuiteOptions, SuiteReport, run_case, run_suite, run_suite_installed};
-pub use validate::Validation;
+pub use validate::{Strictness, Validation};
 pub use wiring::{Finding, Severity, WiringReport};

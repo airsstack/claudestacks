@@ -36,3 +36,6 @@ coding-agent-workspace/
 # generates these now, but an old checkout still can.
 __pycache__/
 *.pyc
+
+# Written by the corpus sweep when it diverges from the committed snapshot.
+crates/claudevs/tests/corpus/expected.snap.actual

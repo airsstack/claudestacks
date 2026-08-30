@@ -1,7 +1,12 @@
 //! Whole-checker integration over the committed negative fixture plugins.
 //!
-//! Each fixture carries exactly one defect. A checker that stopped reporting
-//! its defect would leave the matching assertion below red.
+//! Most fixtures carry exactly one defect; `bad-matcher-plugin` carries three
+//! (two warnings the catalogue and matcher checks report, one error the
+//! `refs` check reports) because a plugin author who gets one thing wrong
+//! rarely gets only one thing wrong, and the fixture doubles as the case that
+//! wiring still fails a plugin for a real reason once the other two stopped
+//! being errors. A checker that stopped reporting its defect would leave the
+//! matching assertion below red.
 
 #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid fixtures")]
 
@@ -61,7 +66,13 @@ fn the_dead_script_fixture_is_a_warning_that_does_not_fail_the_stage() {
 }
 
 #[test]
-fn the_bad_matcher_fixture_is_reported_twice_by_matchers() {
+fn the_bad_matcher_fixture_is_reported_twice_by_matchers_as_warnings() {
+    // An unknown hook event and a matcher Rust cannot compile are both
+    // warnings now, not errors: the catalogue can lag a Claude Code release,
+    // and claudevs cannot prove the JavaScript engine would also reject a
+    // pattern its narrower `regex` crate rejects. Neither fails the stage on
+    // its own (`wiring/finding.rs`); see `the_bad_matcher_fixture_is_reported_
+    // by_refs_and_fails_the_stage` for what still does.
     let report = wiring::run(&fixture("bad-matcher-plugin")).unwrap();
     let matchers: Vec<_> = report
         .findings
@@ -70,15 +81,38 @@ fn the_bad_matcher_fixture_is_reported_twice_by_matchers() {
         .collect();
     assert_eq!(matchers.len(), 2, "{report:?}");
     assert!(
-        matchers
-            .iter()
-            .any(|f| f.message.contains("unknown hook event")),
+        matchers.iter().all(|f| f.severity == Severity::Warning),
+        "{report:?}"
+    );
+    assert!(
+        matchers.iter().any(|f| f
+            .message
+            .contains("is not an event this version of claudevs knows about")),
         "{report:?}"
     );
     assert!(
         matchers
             .iter()
-            .any(|f| f.message.contains("does not compile")),
+            .any(|f| f.message.contains("cannot evaluate matcher")),
         "{report:?}"
     );
+}
+
+#[test]
+fn the_bad_matcher_fixture_is_reported_by_refs_and_fails_the_stage() {
+    // The fixture's `hooks.json` command references
+    // `${CLAUDE_PLUGIN_ROOT}/scripts/absent.sh`, a script that does not
+    // exist — the one finding in this fixture that is still an error, so
+    // wiring still fails for a genuine reason (Makefile.toml's
+    // `claudevs-check` lane relies on this).
+    let report = wiring::run(&fixture("bad-matcher-plugin")).unwrap();
+    let refs: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.checker == "refs")
+        .collect();
+    assert_eq!(refs.len(), 1, "{report:?}");
+    assert_eq!(refs[0].severity, Severity::Error);
+    assert!(refs[0].message.contains("absent.sh"), "{report:?}");
+    assert!(!report.all_clear(), "{report:?}");
 }

@@ -33,6 +33,19 @@ The template follows. `setup` writes the body of this fenced block, without the 
 - **Important** — must be addressed before commit.
 - **Nit** — batch or ignore; never blocks.
 
+## What closes a review
+
+Every review names its Important set — a count, or `none`. A round closes when that
+set is empty: each Important either fixed or explicitly declined in front of the
+author. It does not close when the report is empty, because the report is not
+expected to come back empty — each round of fixes writes new code, and new code gives
+the next round new nits to find. A non-empty report under `none` Important is a pass,
+not unfinished work, and never on its own justifies another round.
+
+This narrows nothing about what gets reported: a review still writes down everything
+it finds at both severities. The stopping condition governs what blocks a commit, not
+what appears in the report.
+
 ## Exclusions
 
 - Generated paths.

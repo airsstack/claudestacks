@@ -1,12 +1,18 @@
-//! The hook events the harness understands.
+//! The hook events claudevs can run a case against.
 //!
-//! Responsibilities: [`HookEvent`] and [`InvalidHookEvent`]. The variants are
-//! the events observed in real hooks.json files in this repository; the set is
-//! `#[non_exhaustive]` at the parse level (an unknown event is an error naming
-//! the known ones) and grows as capture (P4) grounds more.
+//! A variant here means the harness can synthesize a payload for the event and
+//! interpret what a hook returns from it. That is a narrower set than the
+//! events Claude Code documents, which live in [`crate::contract::event`]: a
+//! documented event claudevs cannot simulate is still one a plugin may
+//! legitimately wire, so a checker reads the catalogue while a case reads this
+//! type. Neither derives from the other, and merging them would make one
+//! answer serve two questions.
+//!
+//! Responsibilities: [`HookEvent`] and [`InvalidHookEvent`].
 
 /// A hook event name from hooks.json.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum HookEvent {
     /// Before a tool call runs. Exit 2 blocks the call.
     PreToolUse,

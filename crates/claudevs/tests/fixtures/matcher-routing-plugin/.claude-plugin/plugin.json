@@ -1,0 +1,5 @@
+{
+  "name": "matcher-routing-plugin",
+  "version": "0.1.0",
+  "description": "Two PreToolUse groups behind different matchers, each with its own output."
+}

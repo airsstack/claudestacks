@@ -34,6 +34,39 @@ presented a complete design AND received explicit user approval. This rule holds
 regardless of how simple the work appears. A simple intent may produce a short spec, but
 the spec must still be written, presented, and approved before moving forward.
 
+## Zero assumptions — every claim is proven before it enters the spec
+
+**A spec contains no assumptions, no predictions, and no recollections. Only claims you
+proved in this task.** Plausibility is not evidence. "This is how it surely works" is not
+evidence. A prior artifact in this chain asserting it is not evidence — inherited claims are
+where errors concentrate, because nothing downstream re-checks them.
+
+Before a claim reaches `spec.md`, classify it and produce the matching proof:
+
+| Claim about | Proof required |
+|---|---|
+| This codebase's behaviour | A **temporary test or probe you ran**, with its real output. Not a reading of the source — run it. |
+| This codebase's structure | `file:line` you opened in this task. |
+| An external system's documented behaviour | The artifact fetched to a local file, cited `<file>:<line>`, quoted verbatim. |
+| An external tool's actual behaviour | The command run and its real output, pasted. |
+| A count, or an exhaustive list | The command that produced it (`grep -c`, the artifact's own enumeration), and its output. |
+| A negative — "X does not exist", "there is no such flag" | The exact search run, plus a **control**: the same method finding a sibling you know is present. Without the control the search proves nothing. |
+
+**Write throwaway tests to settle behavioural questions.** Does the harness actually drop
+`args`? Write a probe plugin and run it. Does this assertion ever fail? Break it and watch.
+Does the tool accept that flag? Run it with the flag. A temporary test that is run and
+deleted is worth more than any amount of reasoning about the source, and it is the only way
+to catch a behaviour that differs from what the code appears to say. Delete the probes
+afterwards; keep their output in the spec as the evidence.
+
+Record the evidence inline, next to the claim, at the precision someone else could re-run.
+A spec section whose claims carry no citations is not finished, however confident it reads.
+
+**A claim you cannot prove does not go in.** Write "not verified" beside it, or leave it out
+and say so in the dialogue. An unproven claim admitted here becomes a plan's constant, then a
+test's expected value, and every gate between here and there compares documents to each other
+rather than to the world — so it will not be caught until code meets reality.
+
 ## Checklist
 
 Work through these steps in order. Create a `TodoWrite` item for each step so progress
@@ -65,7 +98,35 @@ is visible.
    plugin is not installed — do the locating inline here and tell the user the agent was
    unavailable. Never fail hard for want of the main plugin.
 
-4. **Ask clarifying questions one at a time.** Surface the questions that matter most
+4. **Ground every external claim against the artifact, before writing any of them down.**
+   A spec that describes an outside system — a documented API, a CLI's behaviour, a file
+   format, a wire protocol — is asserting facts this repository does not own. Fetch the
+   artifact and read it. For documentation, download the raw source to a local file and
+   grep it:
+
+   ```
+   curl -sS -L '<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"
+   ```
+
+   **Do not use a summarizing fetch tool for this.** Such tools truncate long pages and
+   hand the remainder to a small model, which emits plausible invented content instead of
+   an error — repeated fetches of the same section can return contradictory schemas. Prefer
+   the shipped artifact over documentation about it: type declarations, the sdist, the
+   binary's `--help`.
+
+   Every external claim that reaches `spec.md` carries a citation to what you actually read
+   — `<local file>:<line>`, a byte offset, a version. A claim you cannot cite does not go
+   in the spec; write "not verified" or leave it out. Counts, exhaustive lists, and
+   negative existence claims ("the reference documents no such field") are the shapes that
+   go wrong most often and cost most later — check each one individually.
+
+   An inherited claim is not a verified one. If the intent already asserts an external
+   fact, that is where the error is most likely to be: **verify it here rather than
+   carrying it forward.** Every downstream gate compares documents to each other, so a
+   wrong fact admitted at this step is confirmed by every later review and surfaces only
+   when code meets reality.
+
+5. **Ask clarifying questions one at a time.** Surface the questions that matter most
    for the design: purpose, constraints, success criteria, non-goals. Prefer
    multiple-choice questions where natural — they give the user concrete options and
    keep the dialogue moving. Never ask a battery of questions at once; ask one, get the
@@ -73,12 +134,12 @@ is visible.
    written; anything derivable from the intent, the repo, or a loaded guideline is
    derived and stated as an overridable assumption.
 
-5. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
+6. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
    or three distinct approaches along with their trade-offs. Lead with your
    recommendation and explain why you favor it. Invite the user to redirect before
    committing to any path.
 
-6. **Present the design section by section.** Walk through the design in sections
+7. **Present the design section by section.** Walk through the design in sections
    scaled to their complexity. At minimum, cover architecture, key components and their
    responsibilities, data flow, error handling, and testing strategy. Each section must
    conform to the active stack's guideline architecture rules loaded in step 3 — call
@@ -86,14 +147,14 @@ is visible.
    section, confirm the user's understanding and agreement before moving to the next.
    This incremental gate catches disagreements early, before the full spec is written.
 
-7. **Write the spec.** Once the design is agreed upon, write `spec.md` in the chain
+8. **Write the spec.** Once the design is agreed upon, write `spec.md` in the chain
    directory, in the body shape from `${CLAUDE_PLUGIN_ROOT}/references/templates.md`,
    with `status: draft` frontmatter. Carry forward any provenance frontmatter
    (`derived-from-prd` / `derived-from-rfc`) the intent or this dialogue names. The spec
    is the durable record — write it to stand on its own without reference to this
    conversation.
 
-8. **Review the spec — by an agent, not by yourself.** You wrote every line of this
+9. **Review the spec — by an agent, not by yourself.** You wrote every line of this
    spec and held the dialogue that produced it, so you are the weakest available reader
    of it. Spawn `claudestacks-sdlc:artifact-reviewer` over the draft:
 
@@ -106,12 +167,38 @@ is visible.
 
    Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent
    receives its brief as literal text and runs no shell over it, so an unexpanded
-   variable would reach it as a filename. `<NN>` starts at `01` and increments on each
-   re-review of a revised draft, so sequential rounds never overwrite one another.
+   variable would reach it as a filename. The report is always `01`.
+
+   **Exactly one review round. Never a second.** Fix the findings and go to the author.
+   Do not re-spawn the reviewer over the revised draft, and do not spawn it again after
+   the author asks for changes — revise and present.
+
+   A second round is not worth what it costs. Rounds beyond the first return
+   progressively smaller findings on the reasoning, while the errors that actually reach
+   code are wrong external facts, which no round can find because every criterion but one
+   compares documents to each other. Grounding those facts against the artifact — the step
+   above — is what replaces the extra rounds, and the compiler catches the rest in seconds
+   rather than twenty minutes. If a draft needs more than one round, it needs rewriting,
+   not re-reviewing.
 
    The agent returns a verdict summary plus that path. Route off the summary; read the
    `<detail>` only when you must act on a finding. Fix the draft yourself — the agent
    never edits it, never flips a `status`, and never commits.
+
+   **Every finding gets a disposition, and the author sees it.** Not only the blocking
+   ones. Build a table as you work the report — one row per finding, at every tier:
+
+   | # | Tier | Finding | Disposition |
+   |---|---|---|---|
+   | 1 | 🔴 | <one line> | applied |
+   | 2 | 🟡 | <one line> | declined — <reason> |
+
+   Carry that table to the approval gate in step 10. A finding you decided not to act on
+   is the author's call to confirm, not yours to make silently: `artifact-review.md`
+   assigns completeness to the reviewer and the decision to this skill *and the user*.
+   Work the tiers in order but do not stop at the end of 🔴 — the risk tier is where a
+   quietly-dropped finding hides, because nothing about the draft looks unfinished
+   afterwards.
 
    The criteria it applies live in
    `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md` § *Reviewing a draft spec*. If
@@ -119,15 +206,18 @@ is visible.
    criteria inline yourself and tell the user the review ran inline — never skip the
    review for want of the agent.
 
-9. **User review gate.** Ask the user to read the spec file you just wrote and give
-   explicit approval. This is a mandatory stop, not a formality. If they request
-   changes — small clarifications or significant redesigns — revise the spec and re-run
-   step 8's agent review over the revised draft, incrementing `<NN>`. Only on explicit
+10. **User review gate.** Ask the user to read the spec file you just wrote and give
+   explicit approval, and show them step 9's disposition table in the same message. An
+   approval given without sight of the declined findings is not an approval of them.
+   This is a mandatory stop, not a formality. If they request
+   changes — small clarifications or significant redesigns — revise the spec and present
+   it again. **Do not re-spawn the reviewer**; step 9 has already run and runs once per
+   spec. Only on explicit
    approval, flip `spec.md`'s frontmatter
    `status: draft → approved` as the last step of this interaction. Committing the spec
    is the user's call — do not auto-commit.
 
-10. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
+11. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
     already `approved`: rename the existing file to `spec-superseded-YYYY-MM-DD.md`
     (today's date), then flip that renamed file's frontmatter
     `status: approved → superseded` — `artifact-chain.md` §7.2 assigns this transition
@@ -135,7 +225,7 @@ is visible.
     then write a fresh `spec.md` with `status: draft`, starting again from step 1.
     `spec.md` — the unsuffixed name — is always the governing spec for the chain.
 
-11. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
+12. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
     write code or scaffold files yourself; the approved spec is the handoff artifact.
 
 ## Design for isolation

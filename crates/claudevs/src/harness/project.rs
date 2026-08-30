@@ -1,32 +1,99 @@
-//! Materializing a fixture directory as the case's temp project.
+//! Materializing a case's temp project, from a fixture or synthesized fresh.
 //!
 //! Fixtures are plain directories under `tests/fixtures/`. A fixture holding a
 //! file named `.gitinit` gets `git init` + one commit (the marker itself is not
-//! copied). Nothing ever executes against the plugin's real checkout.
+//! copied). A fixtureless case gets [`Project::empty`]'s default project
+//! instead: a manifest, one tracked file, and a git repository, so a hook that
+//! branches on project shape does not silently take its not-found path. Both
+//! kinds are hermetic against the developer's own git configuration — see
+//! [`git`]. Nothing ever executes against the plugin's real checkout.
 
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 
+/// The one file the default project ships and tracks.
+///
+/// A hook case's payload names this path, so a hook that stats its target
+/// finds a real file rather than taking the not-found branch. One constant so
+/// the project and the payload cannot drift apart —
+/// [`crate::harness::payload`] reads it.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "explicit pub(crate) documents that harness::payload, a sibling module, shares this constant"
+)]
+pub(crate) const TRACKED_FILE: &str = "file.txt";
+
+/// The manifest the default project ships.
+///
+/// A hook guarding a lockfile, or refusing to run outside a package, takes its
+/// silent branch in a bare temp directory — and a case then passes exactly as
+/// well when the hook is broken as when it works. This closes that branch for
+/// the commonest shape; it does not close every one. A hook keyed on a
+/// `package.json` or a `pyproject.toml` still finds nothing, and a case that
+/// asserts too little still passes.
+const PROJECT_MANIFEST: &str = "\
+[package]
+name = \"claudevs-test-project\"
+version = \"0.1.0\"
+edition = \"2024\"
+";
+
 /// A materialized temp project (deleted on drop).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Project {
     dir: tempfile::TempDir,
 }
 
 impl Project {
-    /// An empty project.
+    /// A temp directory and nothing else.
     ///
-    /// # Errors
-    ///
-    /// [`Error::Io`] when the temp dir cannot be created.
-    pub fn empty() -> Result<Self> {
+    /// The substrate both constructors share. [`Project::empty`] builds the
+    /// default project on top of it; [`Project::from_fixture`] copies a fixture
+    /// tree into it and leaves that tree exactly as its author wrote it.
+    fn bare() -> Result<Self> {
         let dir = tempfile::tempdir().map_err(|source| Error::Io {
             operation: "create temp project",
             path: String::from("(tempdir)"),
             source,
         })?;
         Ok(Self { dir })
+    }
+
+    /// A project with nothing in it but the shape of a project.
+    ///
+    /// Git-initialised, carrying a manifest and one tracked file. A bare temp
+    /// directory would let a hook that branches on project state take its silent
+    /// branch, which makes a case pass whether the hook works or not.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Io`] when the temp dir cannot be created or written, or when
+    /// `git` is not on `PATH`.
+    pub fn empty() -> Result<Self> {
+        let project = Self::bare()?;
+        let root = project.path();
+
+        write_file(&root.join("Cargo.toml"), PROJECT_MANIFEST)?;
+        write_file(&root.join(TRACKED_FILE), "claudevs test project\n")?;
+
+        git(root, &["init", "-q"])?;
+        git(root, &["add", "Cargo.toml", TRACKED_FILE])?;
+        git(
+            root,
+            &[
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ],
+        )?;
+        Ok(project)
     }
 
     /// A project seeded from `fixtures_root/<name>`.
@@ -42,7 +109,7 @@ impl Project {
                 reason: format!("no directory at `{}`", source.display()),
             });
         }
-        let project = Self::empty()?;
+        let project = Self::bare()?;
         copy_tree(&source, project.path())?;
 
         if source.join(".gitinit").is_file() {
@@ -136,11 +203,29 @@ pub(crate) fn copy_tree(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Writes `contents` to `path`, mapping a failure into [`Error::Io`].
+fn write_file(path: &Path, contents: &str) -> Result<()> {
+    std::fs::write(path, contents).map_err(|source| Error::Io {
+        operation: "write default project file",
+        path: path.display().to_string(),
+        source,
+    })
+}
+
 /// Runs git in `dir`, discarding output.
+///
+/// Hermetic against the developer's own machine: `GIT_CONFIG_GLOBAL=/dev/null`
+/// and `GIT_CONFIG_NOSYSTEM=1` stop the child from reading `~/.gitconfig` or
+/// `/etc/gitconfig`, so a personal `commit.gpgsign`, `core.hooksPath`, or
+/// `init.templateDir` cannot reach a project this harness synthesizes for
+/// itself. Without this, a signing-enabled machine fails every fixtureless
+/// case at the `commit` step with a `gpg` error that names none of the above.
 fn git(dir: &Path, args: &[&str]) -> Result<()> {
     let status = std::process::Command::new("git")
         .args(args)
         .current_dir(dir)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .output()
         .map_err(|source| Error::Io {
             operation: "run git",
@@ -150,12 +235,13 @@ fn git(dir: &Path, args: &[&str]) -> Result<()> {
     if status.status.success() {
         Ok(())
     } else {
-        Err(Error::Fixture {
-            name: dir.display().to_string(),
-            reason: format!(
+        Err(Error::Io {
+            operation: "run git",
+            path: dir.display().to_string(),
+            source: std::io::Error::other(format!(
                 "git {args:?} failed: {}",
                 String::from_utf8_lossy(&status.stderr)
-            ),
+            )),
         })
     }
 }
@@ -209,5 +295,96 @@ mod tests {
         project.overlay(root.path(), "edits").unwrap();
         assert!(project.path().join("new.md").is_file());
         assert!(project.path().join("src/main.rs").is_file());
+    }
+
+    #[test]
+    fn the_default_project_looks_like_a_project_a_hook_could_branch_on() {
+        let project = Project::empty().unwrap();
+        let root = project.path();
+
+        assert!(
+            root.join("Cargo.toml").is_file(),
+            "a hook that branches on project type finds nothing without a manifest"
+        );
+        assert!(
+            root.join(super::TRACKED_FILE).is_file(),
+            "a hook whose payload names a file needs that file to exist"
+        );
+        assert!(
+            root.join(".git").is_dir(),
+            "a hook that shells out to git needs a repository"
+        );
+    }
+
+    #[test]
+    fn the_default_projects_tracked_file_is_committed_not_merely_present() {
+        let project = Project::empty().unwrap();
+        let output = std::process::Command::new("git")
+            .args(["ls-files", "--error-unmatch", super::TRACKED_FILE])
+            .current_dir(project.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "`git ls-files --error-unmatch {}` failed: {}",
+            super::TRACKED_FILE,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn project_empty_is_hermetic_against_a_hostile_global_git_config() {
+        // A developer's own `commit.gpgsign = true` (or `core.hooksPath`, or
+        // `init.templateDir`) must never reach this harness's own synthesized
+        // project — see the doc on `super::git`. Re-exec this test binary as a
+        // child process carrying a hostile `GIT_CONFIG_GLOBAL`, rather than
+        // mutating this process's own environment, so sibling tests running
+        // concurrently on other threads cannot race a process-wide env change.
+        let hostile_config = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(
+            hostile_config.path(),
+            "[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = /nonexistent/gpg\n",
+        )
+        .unwrap();
+
+        let exe = std::env::current_exe().unwrap();
+        let output = std::process::Command::new(exe)
+            .args([
+                "--exact",
+                "harness::project::tests::a_project_is_built_under_a_hostile_global_git_config",
+                "--include-ignored",
+            ])
+            .env("GIT_CONFIG_GLOBAL", hostile_config.path())
+            .output()
+            .unwrap();
+
+        assert!(
+            output.status.success(),
+            "stdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    #[ignore = "exercised only as a child process of \
+                `project_empty_is_hermetic_against_a_hostile_global_git_config`, \
+                under a deliberately hostile GIT_CONFIG_GLOBAL"]
+    fn a_project_is_built_under_a_hostile_global_git_config() {
+        Project::empty().unwrap();
+    }
+
+    #[test]
+    fn a_fixture_project_is_left_exactly_as_its_author_wrote_it() {
+        // A fixture author owns their tree. A manifest injected into it could
+        // collide with one they shipped, and `from_fixture`'s `.gitinit` marker
+        // is how a fixture asks for a repository.
+        let fixtures = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(fixtures.path().join("plain")).unwrap();
+        std::fs::write(fixtures.path().join("plain/README.md"), "x").unwrap();
+        let project = Project::from_fixture(fixtures.path(), "plain").unwrap();
+        assert!(!project.path().join("Cargo.toml").exists());
+        assert!(!project.path().join(super::TRACKED_FILE).exists());
+        assert!(!project.path().join(".git").exists());
     }
 }

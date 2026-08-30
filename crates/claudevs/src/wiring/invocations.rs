@@ -20,8 +20,15 @@
 //! finds `tests/**` entries by naming convention rather than by any other
 //! file pointing at them, so they are entry points the harness runs, not
 //! scripts that must be named to count as used.
+//!
+//! Fenced code blocks are read here and skipped by the `refs` checker, which
+//! is not a contradiction. This checker asks "is this file referenced by
+//! anything?", and a command inside a fence is evidence that it is. That one
+//! asks "does this path exist?", and an example path inside a fence is not
+//! claiming to. Two questions of the same text, two right answers.
 
 use std::collections::HashSet;
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 
 use crate::case;
@@ -30,6 +37,7 @@ use crate::wiring::{Finding, Severity, refs};
 
 /// One command parsed out of a fenced block.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct FencedCommand {
     /// 1-based line where the command starts.
     pub line: usize,
@@ -110,6 +118,16 @@ fn flush(commands: &mut Vec<FencedCommand>, pending: &mut Option<(usize, String)
 /// File extensions the dead-file report covers.
 const SCRIPT_EXTENSIONS: [&str; 4] = ["sh", "lua", "py", "js"];
 
+/// Files a language reaches by importing their directory rather than by name.
+///
+/// One per scanned language. `mod.rs` is deliberately absent: `.rs` is not in
+/// [`SCRIPT_EXTENSIONS`], so a Rust file is never a candidate here and the
+/// entry would be dead code. Only `__init__.py` is backed by the corpus that
+/// motivated this exemption; `index.js` and `init.lua` are the same convention
+/// in the other two scanned languages and are included on that basis rather
+/// than on measurement.
+const INDEX_FILES: [&str; 3] = ["__init__.py", "index.js", "init.lua"];
+
 /// Reports scripts in the plugin that nothing else in it names.
 ///
 /// A script counts as referenced when its file name appears in any other
@@ -117,10 +135,16 @@ const SCRIPT_EXTENSIONS: [&str; 4] = ["sh", "lua", "py", "js"];
 /// skill, a sibling script. Existence of a *referenced* path is the `refs`
 /// checker's job, not this one.
 ///
-/// A file `case::discover` classifies as a case file is exempt even when
-/// nothing names it: the claudevs harness finds it by glob under
-/// `tests/**` and runs it directly, so "referenced by nothing" is false for
-/// it — it just has no name to be referenced by.
+/// A script escapes the report five ways, not one: a file `case::discover`
+/// classifies as a case file is exempt even when nothing names it, because the
+/// claudevs harness finds it by glob under `tests/**` and runs it directly, so
+/// "referenced by nothing" is false for it — it just has no name to be
+/// referenced by. The plugin's own `tests/**` tree is exempt outright, whatever
+/// its files are called. A language index file (`__init__.py` and its peers)
+/// is reached by its directory rather than by name. Sample material that does
+/// not present as executable is not wiring at all. And a reference by bare
+/// module stem — an import or a `require` that never spells the extension —
+/// counts as a reference the same as a reference by filename.
 ///
 /// # Errors
 ///
@@ -130,19 +154,33 @@ pub fn check(plugin_dir: &Path) -> Result<Vec<Finding>> {
     let case_files = discovered_case_files(plugin_dir)?;
     let mut findings = Vec::new();
 
-    for (path, relative, _) in &files {
+    for (path, relative, text) in &files {
         let is_script = path
             .extension()
             .and_then(|e| e.to_str())
             .is_some_and(|e| SCRIPT_EXTENSIONS.contains(&e));
-        if !is_script || case_files.contains(path) {
-            continue;
-        }
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
             continue;
         };
+        if !is_script
+            || case_files.contains(path)
+            || is_in_tests_tree(relative)
+            || INDEX_FILES.contains(&name)
+            || !presents_as_executable(path, text, relative)
+        {
+            continue;
+        }
+        // Module systems import by stem: a Python `from … import config_loader` and
+        // a Lua `require("lib.globs")` never spell the extension. Matching only the
+        // filename reports such a file as dead when it is the most-used file in the
+        // plugin.
+        let stem = path.file_stem().and_then(|n| n.to_str()).unwrap_or(name);
         let referenced = files.iter().any(|(other, _, other_text)| {
-            other != path && (other_text.contains(name) || mentions(other_text, name))
+            other != path
+                && (other_text.contains(name)
+                    || other_text.contains(stem)
+                    || mentions(other_text, name)
+                    || mentions(other_text, stem))
         });
         if !referenced {
             findings.push(Finding {
@@ -155,6 +193,32 @@ pub fn check(plugin_dir: &Path) -> Result<Vec<Finding>> {
         }
     }
     Ok(findings)
+}
+
+/// Whether a file presents as something meant to be run.
+///
+/// A shebang or an executable bit. Sample material a skill ships for a reader
+/// has neither, and reporting it as dead wiring is reporting the skill for
+/// doing its job. Inside `hooks/`, everything is treated as executable
+/// regardless: that tree is what Claude Code runs, so a stray file there is
+/// worth a warning even without a bit set.
+fn presents_as_executable(path: &Path, text: &str, relative: &str) -> bool {
+    if relative.starts_with("hooks/") {
+        return true;
+    }
+    if text.starts_with("#!") {
+        return true;
+    }
+    std::fs::metadata(path).is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0)
+}
+
+/// Whether `relative` sits in the plugin's own test tree.
+///
+/// A plugin's tests are not wired into the plugin, and claudevs' case-file
+/// naming is not the only convention — a plugin with a `tests/test_guard.py`
+/// is testing itself, not shipping dead wiring.
+fn is_in_tests_tree(relative: &str) -> bool {
+    relative == "tests" || relative.starts_with("tests/")
 }
 
 /// The paths `case::discover` classifies as case files under `plugin_dir`.
@@ -204,12 +268,14 @@ fn readable_files(plugin_dir: &Path) -> Result<Vec<(PathBuf, String, String)>> {
         let Ok(text) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
-        let relative = entry
-            .path()
-            .strip_prefix(plugin_dir)
-            .unwrap_or_else(|_| entry.path())
-            .display()
-            .to_string();
+        // `WalkDir` is rooted at `plugin_dir`, so every entry it yields is a
+        // descendant and the strip always succeeds. Skipping beats falling
+        // back to the unstripped path, which would put an absolute path in the
+        // `file` field of every finding built from this entry.
+        let Ok(relative) = entry.path().strip_prefix(plugin_dir) else {
+            continue;
+        };
+        let relative = relative.display().to_string();
         files.push((entry.path().to_path_buf(), relative, text));
     }
     Ok(files)
@@ -218,6 +284,8 @@ fn readable_files(plugin_dir: &Path) -> Result<Vec<(PathBuf, String, String)>> {
 #[cfg(test)]
 mod tests {
     #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid fixtures")]
+
+    use std::os::unix::fs::PermissionsExt;
 
     use super::{check, parse_fenced};
 
@@ -344,17 +412,186 @@ echo two
     }
 
     #[test]
-    fn a_non_case_file_under_tests_named_by_nothing_is_still_reported() {
-        // `tests/helper.lua` sits under tests/ but does not match the
-        // case-file naming convention (`_test.lua` / `test_*.lua`), so
-        // `case::discover` does not classify it as a case file. The exemption
-        // must not widen to "anything under tests/" — this keeps it honest.
+    fn a_python_module_imported_by_stem_is_referenced() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hookify/core")).unwrap();
+        std::fs::write(
+            dir.path().join("hookify/core/config_loader.py"),
+            "RULES = []\n",
+        )
+        .unwrap();
+        // The executable bit is set so this fixture survives
+        // `presents_as_executable`: without it the file would be exempted as
+        // sample material before the stem check ever runs, and the assertion
+        // below would pass whether or not the stem widening exists.
+        std::fs::set_permissions(
+            dir.path().join("hookify/core/config_loader.py"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("hookify/core/main.py"),
+            "from hookify.core.config_loader import load_rules\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert!(
+            findings
+                .iter()
+                .all(|f| !f.message.contains("config_loader")),
+            "{findings:?}"
+        );
+    }
+
+    #[test]
+    fn a_lua_module_required_by_stem_is_referenced() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("lib")).unwrap();
+        std::fs::write(dir.path().join("lib/globs.lua"), "return {}\n").unwrap();
+        // See the matching comment in `a_python_module_imported_by_stem_is_referenced`:
+        // the bit is what keeps this fixture from being exempted before the
+        // stem check runs.
+        std::fs::set_permissions(
+            dir.path().join("lib/globs.lua"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("init.lua"),
+            "local g = require(\"lib.globs\")\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert!(
+            findings.iter().all(|f| !f.message.contains("globs")),
+            "{findings:?}"
+        );
+    }
+
+    #[test]
+    fn a_stem_that_appears_nowhere_is_still_reported() {
+        // The executable bit is set deliberately: the non-executable exemption
+        // in `presents_as_executable` exempts a non-executable file outside
+        // `hooks/` as sample material, which is an axis orthogonal to what
+        // this test pins — a stem that appears nowhere. Without the bit, this
+        // file would be skipped before the stem check ever runs, and the test
+        // would pass for the wrong reason.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("lib")).unwrap();
+        std::fs::write(dir.path().join("lib/orphan.lua"), "return {}\n").unwrap();
+        std::fs::set_permissions(
+            dir.path().join("lib/orphan.lua"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("driver.lua"),
+            "local g = require(\"lib.other\")\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert!(
+            findings.iter().any(|f| f.message.contains("orphan.lua")),
+            "{findings:?}"
+        );
+    }
+
+    #[test]
+    fn a_language_index_file_is_exempt_because_its_directory_is_the_reference() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("pkg")).unwrap();
+        std::fs::write(dir.path().join("pkg/__init__.py"), "").unwrap();
+        // The executable bit is set so this fixture survives
+        // `presents_as_executable`: without it the file would already be
+        // exempted as sample material, and the assertion below would pass
+        // whether or not the index-file exemption exists.
+        std::fs::set_permissions(
+            dir.path().join("pkg/__init__.py"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_plugins_own_tests_directory_is_exempt_whatever_the_files_are_called() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("tests")).unwrap();
-        std::fs::write(dir.path().join("tests/helper.lua"), "return {}\n").unwrap();
+        std::fs::write(
+            dir.path().join("tests/test_guard.py"),
+            "# nothing names me\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("tests/helpers.sh"), "# nor me\n").unwrap();
+        // Both bits are set so these fixtures survive `presents_as_executable`:
+        // without them the files would already be exempted as sample
+        // material, and the assertion below would pass whether or not the
+        // tests-tree exemption exists.
+        std::fs::set_permissions(
+            dir.path().join("tests/test_guard.py"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            dir.path().join("tests/helpers.sh"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
 
+    #[test]
+    fn a_non_executable_unshebanged_script_outside_hooks_and_skills_is_exempt() {
+        // Pins the actual reach of `presents_as_executable` today: the
+        // exemption is not scoped to `skills/`, so a dead, non-executable,
+        // unshebanged script directly under `scripts/` escapes the report
+        // the same way sample material under `skills/` does. Whether the
+        // exemption should be narrowed to `skills/` is a scoping question
+        // for the checker's design, not this test.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        std::fs::write(dir.path().join("scripts/dead.py"), "print('unused')\n").unwrap();
+        std::fs::write(dir.path().join("scripts/dead.sh"), "echo unused\n").unwrap();
+        std::fs::write(dir.path().join("scripts/dead.lua"), "return {}\n").unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_script_outside_tests_that_nothing_names_is_still_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        std::fs::write(dir.path().join("scripts/orphan.sh"), "#!/bin/sh\n").unwrap();
         let findings = check(dir.path()).unwrap();
         assert_eq!(findings.len(), 1, "{findings:?}");
-        assert_eq!(findings[0].file, "tests/helper.lua");
+    }
+
+    #[test]
+    fn a_non_executable_sample_outside_hooks_is_not_dead_wiring() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("skills/x")).unwrap();
+        std::fs::write(dir.path().join("skills/x/example.sh"), "echo sample\n").unwrap();
+        assert!(check(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_shebanged_script_outside_hooks_that_nothing_names_is_still_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("scripts")).unwrap();
+        std::fs::write(
+            dir.path().join("scripts/optimize-prompt.py"),
+            "#!/usr/bin/env python3\nprint('hi')\n",
+        )
+        .unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+    }
+
+    #[test]
+    fn a_non_executable_file_inside_hooks_is_still_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hooks")).unwrap();
+        std::fs::write(dir.path().join("hooks/helper.sh"), "echo helper\n").unwrap();
+        let findings = check(dir.path()).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
     }
 }

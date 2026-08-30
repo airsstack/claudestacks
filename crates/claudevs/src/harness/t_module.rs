@@ -47,10 +47,11 @@ use airsl::mlua::LuaSerdeExt as _;
 use airsl::{HostModule, InstallContext};
 
 use crate::case::Decision;
+use crate::contract::handler::HookCommand;
 use crate::error::Error;
 use crate::harness::{
     DEFAULT_TIMEOUT, Project, base_env, default_payload, merge, observe, overlay_into, run,
-    run_shell, substitute_project,
+    run_handler, substitute_project,
 };
 use crate::types::HookEvent;
 
@@ -165,21 +166,24 @@ fn install_hook(
     let hook = lua
         .create_function(
             move |lua, (reference, payload): (String, Option<mlua::Table>)| {
-                let (event, command) = resolve_ref(&plugin_dir, &reference).map_err(lua_err)?;
-
                 let project = Project::empty().map_err(lua_err)?;
                 let project_str = project.path().display().to_string();
-                let mut value = default_payload(event);
-                if let Some(table) = payload {
-                    let overlay = serde_json::to_value(mlua::Value::Table(table))
-                        .map_err(mlua::Error::external)?;
-                    merge(&mut value, &overlay);
-                }
-                substitute_project(&mut value, &project_str);
+
+                let overlay = match payload {
+                    Some(table) => Some(
+                        serde_json::to_value(mlua::Value::Table(table))
+                            .map_err(mlua::Error::external)?,
+                    ),
+                    None => None,
+                };
+
+                let (event, handler, value) =
+                    resolve_ref(&plugin_dir, &reference, overlay.as_ref(), &project_str)
+                        .map_err(lua_err)?;
 
                 let env = base_env(&plugin_dir, project.path());
-                let captured = run_shell(
-                    &command,
+                let captured = run_handler(
+                    &handler,
                     project.path(),
                     &env,
                     Some(&value.to_string()),
@@ -348,15 +352,34 @@ impl HostModule for TModule {
     }
 }
 
-/// `ref` is an event name, or a substring unique across all events' commands.
+/// `ref` is an event name, or a substring unique across all events' handlers.
+///
+/// The payload is built before resolution rather than after, because routing
+/// reads it: a group's matcher is compared against a payload field, so a
+/// handler cannot be chosen without one. For the substring form each
+/// candidate event is tried with that event's own payload, since the default
+/// payload differs per event.
 fn resolve_ref(
     plugin_dir: &std::path::Path,
     reference: &str,
-) -> crate::error::Result<(HookEvent, String)> {
+    overlay: Option<&serde_json::Value>,
+    project: &str,
+) -> crate::error::Result<(HookEvent, HookCommand, serde_json::Value)> {
+    let payload_for = |event: HookEvent| {
+        let mut value = default_payload(event);
+        if let Some(overlay) = overlay {
+            merge(&mut value, overlay);
+        }
+        substitute_project(&mut value, project);
+        value
+    };
+
     if let Ok(event) = reference.parse::<HookEvent>() {
-        let command = crate::harness::resolve_hook(plugin_dir, event, None)?;
-        return Ok((event, command));
+        let payload = payload_for(event);
+        let handler = crate::harness::resolve_hook(plugin_dir, event, None, &payload)?;
+        return Ok((event, handler, payload));
     }
+
     let mut matches = Vec::new();
     for event in [
         HookEvent::PreToolUse,
@@ -365,17 +388,20 @@ fn resolve_ref(
         HookEvent::SessionStart,
         HookEvent::SessionEnd,
     ] {
-        if let Ok(command) = crate::harness::resolve_hook(plugin_dir, event, Some(reference)) {
-            matches.push((event, command));
+        let payload = payload_for(event);
+        if let Ok(handler) =
+            crate::harness::resolve_hook(plugin_dir, event, Some(reference), &payload)
+        {
+            matches.push((event, handler, payload));
         }
     }
     match matches.len() {
         1 => Ok(matches.remove(0)),
         0 => Err(Error::HookResolution {
-            reason: format!("`{reference}` matches no hook command"),
+            reason: format!("`{reference}` matches no hook handler"),
         }),
         n => Err(Error::HookResolution {
-            reason: format!("`{reference}` matches {n} hook commands across events"),
+            reason: format!("`{reference}` matches {n} hook handlers across events"),
         }),
     }
 }
@@ -545,6 +571,7 @@ mod tests {
         decision_name, ensure_contained, ensure_contained_in_plugin, resolve_ref, skill_command,
     };
     use crate::case::Decision;
+    use crate::contract::handler::HookCommand;
     use crate::harness::Project;
     use crate::types::HookEvent;
 
@@ -563,23 +590,24 @@ mod tests {
     #[test]
     fn resolve_ref_matches_an_event_name_directly() {
         let dir = plugin(TWO_EVENTS);
-        let (event, command) = resolve_ref(dir.path(), "PreToolUse").unwrap();
+        let (event, handler, _payload) =
+            resolve_ref(dir.path(), "PreToolUse", None, "/tmp/p").unwrap();
         assert_eq!(event, HookEvent::PreToolUse);
-        assert_eq!(command, "sh gate.sh");
+        assert_eq!(handler, HookCommand::Shell(String::from("sh gate.sh")));
     }
 
     #[test]
     fn resolve_ref_matches_a_command_substring_unique_across_events() {
         let dir = plugin(TWO_EVENTS);
-        let (event, command) = resolve_ref(dir.path(), "audit").unwrap();
+        let (event, handler, _payload) = resolve_ref(dir.path(), "audit", None, "/tmp/p").unwrap();
         assert_eq!(event, HookEvent::PostToolUse);
-        assert_eq!(command, "sh audit.sh");
+        assert_eq!(handler, HookCommand::Shell(String::from("sh audit.sh")));
     }
 
     #[test]
     fn resolve_ref_reports_a_zero_match_naming_the_reference() {
         let dir = plugin(TWO_EVENTS);
-        let error = resolve_ref(dir.path(), "nonexistent")
+        let error = resolve_ref(dir.path(), "nonexistent", None, "/tmp/p")
             .unwrap_err()
             .to_string();
         assert!(error.contains("nonexistent"), "{error}");
@@ -593,8 +621,99 @@ mod tests {
                 "PostToolUse":[{"hooks":[{"type":"command","command":"sh both.sh"}]}]
             }}"#,
         );
-        let error = resolve_ref(dir.path(), "both").unwrap_err().to_string();
+        let error = resolve_ref(dir.path(), "both", None, "/tmp/p")
+            .unwrap_err()
+            .to_string();
         assert!(error.contains('2'), "{error}");
+    }
+
+    #[test]
+    fn a_lua_hook_call_runs_an_exec_handler_with_its_arguments() {
+        // A plugin whose only SessionStart handler carries its output in
+        // `args`. Under `run_shell` this spawns `sh -c sh` and prints
+        // nothing.
+        let dir = plugin(
+            r#"{"hooks":{"SessionStart":[{"hooks":[
+                 {"type":"command","command":"sh","args":["-c","echo exec-args-ran"]}
+               ]}]}}"#,
+        );
+        let (event, handler, _payload) =
+            resolve_ref(dir.path(), "SessionStart", None, "/tmp/p").unwrap();
+        assert_eq!(event, HookEvent::SessionStart);
+        assert_eq!(
+            handler,
+            HookCommand::Exec {
+                program: String::from("sh"),
+                args: vec![String::from("-c"), String::from("echo exec-args-ran")],
+            },
+        );
+    }
+
+    /// Builds the same confined `airsl` engine `crate::case::lua::engine_for`
+    /// wires up — stdlib plus `TModule`, zero grants — reproduced here
+    /// because that function is `pub(super)` to `crate::case` and is not
+    /// reachable from this module. Drives `install_hook`'s closure end to
+    /// end through `t.hook()`, rather than calling `resolve_ref` directly as
+    /// the tests above do. Keep this wiring in step with
+    /// `crate::case::lua::engine_for` if that function's policy or module
+    /// set changes.
+    fn engine_for(plugin_dir: &std::path::Path) -> airsl::Engine {
+        let mut modules = airsl::modules::stdlib::stdlib().unwrap();
+        modules
+            .insert(Box::new(super::TModule::new(
+                plugin_dir.to_path_buf(),
+                plugin_dir.join("tests/fixtures"),
+            )))
+            .unwrap();
+        airsl::Engine::builder()
+            .policy(airsl::Policy::confined())
+            .stdlib(modules)
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_lua_t_hook_call_spawns_an_args_carrying_handler_directly() {
+        // The end-to-end counterpart to
+        // `a_lua_hook_call_runs_an_exec_handler_with_its_arguments`: that test
+        // pins `resolve_ref`'s routing, but `install_hook`'s closure calls
+        // `run_handler` one layer further in. A handler routed through
+        // `run_shell` there instead of spawned directly would run `sh -c sh`
+        // and leave `stdout` empty.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("hooks")).unwrap();
+        std::fs::write(
+            dir.path().join("hooks/hooks.json"),
+            r#"{"hooks":{"SessionStart":[{"hooks":[
+                 {"type":"command","command":"sh","args":["-c","echo exec-args-ran"]}
+               ]}]}}"#,
+        )
+        .unwrap();
+
+        let engine = engine_for(dir.path());
+        let script = airsl::Script::from_source(
+            "return airsstack.claudevs.hook(\"SessionStart\")",
+            "hook-call",
+        )
+        .unwrap();
+        let reply: airsl::mlua::Table = engine.eval_to(&script).unwrap();
+        let stdout: String = reply.get("stdout").unwrap();
+        assert_eq!(stdout.trim(), "exec-args-ran");
+    }
+
+    #[test]
+    fn a_lua_hook_call_routes_by_matcher_the_way_a_yaml_case_does() {
+        let dir = plugin(
+            r#"{"hooks":{"PreToolUse":[
+                 {"matcher":"Edit","hooks":[{"type":"command","command":"echo edit"}]},
+                 {"matcher":"Bash","hooks":[{"type":"command","command":"echo bash"}]}
+               ]}}"#,
+        );
+        let overlay = serde_json::json!({ "tool_name": "Bash" });
+        let (_event, handler, payload) =
+            resolve_ref(dir.path(), "PreToolUse", Some(&overlay), "/tmp/p").unwrap();
+        assert_eq!(handler, HookCommand::Shell(String::from("echo bash")));
+        assert_eq!(payload["tool_name"], "Bash");
     }
 
     #[test]

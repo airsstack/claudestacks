@@ -11,8 +11,13 @@
 --   airsl run --fail-open --policy confined \
 --     --allow-env HOME --allow-env TMPDIR --allow-env AIRSSTACK_HOME \
 --     --allow-env AIRSSTACK_ENFORCE_REGISTRY \
---     --allow-read / --allow-write "$TMPDIR" --allow-exec git \
+--     --allow-read / --allow-write "$TMPDIR" \
 --     hooks/enforce.lua
+--
+-- No `--allow-exec git`: the repository root and the per-repo key are read off `.git` rather than
+-- asked of git (`lib/enforce.lua`'s `toplevel` and `common_dir`), so this runs unchanged in a
+-- worktree-isolated Claude Code session, whose guard refuses any command carrying a `git` operand
+-- it cannot see through.
 
 local enforce = require("lib.enforce")
 local env = airsstack.env
@@ -75,7 +80,7 @@ local function explain(file_path)
     lines[#lines + 1] = "  -> " .. text
   end
 
-  local top = enforce.git(cwd, "rev-parse", "--show-toplevel")
+  local top = enforce.toplevel(cwd)
   if top then
     local drift = enforce.parity_report(top, enforce.read_registry(config.registry))
     if #drift > 0 then

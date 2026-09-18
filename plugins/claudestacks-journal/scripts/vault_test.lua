@@ -4,6 +4,8 @@
 
 local vault = require("lib.vault")
 local json = airsstack.json
+local fs = airsstack.fs
+local path = airsstack.path
 
 return {
   sanitize_replaces_every_character_outside_the_safe_set = function()
@@ -127,5 +129,67 @@ return {
   sorted_keys_orders_the_keys_and_survives_an_empty_map = function()
     assert(json.encode(vault.sorted_keys({ b = 1, a = 2, c = 3 })) == '["a","b","c"]')
     assert(#vault.sorted_keys({}) == 0)
+  end,
+
+  -- The project floor without git. `--allow-exec git` cannot be passed from a worktree-isolated
+  -- Claude Code session — the guard refuses the whole command over that operand — so the floor has
+  -- to come from `.git` itself, which carries the same answer `rev-parse --git-common-dir` gives.
+
+  the_common_dir_of_a_plain_checkout_is_its_own_dot_git = function()
+    local repo = fs.tempdir()
+    fs.mkdir(path.join(repo, ".git"))
+    assert(vault.common_dir(repo) == path.join(repo, ".git"), tostring(vault.common_dir(repo)))
+  end,
+
+  a_linked_worktree_resolves_to_the_main_repository_dot_git = function()
+    -- What `.git` holds in a linked worktree, verbatim: a gitdir pointer into the main repo.
+    local main = fs.tempdir()
+    fs.mkdir(path.join(main, ".git"))
+    local tree = fs.tempdir()
+    fs.write(path.join(tree, ".git"), "gitdir: " .. path.join(main, ".git", "worktrees", "wt") .. "\n")
+
+    assert(vault.common_dir(tree) == path.join(main, ".git"), tostring(vault.common_dir(tree)))
+  end,
+
+  a_subdirectory_finds_the_checkout_above_it = function()
+    local repo = fs.tempdir()
+    fs.mkdir(path.join(repo, ".git"))
+    local deep = path.join(repo, "crates", "clauders")
+    fs.mkdir(deep)
+    assert(vault.common_dir(deep) == path.join(repo, ".git"), tostring(vault.common_dir(deep)))
+  end,
+
+  outside_a_repository_there_is_no_common_dir = function()
+    assert(vault.common_dir(fs.tempdir()) == nil)
+  end,
+
+  every_worktree_of_one_repository_shares_the_project_floor = function()
+    -- The point of the whole resolution: notes from a linked worktree file under the main repo's
+    -- name, not the worktree directory's.
+    local main = fs.tempdir()
+    fs.mkdir(path.join(main, ".git"))
+    local tree = fs.tempdir()
+    fs.write(path.join(tree, ".git"), "gitdir: " .. path.join(main, ".git", "worktrees", "wt") .. "\n")
+
+    assert(vault.project_base(tree) == vault.project_base(main), vault.project_base(tree))
+    assert(vault.project_base(tree) == vault.sanitize(path.basename(main)), vault.project_base(tree))
+  end,
+
+  a_malformed_dot_git_file_stops_the_ascent = function()
+    -- Real git refuses rather than looking further up: `fatal: invalid gitfile format`, exit 128.
+    -- Ascending past it would answer with the outer repository, which is a different repository
+    -- from the one the caller is standing in. `lib/enforce.lua`'s `common_dir` must agree.
+    local outer = fs.tempdir()
+    fs.mkdir(path.join(outer, ".git"))
+    local child = path.join(outer, "child")
+    fs.mkdir(child)
+    fs.write(path.join(child, ".git"), "not a gitdir pointer\n")
+
+    assert(vault.common_dir(child) == nil, tostring(vault.common_dir(child)))
+  end,
+
+  outside_a_repository_the_project_floor_is_the_directory_name = function()
+    local loose = fs.tempdir()
+    assert(vault.project_base(loose) == vault.sanitize(path.basename(loose)), vault.project_base(loose))
   end,
 }

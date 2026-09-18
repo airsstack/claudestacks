@@ -40,6 +40,11 @@ end
 --
 -- `-C` rather than a working directory on the child: `proc.run` takes an argv array and nothing
 -- else, so the directory travels as an argument.
+--
+-- No production path calls this any more — the root and the per-repo key are read off `.git`
+-- (`toplevel`, `common_dir`), so the dispatcher needs no `--allow-exec git` grant. It survives for
+-- `enforce_test.lua`, which builds real repositories with `git init` / `git worktree add` to check
+-- the read path against git's own layout, under the grant `cargo make plugins-test` provides.
 function M.git(dir, ...)
   local argv = { "git", "-C", dir }
   for _, value in ipairs({ ... }) do
@@ -71,12 +76,85 @@ function M.is_file(target)
   return ok and found
 end
 
+-- The nearest ancestor holding `.git`, and that `.git` itself — or nil outside a repository.
+--
+-- Read rather than run: `--allow-exec git` cannot be passed from a worktree-isolated Claude Code
+-- session (full account in the `claudestacks` plugin's
+-- `skills/process-guidelines/references/context-handoff.md`), and this runs on every hook
+-- dispatch. Ascends because the hook's cwd is rarely the repository root.
+local function dot_git(cwd)
+  local current = M.realpath(cwd) or cwd
+  while true do
+    local candidate = path.join(current, ".git")
+    -- Guarded: the ascent leaves the granted read root as soon as the caller is below it. A
+    -- denial means "cannot see", so the walk continues rather than raising through the hook.
+    local seen, present = pcall(fs.exists, candidate)
+    if seen and present then
+      return current, candidate
+    end
+    local parent = path.dirname(current)
+    if parent == current or parent == "" then
+      return nil, nil
+    end
+    current = parent
+  end
+end
+
+-- The worktree root: what `rev-parse --show-toplevel` answers, without running git.
+function M.toplevel(cwd)
+  -- Narrowed to one value on purpose: `dot_git` also returns the `.git` path, and `return
+  -- dot_git(cwd)` would leak it to every caller through Lua's multiple returns.
+  local top = dot_git(cwd)
+  return top
+end
+
+-- The main repository's `.git`: the directory `rev-parse --git-common-dir` names, without running
+-- git. The same directory, not necessarily the same spelling — a relative `gitdir:` pointer yields
+-- an uncanonicalised path, which `project_key` canonicalises before hashing it.
+--
+-- A plain checkout holds a `.git` directory, which is already the common one. A linked worktree
+-- holds a `.git` file reading `gitdir: <main>/.git/worktrees/<name>`; dropping that
+-- `worktrees/<name>` tail reaches the `.git` every worktree of the repository shares.
+function M.common_dir(cwd)
+  local top, candidate = dot_git(cwd)
+  if not top then
+    return nil
+  end
+  -- A refused question is not an answer: without knowing whether `.git` is a directory or a
+  -- pointer file, neither branch below is safe, so the caller is told nothing rather than told
+  -- "plain checkout".
+  local ok, is_file = pcall(fs.is_file, candidate)
+  if not ok then
+    return nil
+  end
+  if not is_file then
+    return candidate
+  end
+
+  local read, text = pcall(fs.read, candidate)
+  if not read or not text then
+    return nil
+  end
+  local target = text:match("^%s*gitdir:%s*(.-)%s*$")
+  if not target or target == "" then
+    return nil
+  end
+  if not path.is_absolute(target) then
+    target = path.join(top, target)
+  end
+  local parent = path.dirname(target)
+  if path.basename(parent) == "worktrees" then
+    return path.dirname(parent)
+  end
+  return target
+end
+
 -- The stable per-repo key. Every linked worktree of one repository collapses to one value.
 --
 -- Keys, never path prefixes, are what gate 1 compares: a linked worktree may live anywhere on
 -- disk, so comparing where it sits would fragment one project into several.
 function M.project_key(cwd)
-  local common = M.git(cwd, "rev-parse", "--git-common-dir")
+  local common = M.common_dir(cwd)
   local absolute, base
   if common then
     if not path.is_absolute(common) then
@@ -104,7 +182,7 @@ function M.path_for_matching(file_path, cwd)
   local absolute = path.absolute(file_path)
   local target = M.realpath(absolute) or absolute
 
-  local top = M.git(cwd, "rev-parse", "--show-toplevel")
+  local top = M.toplevel(cwd)
   if top then
     top = M.realpath(top) or top
     if target == top then

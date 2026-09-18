@@ -6,7 +6,7 @@
 --
 --   airsl run --policy confined \
 --     --allow-env AIRSSTACK_HOME --allow-env HOME \
---     --allow-read "$AIRSSTACK_HOME" --allow-read . --allow-exec git \
+--     --allow-read "$AIRSSTACK_HOME" --allow-read . \
 --     scripts/orientation.lua [project]
 
 local orientation = require("lib.orientation")

@@ -7,7 +7,6 @@
 
 local fs = airsstack.fs
 local path = airsstack.path
-local proc = airsstack.proc
 local regex = airsstack.regex
 
 local M = {}
@@ -22,25 +21,71 @@ function M.cwd()
   return path.absolute(".")
 end
 
--- Runs git in `dir` and returns its trimmed stdout, or nil on any failure.
+-- The main repository's `.git`, found by reading rather than by running git, or nil outside a
+-- repository.
 --
--- `-C` rather than a working directory on the child: `proc.run` takes an argv array and nothing
--- else, so the directory has to travel as an argument. Every git invocation in this suite accepts
--- it.
-function M.git(dir, ...)
-  local argv = { "git", "-C", dir }
-  for _, value in ipairs({ ... }) do
-    argv[#argv + 1] = value
+-- Names the same directory `rev-parse --git-common-dir` does, without the `--allow-exec git`
+-- grant — the same directory, not necessarily the same spelling: a relative `gitdir:` pointer
+-- yields an uncanonicalised path here, which `project_base` canonicalises before it is used. A
+-- worktree-isolated Claude Code session cannot pass that flag (the `claudestacks` plugin's
+-- `skills/process-guidelines/references/context-handoff.md` has the full account). The answer is
+-- on disk either way — `.git` is a directory in a plain checkout, and in a linked
+-- worktree a file holding `gitdir: <main>/.git/worktrees/<name>`, whose `worktrees/<name>` tail is
+-- dropped to reach the one `.git` every worktree of the repository shares.
+--
+-- Ascends to the root because a caller may stand in a subdirectory, which is the case git handled.
+function M.common_dir(dir)
+  local current = M.realpath(dir) or dir
+  while true do
+    local candidate = path.join(current, ".git")
+    -- Guarded: the ascent leaves the granted read root on its first step whenever the caller is
+    -- below it, and `--allow-read .` is exactly what this script is invoked with. A denial means
+    -- "cannot see", so the walk continues and the caller falls back as it did before.
+    local seen, present = pcall(fs.exists, candidate)
+    if seen and present then
+      -- A refused question is not an answer: without knowing whether `.git` is a directory or a
+      -- pointer file, neither branch below is safe, so the caller is told nothing rather than
+      -- told "plain checkout".
+      local ok, is_file = pcall(fs.is_file, candidate)
+      if not ok then
+        return nil
+      end
+      if not is_file then
+        return candidate
+      end
+      -- A `.git` file that is not a readable gitdir pointer ends the search rather than passing
+      -- it upwards: git itself refuses here (`fatal: invalid gitfile format`, exit 128), and the
+      -- repository above is a different repository from the one the caller stands in. Matches
+      -- `lib/enforce.lua`'s `common_dir`.
+      return M.gitdir_pointer(current, candidate)
+    end
+    local parent = path.dirname(current)
+    if parent == current or parent == "" then
+      return nil
+    end
+    current = parent
   end
-  local ok, result = pcall(proc.run, argv)
-  if not ok or result.status ~= 0 then
+end
+
+-- The common `.git` a worktree's `.git` file points at, or nil when the file is not a pointer.
+function M.gitdir_pointer(dir, file)
+  local ok, text = pcall(fs.read, file)
+  if not ok or not text then
     return nil
   end
-  local text = result.stdout:gsub("%s+$", "")
-  if text == "" then
+  local target = text:match("^%s*gitdir:%s*(.-)%s*$")
+  if not target or target == "" then
     return nil
   end
-  return text
+  if not path.is_absolute(target) then
+    target = path.join(dir, target)
+  end
+  -- `<main>/.git/worktrees/<name>` is per-worktree; its grandparent `.git` is the shared one.
+  local parent = path.dirname(target)
+  if path.basename(parent) == "worktrees" then
+    return path.dirname(parent)
+  end
+  return target
 end
 
 -- The repository basename, with linked worktrees collapsing onto the main repo.
@@ -50,7 +95,7 @@ end
 -- Outside a repository the working directory's own basename is the floor.
 function M.project_base(dir)
   local base = dir or M.cwd()
-  local common = M.git(base, "rev-parse", "--git-common-dir")
+  local common = M.common_dir(base)
   if not common then
     local absolute = M.realpath(base) or base
     return M.sanitize(path.basename(absolute)), absolute

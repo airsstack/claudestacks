@@ -1,0 +1,6 @@
+{
+  "name": "session-context",
+  "version": "0.1.0",
+  "description": "claudevs example: context injected at SessionStart and UserPromptSubmit",
+  "author": { "name": "rstlix0x0" }
+}

@@ -1,0 +1,1 @@
+blocked-by-policy: recursive deletes are not allowed

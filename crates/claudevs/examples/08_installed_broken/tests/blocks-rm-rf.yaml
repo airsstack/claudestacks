@@ -1,0 +1,8 @@
+event: PreToolUse
+payload:
+  tool_name: Bash
+  tool_input:
+    command: rm -rf build
+expect:
+  decision: deny
+  stderr_contains: blocked-by-policy

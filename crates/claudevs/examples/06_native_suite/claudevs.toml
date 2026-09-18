@@ -1,0 +1,2 @@
+[[native]]
+run = "sh tests/native/syntax-check.sh"

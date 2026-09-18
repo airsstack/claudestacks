@@ -1,0 +1,8 @@
+event: PreToolUse
+payload:
+  tool_name: Bash
+  tool_input:
+    command: git push origin main
+expect:
+  exit: 0
+  output: none

@@ -1,0 +1,6 @@
+{
+  "name": "lua-cases",
+  "version": "0.3.1",
+  "description": "claudevs example: generated data cases and scripted cases in Lua",
+  "author": { "name": "rstlix0x0" }
+}

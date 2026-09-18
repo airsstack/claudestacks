@@ -1,0 +1,6 @@
+{
+  "name": "installed-broken",
+  "version": "0.1.0",
+  "description": "claudevs example: a hook that reads a file outside its plugin root",
+  "author": { "name": "rstlix0x0" }
+}

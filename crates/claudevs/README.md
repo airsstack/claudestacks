@@ -13,6 +13,13 @@ println!("{}", claudevs::render_human(&report));
 # Ok::<(), claudevs::Error>(())
 ```
 
+## Documentation
+
+- [`docs/README.md`](docs/README.md) — tutorials, how-to guides, reference and explanation, for plugin
+  authors using the `claudevs` binary and for Rust callers of this crate.
+- [`examples/README.md`](examples/README.md) — runnable example plugins, each with its case files and
+  the `claudevs check` outcome it produces.
+
 ## Commands
 
 | Command | What it does |
@@ -31,33 +38,41 @@ delegated validation stage; see below for what that changes.
 Exit codes read the same way everywhere: `0` when nothing was wrong, `1` for
 verdict failures or findings, `2` when claudevs itself could not run. What
 counts as "could not run" is per command, and the differences are deliberate.
-`test` exits 2 on a usage error, an unreadable plugin directory, or a suite with
-no cases to discover — a plugin with no cases is a broken discovery convention,
-not a green suite. Inside `check` that same condition is an environment gap for
-one stage, so it skips with a reason and the run can still end at 0. `doctor`
-never exits 2 at all: every failure it can meet is something it reports as a
-gap, which is a 1.
+`test` exits 2 whenever claudevs cannot run — for example on a usage error, an
+unreadable plugin directory, a Lua case file that does not load, or a suite
+with no cases to discover; the CLI reference lists every case. A plugin with no
+cases is a broken discovery convention, not a green suite. Inside `check` that
+condition is an environment gap for one stage, so it skips with a reason and
+the run can still end at 0. `doctor` reports every environment problem it
+meets as a gap, which is a 1; it exits 2 only when `--json` cannot render its
+report, which its report types never cause.
 
 ## The wiring checkers
 
 `check`'s wiring stage runs three static checkers. None of them executes
 anything in the plugin.
 
-- **refs** — every `${CLAUDE_PLUGIN_ROOT}/…` occurrence anywhere in the plugin
-  must resolve to a file that exists. A `..` segment that leaves the plugin root
-  is a finding even when the path it names happens to resolve today: the file is
-  not shipped with the plugin and will not be there once it is installed.
+- **refs** — every `${CLAUDE_PLUGIN_ROOT}/…` reference in the files Claude Code
+  loads from a plugin (`.claude-plugin/*.json` and everything under `hooks/`,
+  `skills/`, `agents/` and `commands/`) must resolve to a file that exists.
+  References inside fenced code blocks are examples and are skipped. A `..`
+  segment that leaves the plugin root is a finding even when the path it names
+  happens to resolve today: the file is not part of the plugin and will not be
+  there once it is installed.
 - **invocations** — fenced command blocks in skill markdown are parsed into
   invocations by the crate's one fenced-command parser, the same one
-  `t.skill_command` uses. Scripts that exist in the plugin but are named by
-  nothing else in it are reported as dead files. That one is a **warning**, not
-  an error: it does not fail the stage. Case files are exempt, because the suite
-  runner finds them by naming convention rather than by any reference.
-- **matchers** — `hooks.json` event names must be known events, and each
-  `matcher` must compile. Compilation uses the `regex` crate, which has no
-  lookaround and no backreferences, so a pattern relying on either is reported
-  here even where the runtime might accept it. The finding says which engine
-  rejected the pattern.
+  `t.skill_command` uses. A script (`.sh`, `.lua`, `.py` or `.js`) that nothing
+  else in the plugin names is reported as a dead file. That one is a
+  **warning**, not an error: it does not fail the stage. Case files, anything
+  under `tests/`, language index files such as `__init__.py`, and files outside
+  `hooks/` that neither start with `#!` nor are executable are not reported.
+- **matchers** — `hooks/hooks.json` must be JSON with a top-level `hooks`
+  object; either failure is an error. Everything else this checker reports is a
+  warning: an event name claudevs does not know, a `matcher` on an event that
+  takes none, and a `matcher` claudevs cannot evaluate in the exact-match and
+  pattern modes the hooks reference defines. The event catalogue can lag a
+  Claude Code release, and a matcher claudevs cannot evaluate is not proof the
+  runtime rejects it.
 
 ## The validation stage and its absence
 

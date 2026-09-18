@@ -1,0 +1,6 @@
+{
+  "name": "hook-decision",
+  "version": "0.1.0",
+  "description": "claudevs example: a PreToolUse gate asserted with YAML hook cases",
+  "author": { "name": "rstlix0x0" }
+}

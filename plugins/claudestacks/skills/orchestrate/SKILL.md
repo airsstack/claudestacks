@@ -106,7 +106,8 @@ Subagents report through the filesystem so the main thread holds summaries, not 
 
 1. **Session start.** Run `handoff.lua init` (full invocation in `references/context-handoff.md`) once at the top of the
    pipeline. It prints the session dir and id; keep them. It also prunes stale prior sessions and writes
-   the `.active` lease.
+   the `.active` lease. If it is refused or fails, take that reference's **When init cannot run**
+   fallback rather than improvising a layout.
 2. **Per spawn.** Assign the spawn a file `<NN>-<agent>-<slug>.md` under the session dir and pass that
    **full write-path** in the agent's brief. Call `handoff.lua beat
    <session-dir>` as a heartbeat so a long run is never pruned by a concurrent session.

@@ -97,8 +97,11 @@ Subagent detail stays on disk; only summaries reach you. The protocol — file s
 contract, retention — is the `claudestacks` plugin's
 `skills/process-guidelines/references/context-handoff.md`. Drive it:
 
-1. **Once, at the top of the run:** `handoff.lua init`. It prints the session dir and id,
-   prunes stale sessions, and writes the `.active` lease. Keep both values.
+1. **Once, at the top of the run:** `handoff.lua init` (full invocation in that reference).
+   It prints the session dir and id, prunes stale sessions, and writes the `.active` lease.
+   Keep both values. If it is refused or fails, fall back as that reference's **When init
+   cannot run** says — `<session-scratch>/handoff/`, no lease, no prune — and record the
+   deviation in the plan's execution record.
 2. **Per spawn:** assign `<NN>-<agent>-<slug>.md` under the session dir and pass that **full
    write-path** in the brief. Call `handoff.lua beat <session-dir>` so a long run is never
    pruned by a concurrent session.

@@ -31,11 +31,17 @@ for link-worthiness.
 
    ```sh
    airsl run --policy confined \
-  --allow-read . --allow-exec git \
+  --allow-read . \
   "${CLAUDE_PLUGIN_ROOT}/scripts/project-key.lua"
    ```
 
    Capture stdout as `project`.
+
+   In a worktree-isolated session the guard refuses **any** `airsl` command in this skill
+   that carries a variable it cannot resolve — `${CLAUDE_PLUGIN_ROOT}`, `$TMPDIR`, `$PWD`
+   and `$HOME_ROOT` each come back as "a value computed at runtime"; `$HOME` is accepted.
+   That covers every block below, not only this one. Resolve each with a plain `echo`
+   first — plain commands may use variables — and paste the absolute paths in.
 
 3. Spawn the `journal-recall` subagent (Task / Agent tool,
    `subagent_type: journal-recall`), passing `query`, `project`, `mode=link`,

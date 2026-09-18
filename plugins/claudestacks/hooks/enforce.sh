@@ -37,7 +37,6 @@ SENTINELS="${TMPDIR:-/tmp}"
   --allow-env HOME --allow-env TMPDIR \
   --allow-env AIRSSTACK_HOME --allow-env AIRSSTACK_ENFORCE_REGISTRY \
   --allow-read / --allow-write "$SENTINELS" \
-  --allow-exec git \
   "$DIR/enforce.lua" || exit 0
 
 exit 0

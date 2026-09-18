@@ -33,7 +33,7 @@ HOME_ROOT="${AIRSSTACK_HOME:-$HOME/.airsstack}"
 "$AIRSL" run --fail-open --policy confined \
   --allow-env AIRSSTACK_HOME --allow-env HOME \
   --allow-read "$HOME_ROOT" --allow-write "$HOME_ROOT" \
-  --allow-read . --allow-exec git \
+  --allow-read . \
   "$DIR/session-start.lua" || exit 0
 
 exit 0

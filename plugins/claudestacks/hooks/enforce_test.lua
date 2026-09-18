@@ -420,6 +420,44 @@ return {
     assert(enforce.project_key(project) == enforce.project_key(linked))
   end,
 
+  -- Resolution without `--allow-exec git`. The production path must not need the grant: a
+  -- worktree-isolated Claude Code session cannot pass it, its guard refusing the whole command
+  -- over the `git` operand. These fixtures are built by hand rather than by `git init`, so they
+  -- exercise the read-only path whether or not the grant is present.
+
+  the_toplevel_of_a_hand_built_checkout_is_found_without_git = function()
+    local project = fs.tempdir()
+    fs.mkdir(path.join(project, ".git"))
+    fs.mkdir(path.join(project, "src"))
+    fs.write(path.join(project, "src", "main.rs"), "fn main() {}\n")
+
+    assert(enforce.path_for_matching(path.join(project, "src", "main.rs"), project)
+      == "src/main.rs")
+  end,
+
+  a_hand_built_linked_worktree_shares_the_key_without_git = function()
+    local project = fs.tempdir()
+    fs.mkdir(path.join(project, ".git"))
+    local linked = fs.tempdir()
+    fs.write(path.join(linked, ".git"),
+      "gitdir: " .. path.join(project, ".git", "worktrees", "wt") .. "\n")
+
+    assert(enforce.project_key(linked) == enforce.project_key(project),
+      tostring(enforce.project_key(linked)) .. " vs " .. tostring(enforce.project_key(project)))
+  end,
+
+  a_malformed_dot_git_file_stops_the_ascent = function()
+    -- Mirrors the same-named test in the journal suite: real git refuses on an unreadable gitfile
+    -- rather than answering with the repository above it, and both resolutions follow git.
+    local outer = fs.tempdir()
+    fs.mkdir(path.join(outer, ".git"))
+    local child = path.join(outer, "child")
+    fs.mkdir(child)
+    fs.write(path.join(child, ".git"), "not a gitdir pointer\n")
+
+    assert(enforce.common_dir(child) == nil, tostring(enforce.common_dir(child)))
+  end,
+
   a_sentinel_is_claimed_exactly_once = function()
     local directory = fs.tempdir()
     local file = enforce.sentinel_path(directory, "s", "main", "rust", "code")

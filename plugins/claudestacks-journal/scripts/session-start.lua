@@ -7,7 +7,7 @@
 --   airsl run --fail-open --policy confined \
 --     --allow-env AIRSSTACK_HOME --allow-env HOME \
 --     --allow-read "$AIRSSTACK_HOME" --allow-write "$AIRSSTACK_HOME" \
---     --allow-read . --allow-exec git \
+--     --allow-read . \
 --     scripts/session-start.lua
 
 local index = require("lib.index")

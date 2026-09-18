@@ -100,6 +100,54 @@ refresh or drop.
   it on each spawn as a heartbeat.
 - `handoff.lua end <session-dir>` — drop the lease at clean session close.
 
+### The invocation
+
+Run exactly this, from the repository root:
+
+```
+airsl run --policy confined \
+  --allow-env AIRSSTACK_HANDOFF_KEEP --allow-env AIRSSTACK_HANDOFF_GRACE \
+  --allow-read . --allow-write . \
+  "${CLAUDE_PLUGIN_ROOT}/scripts/handoff.lua" init
+```
+
+`beat` and `end` take the same flags, with `beat <session-dir>` or `end <session-dir>`
+in place of `init`.
+
+**No `--allow-exec git`.** Claude Code's worktree-isolation guard refuses a command whose
+operands it cannot read, and `git` behind a launcher it cannot see through is one: it
+cannot prove the resulting call stays inside the worktree, so it blocks the whole command
+before `airsl` starts. That is what made `init` unusable in an isolated session.
+
+The same guard also rejects most variables in an `airsl` command line — `${CLAUDE_PLUGIN_ROOT}`,
+`$TMPDIR` and `$PWD` all come back as "a value computed at runtime". `$HOME` resolves and
+is accepted; nothing else here should be relied on. So in an isolated session, resolve the
+path in a separate plain command first and paste the result in:
+
+```sh
+echo "$CLAUDE_PLUGIN_ROOT"     # plain commands may use variables freely
+```
+
+then run the block above with that absolute literal in place of the variable.
+
+Without the git grant the root comes from the working directory, which is correct
+whenever the caller stands at the repository root — Claude Code resets the shell there on
+every call. From anywhere else, pass an absolute literal path:
+
+```
+  "${CLAUDE_PLUGIN_ROOT}/scripts/handoff.lua" init --root /abs/path/to/worktree
+```
+
+`init` prints a warning to stderr when it fell back to the working directory, so a tree
+minted in the wrong place is visible rather than silent.
+
+### When init cannot run
+
+If `init` is refused or fails, do not improvise a layout per run. Use
+`<session-scratch>/handoff/` with the same `<NN>-<agent>-<slug>.md` file naming, skip the
+`.active` lease and pruning, and record the deviation in the run's execution record. The
+protocol above is unchanged for everything else — only the location and the lease differ.
+
 Retention: keep the last `AIRSSTACK_HANDOFF_KEEP` (default 10) session dirs. A dir beyond
 that is pruned only once its `.active` lease is absent or older than
 `AIRSSTACK_HANDOFF_GRACE` minutes (default 120). So an active (heartbeating) session is

@@ -11,11 +11,17 @@ Run exactly this, from the current working directory:
 airsl run --policy confined \
   --allow-env HOME --allow-env TMPDIR --allow-env AIRSSTACK_HOME \
   --allow-env AIRSSTACK_ENFORCE_REGISTRY \
-  --allow-read / --allow-write "${TMPDIR:-/tmp}" --allow-exec git \
+  --allow-read / --allow-write "${TMPDIR:-/tmp}" \
   "${CLAUDE_PLUGIN_ROOT}/hooks/enforce.lua" --explain "$ARGUMENTS"
 ```
 
 If `$ARGUMENTS` is empty, ask which file path to diagnose and stop; do not guess one.
+
+In a worktree-isolated session the guard refuses an `airsl` command carrying a variable it
+cannot resolve — here `${TMPDIR:-/tmp}` and `${CLAUDE_PLUGIN_ROOT}` both come back as "a value
+computed at runtime". Resolve them first with plain `echo "$TMPDIR"` and
+`echo "$CLAUDE_PLUGIN_ROOT"` — plain commands may use variables — and rerun with those absolute
+paths in place of the variables.
 
 Then read the trace back to the user, in this order:
 

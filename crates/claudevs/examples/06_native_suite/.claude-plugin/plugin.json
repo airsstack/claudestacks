@@ -1,0 +1,6 @@
+{
+  "name": "native-suite",
+  "version": "0.1.0",
+  "description": "claudevs example: a native test command declared in claudevs.toml",
+  "author": { "name": "rstlix0x0" }
+}

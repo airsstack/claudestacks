@@ -1,0 +1,7 @@
+event: PreToolUse
+payload:
+  tool_input:
+    file_path: .env
+expect:
+  decision: deny
+  stderr_contains: refusing to edit a .env file

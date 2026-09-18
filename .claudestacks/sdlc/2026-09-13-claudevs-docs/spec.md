@@ -8,9 +8,10 @@ created: 2026-09-13
 This spec gives `claudevs` a Diátaxis docs tree with two tracks of equal weight: plugin authors using
 the `claudevs` binary, and Rust callers of the engine library. It adds a set of runnable example
 plugins, some deliberately broken, and puts two gates on them so neither can drift from the code. The
-example plugins join the existing `claudevs-check` lane. Every Rust snippet in the engine docs is a
-doctest run by the existing Definition-of-Done step. The spec also fixes the README claim that
-contradicts the code, and updates the two places that describe the `claudevs-check` lane.
+examples are verified by a Rust test under the existing Definition-of-Done step, not by the
+`claudevs-check` lane, which keeps testing the fixture corpus alone. Every Rust snippet in the engine
+docs is a doctest run by that same step. The spec also fixes the README claim that contradicts the
+code.
 
 Evidence in this spec is `file:line` in this worktree at the time of writing, or a command run in this
 design session with its real output. Probe directories were created under the session scratchpad and
@@ -232,7 +233,8 @@ crates/claudevs/examples/
 ├─ 05_lua_cases/
 ├─ 06_native_suite/
 ├─ 07_wiring_broken/
-└─ 08_installed_broken/
+├─ 08_installed_broken/
+└─ 09_doctor_gaps/
 ```
 
 | Example | Shows | `claudevs check` must end |
@@ -245,6 +247,7 @@ crates/claudevs/examples/
 | `06_native_suite` | `claudevs.toml` `[[native]]` | exit 0, no FAIL |
 | `07_wiring_broken` | a braced `${CLAUDE_PLUGIN_ROOT}/…` reference that does not resolve (P9) | exit 1, `FAIL  wiring` |
 | `08_installed_broken` | a hook that reaches outside the plugin root, passing `test` and failing only `test --installed` (P8) | exit 1, `FAIL  test --installed` |
+| `09_doctor_gaps` | what `claudevs doctor` answers and what it does not: the healthy run, a gap reproduced by hiding the `claude` binary, a gap reproduced outside any marketplace, and the warn shade a plugin with no case files produces | exit 0, no FAIL |
 
 Rules every example follows:
 
@@ -266,30 +269,23 @@ Rules every example follows:
 
 ### 4.1 Example gate
 
-The `claudevs-check` task (P14) grows to cover `examples/` without a second task or CI job. This is a
-deliberate reading of the intent's "runs in CI next to `cargo make claudevs-check`": the fixtures and
-the examples ask the same question, whether `claudevs check` still ends where it should. A second task
-would duplicate `_run` and the two assertion functions. One lane and one job also means CI and a local
-run stay the same command.
+The examples are documentation, not gate data, so they stay out of `claudevs-check` entirely. That
+task keeps testing `crates/claudevs/tests/fixtures/` and nothing else: those eight plugin roots exist
+to make the checkers fail on purpose, and their expectations belong in a pass/fail lane. An example
+exists to be read and copied, and what has to stay true of it is that the run its README shows still
+produces what the README says.
 
-- `_run` takes a full plugin path instead of `root` + name. The eight fixture calls pass
-  `crates/claudevs/tests/fixtures/<name>` and keep their current expectations.
-- The example calls are:
-
-  ```
-  expect_no_fail    crates/claudevs/examples/01_hook_decision   0
-  expect_stage_fail crates/claudevs/examples/02_hook_decision_broken 1 test
-  expect_no_fail    crates/claudevs/examples/03_session_context 0
-  expect_no_fail    crates/claudevs/examples/04_script_and_flow 0
-  expect_no_fail    crates/claudevs/examples/05_lua_cases       0
-  expect_no_fail    crates/claudevs/examples/06_native_suite    0
-  expect_stage_fail crates/claudevs/examples/07_wiring_broken   1 wiring
-  expect_stage_fail crates/claudevs/examples/08_installed_broken 1 "test --installed"
-  ```
-
-- The task's `description` and the CI job `name` (`ci.yml:65`) name both fixtures and examples.
-- The passing expectations must not depend on `claude` being installed, because the runner has none
-  (P14). `expect_no_fail` already anchors on `ok    wiring` for that reason (`Makefile.toml:260-271`).
+- `Makefile.toml` is not touched by this chain. No new cargo-make task, no new CI job, and no example
+  path in an existing one.
+- Each example is verified from Rust, where the check report is a typed value rather than text to
+  grep: `crates/claudevs/tests/examples.rs` walks `crates/claudevs/examples/*/`, runs
+  `claudevs::check::run` on each, and asserts the outcome that example's README documents — every
+  deterministic stage ran, and either nothing failed or the named stage did. `validate` is excluded:
+  it skips wherever `claude` is absent, which is the documented degradation on CI.
+- That test runs under the existing Definition-of-Done step (`cargo test --workspace --all-targets`),
+  so it needs no new lane and no new job.
+- The engine doctests of §4.2 run several examples as a side effect. They are not the gate — the test
+  above covers all eight, including the ones no doctest names.
 
 Every broken example's expectation is proven red before it is trusted. It must be seen failing its
 expectation with the defect removed, and passing with the defect present.
@@ -319,8 +315,7 @@ expectation with the defect removed, and passing with the defect present.
 - `crates/claudevs/README.md`: replace the matcher paragraph (`:56-60`) with a description that
   matches P2, and link `docs/README.md` and `examples/README.md`. Every other behavioural sentence in
   the README is re-checked against the source or a run in the same change, and corrected if wrong.
-- Root `CLAUDE.md:182-183`: say that `cargo make claudevs-check` covers the fixtures and the example
-  plugins.
+- Root `CLAUDE.md`: no change. The lane still covers the fixture corpus and nothing else.
 
 ## 6. Accuracy and wording rules for the shipped text
 
@@ -346,3 +341,33 @@ README:
 - Rust `[[example]]` programs for the engine.
 - Restructuring `crates/claudevs/tests/fixtures/`, the corpus lane, or `crates/clauders/docs/`.
 - A new CI job or cargo-make task.
+
+## 8. Amendments
+
+### 2026-09-18 — §4.1, the examples leave the `claudevs-check` lane
+
+As approved, §4.1 put the example plugins in `cargo make claudevs-check` alongside the fixture corpus,
+on the reading that "the fixtures and the examples ask the same question". They do not. The fixtures
+are test data for claudevs — four of the eight are built to fail so the lane can prove the checkers
+still report. The examples are teaching material for plugin authors, and the thing that must stay true
+of them is that the run each README shows still produces what the README says.
+
+Merging the two made `Makefile.toml` the home of the examples' correctness, in shell, asserted by
+grepping rendered output. Executing plan 01 showed the cost twice in one session: a skipped stage
+passed the lane silently, and the assertion added to catch it grew two more shell functions.
+
+§4.1 now keeps the examples out of the lane entirely and verifies them from Rust, where a stage
+outcome is a typed value. `Makefile.toml` is untouched by this chain. Authorized by the author on
+2026-09-18, mid-execution of plan 01, who identified the merge as the error.
+
+### 2026-09-18 — §3, a ninth example for `claudevs doctor`
+
+The eight examples all teach `claudevs check`. Running `claudevs doctor` on `07_wiring_broken` or
+`08_installed_broken` reports `0 gaps, 0 warnings` and exit 0, because doctor probes whether the
+environment can run the stages at all rather than judging the plugin — both defects are invisible to
+its five probes. Nothing in the set said so, which reads as doctor missing a defect it was never
+asked about.
+
+`09_doctor_gaps` is added: an ordinary passing plugin whose README teaches the distinction, with a
+gap and a warn each reproduced by a command the reader can run. Requested by the author on
+2026-09-18 after hitting exactly that confusion.

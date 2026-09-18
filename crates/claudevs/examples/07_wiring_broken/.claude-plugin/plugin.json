@@ -1,0 +1,6 @@
+{
+  "name": "wiring-broken",
+  "version": "0.1.0",
+  "description": "claudevs example: a hooks.json reference to a script that does not exist",
+  "author": { "name": "rstlix0x0" }
+}

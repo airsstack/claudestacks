@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-09-13
 depends-on: [01]
 ---
@@ -1327,3 +1327,34 @@ Each doc task gives, in order: the file's headings; under each heading, the fact
 - `every_engine_doc_is_compiled_as_a_doctest` was seen failing for each engine doc before it was wired in (Tasks 1–3), and a deliberately wrong snippet was seen failing the doctest step (Task 1 step 9).
 - Every CLI doc output block is pasted from a run made while writing it; the recorded blocks in this plan came from runs of the same commands.
 - No `file:line`, banned vocabulary or untagged opening fence under `crates/claudevs/docs/` or in the crate README; every relative link resolves.
+
+## Review findings
+
+- accuracy — three sentences drafted for `docs/architecture.md` and `docs/cli/explanation.md` asserted
+  behaviour of the `claude` binary and of handler resolution that nothing in this repository can show.
+  Dropped rather than shipped.
+- accuracy — the crate README's matcher claim and three others were corrected against the source; see
+  plan 01's findings.
+- gap — nothing in `docs/cli/reference.md` said a clean `doctor` diagnosis is not a verdict on the
+  plugin. Added, pointing at `examples/09_doctor_gaps`.
+- stale — spec P6 records `claude 2.1.270`; the machine that wrote these docs has `2.1.276`. No claim
+  depends on the difference; the version stamp is stale and left as written.
+
+## Probe results
+
+- Claim: every engine guide is compiled as a doctest and the guard test fails when one is not wired in.
+  Command: `cargo test -p claudevs --lib docs_doctests`, run with each guide unwired in turn. Output:
+  the guard test failed with the named panic each time, then passed once wired. Final state: 1 passed.
+- Claim: a wrong snippet in a guide fails the gate. Command: flipped an `exit_code` assertion in
+  `docs/engine/tutorial.md` and ran `cargo test -p claudevs --all-features --doc`. Output: the doctest
+  failed with the left/right values, then passed again on revert.
+- Claim: the engine guides' snippets compile and pass as written. Command:
+  `cargo test -p claudevs --all-features --doc`. Output: `13 passed; 0 failed`, plus one pre-existing
+  `compile_fail` doctest in `report/render.rs`.
+
+## Deviations
+
+- 2026-09-18 — Tasks 1 through 10 ran as parallel agents rather than in plan order, to meet a same-day
+  deadline. Tasks 1-3 were kept sequential in one agent because they share the doctest module.
+- 2026-09-18 — no independent reviewer pass. Each task's own verification ran and the workspace
+  Definition of Done ran once at the end, green; the diff has not been read by a reviewer agent.

@@ -1,0 +1,7 @@
+invocation:
+  argv: [sh, -c, 'sh "$CLAUDE_PLUGIN_ROOT/scripts/greet.sh"']
+  env:
+    GREETING_NAME: claudevs
+expect:
+  exit: 0
+  stdout_contains: hello, claudevs

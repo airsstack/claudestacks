@@ -1,0 +1,6 @@
+{
+  "name": "hook-decision-broken",
+  "version": "0.1.0",
+  "description": "claudevs example: the hook-decision gate with a defect its cases catch",
+  "author": { "name": "rstlix0x0" }
+}

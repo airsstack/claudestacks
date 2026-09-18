@@ -1,0 +1,5 @@
+event: UserPromptSubmit
+payload:
+  prompt: deploy the api to production
+expect:
+  context_contains: change ticket

@@ -1,0 +1,16 @@
+project: notes-repo
+steps:
+  - run:
+      argv: [sh, -c, 'sh "$CLAUDE_PLUGIN_ROOT/scripts/new-note.sh" "first note"']
+    expect:
+      exit: 0
+      stdout_contains: created notes/first-note.md
+  - apply_fixture: imported-notes
+  - run:
+      argv: [ls, notes]
+expect:
+  exit: 0
+  stdout_contains: imported.md
+  files_exist:
+    - notes/first-note.md
+    - notes/imported.md

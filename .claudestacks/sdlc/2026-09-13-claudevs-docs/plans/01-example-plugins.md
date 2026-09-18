@@ -1,15 +1,16 @@
 ---
-status: approved
+status: done
 created: 2026-09-13
 ---
 
 # claudevs Example Plugins Implementation Plan
 
-**Goal:** Make `cargo make claudevs-check` assert the `claudevs check` outcome that each of eight example plugins under `crates/claudevs/examples/` documents in its README.
+**Goal:** Build eight example plugins under `crates/claudevs/examples/`, each verified by
+`crates/claudevs/tests/examples.rs` against the `claudevs check` outcome its README documents.
 
-**Architecture:** Every example is a plugin root (`.claude-plugin/plugin.json`, `hooks/`, `tests/`, `README.md`) run through the `claudevs` binary, never a Cargo target. The examples share one marketplace manifest at `crates/claudevs/examples/.claude-plugin/marketplace.json`, without which `test --installed` skips. The existing `claudevs-check` cargo-make task takes full plugin paths so fixtures and examples share its `_run`, `expect_no_fail` and `expect_stage_fail` functions. The CI job keeps its id and gets a name that covers both.
+**Architecture:** Every example is a plugin root (`.claude-plugin/plugin.json`, `hooks/`, `tests/`, `README.md`) run through the `claudevs` binary, never a Cargo target. The examples share one marketplace manifest at `crates/claudevs/examples/.claude-plugin/marketplace.json`, which keys their installed path as `cache/claudevs-examples/<plugin>/<version>/`. It is what makes that path the examples' own rather than the repository's: removing it does not make `test --installed` skip here, because the lookup walks ancestors and finds the repo-root `.claude-plugin/marketplace.json` (`name: claudestacks`) instead — verified 2026-09-18 by moving the directory aside and re-running `claudevs check` on an example, which still resolved to the repo-root marketplace and `test --installed` still passed. A plugin with no marketplace in any ancestor does skip, which is the case `08_installed_broken`'s README describes. Each example's correctness is asserted from Rust, not from the fixture corpus's shell lane: `crates/claudevs/tests/examples.rs` (Task 10) walks `crates/claudevs/examples/*/`, runs `claudevs::check::run` on each, and compares the typed stage outcomes against the expectation its README documents. `Makefile.toml` and `cargo make claudevs-check` are untouched by this chain and keep testing `crates/claudevs/tests/fixtures/` alone (spec §4.1, §8 amendment of 2026-09-18).
 
-**Tech Stack:** POSIX `sh` hook scripts, YAML and Lua case files, `claudevs.toml`, a cargo-make `@shell` script, GitHub Actions YAML.
+**Tech Stack:** POSIX `sh` hook scripts, YAML and Lua case files, `claudevs.toml`, a Rust integration test.
 
 **Content authority:** `spec.md` §3 (example plugins), §4.1 (example gate), §5 second bullet (root `CLAUDE.md`), §6 (wording rules for shipped text).
 
@@ -18,9 +19,6 @@ created: 2026-09-13
 ## File structure
 
 ```
-Makefile.toml                                              — [modify] claudevs-check takes full plugin paths; eight example expectations
-.github/workflows/ci.yml                                   — [modify] job `claudevs-check` renamed "claudevs fixtures and examples"
-CLAUDE.md                                                  — [modify] lane description names the example plugins
 crates/claudevs/examples/README.md                         — [create] index table, how to run, why the marketplace manifest and shared/ exist
 crates/claudevs/examples/.claude-plugin/marketplace.json   — [create] marketplace manifest the installed layout is keyed by
 crates/claudevs/examples/shared/policy-message.txt         — [create] file 08_installed_broken reaches outside its root for
@@ -32,164 +30,40 @@ crates/claudevs/examples/05_lua_cases/**                   — [create] data and
 crates/claudevs/examples/06_native_suite/**                — [create] claudevs.toml [[native]]
 crates/claudevs/examples/07_wiring_broken/**               — [create] dangling ${CLAUDE_PLUGIN_ROOT} reference; FAIL wiring
 crates/claudevs/examples/08_installed_broken/**            — [create] hook reads above the plugin root; FAIL test --installed
+crates/claudevs/tests/examples.rs                          — [create] runs claudevs::check::run on every example, asserts its README's outcome
 ```
 
 Every command runs from the worktree root. Two commands recur:
 
-- **The lane:** `cargo make claudevs-check`. It prints one `ok  <path> (…)` line per plugin and stops at the first plugin whose expectation fails, printing `claudevs check <path>: expected …` and the captured output to stderr (`Makefile.toml:231-234`, `:256-258`, `:268-270`, `:279-281`).
 - **One example:** `cargo run -q -p claudevs-cli -- check crates/claudevs/examples/<name>; echo "exit=$?"`.
+- **The example gate:** `cargo test -p claudevs --test examples --all-features`. It runs `claudevs::check::run` on all eight examples in one process and panics naming the example and stage that diverged from its README (`crates/claudevs/tests/examples.rs`, built in Task 10).
 
 Expected outputs below come from runs of scratch copies of these files (identical except that 04's `tests/fixtures/notes-repo/README.md` and 08's reworded script comment were added afterwards; neither is read by any case) on a machine with `claude` 2.1.270 on `PATH`. The `validate` detail lines hold a machine-specific absolute path and are shown as `…`. Without `claude` on `PATH`, the first stage prints `  skip  validate` followed by ``cannot run `claude`: No such file or directory (os error 2)``, the summary counts one stage fewer and one skipped, and the exit code and every other stage line are unchanged. That was run for all eight examples with `env PATH=/usr/bin:/bin target/debug/claudevs check …`.
 
-**Rules for every README and script comment in `crates/claudevs/examples/`** (spec §6): no `file:line` citations; none of the development vocabulary banned in `crates/clauders/CLAUDE.md:150-160`; quoted output is pasted from the run in the same task, with temp paths and the validate detail elided as `…`. Task 12 greps for both.
+**Rules for every README and script comment in `crates/claudevs/examples/`** (spec §6): no `file:line` citations; none of the development vocabulary banned in `crates/clauders/CLAUDE.md:150-160`; quoted output is pasted from the run in the same task, with temp paths and the validate detail elided as `…`. Task 13 greps for both.
 
 **Commits:** the `execute` skill reserves committing to the user. The final task gives a suggested message; no task runs `git commit`.
 
-### Task 1 — Let the claudevs-check lane take full plugin paths
+### Task 1 — Withdrawn: the claudevs-check lane does not take example plugin paths
 
-**Files:**
-- Modify `Makefile.toml`
+This task set out to make `cargo make claudevs-check` take full plugin paths so the example plugins
+could share the fixtures' `_run` function, asserted through a new `expect_example`. That merge was the
+error, on the reading that the fixtures and the examples ask the same question. They do not: the
+fixtures are test data for claudevs, four of the eight built to fail so the lane can prove the checkers
+still report, while the examples are teaching material, and the only thing that has to stay true of one
+is that the run its README shows still produces what the README says.
 
-**Steps:**
+Putting both in `Makefile.toml` made the examples' correctness a shell assertion over grepped output.
+Executing this plan showed the cost twice in one session: a skipped stage passed the lane silently, and
+the assertion added to catch it grew two more shell functions.
 
-1. Record the current lane as the baseline:
-
-   ```
-   $ cargo make claudevs-check
-   ```
-
-   Expected, among cargo-make's own log lines, and a zero exit:
-
-   ```text
-   ok  minimal-plugin (exit 0, no stage failed)
-   ok  dead-script-plugin (exit 0, no stage failed)
-   ok  escape-plugin (FAIL wiring)
-   ok  bad-matcher-plugin (FAIL wiring)
-   ok  hooks-array-plugin (FAIL wiring)
-   ok  project-branch-plugin (exit 0, no stage failed)
-   ok  exec-args-plugin (exit 0, no stage failed)
-   ok  matcher-routing-plugin (FAIL test)
-   ```
-
-2. In `Makefile.toml`, replace the task description (`:167`):
-
-   ```toml
-   description = "claudevs check over the fixture plugin corpus, both directions"
-   ```
-
-   with:
-
-   ```toml
-   description = "claudevs check over the fixture plugin corpus and the example plugins, both directions"
-   ```
-
-3. Replace this block (`:203-212`):
-
-   ```text
-   # `root` is deliberately relative: `claudevs check` resolves `plugin_dir` to
-   # an absolute path once, up front, and uses that single value for both the
-   # spawned delegate's argv and its cwd (crates/claudevs/src/validate.rs), so a
-   # relative path here is no longer doubled. Keeping it relative means that on
-   # a machine that has `claude`, this lane also exercises the delegate's path
-   # handling, so that defect cannot come back unnoticed.
-   script_runner = "@shell"
-   script = '''
-   set -e
-   root="crates/claudevs/tests/fixtures"
-   ```
-
-   with:
-
-   ```text
-   # Plugin paths are deliberately relative: `claudevs check` resolves `plugin_dir`
-   # to an absolute path once, up front, and uses that single value for both the
-   # spawned delegate's argv and its cwd (crates/claudevs/src/validate.rs), so a
-   # relative path here is no longer doubled. Keeping them relative means that on
-   # a machine that has `claude`, this lane also exercises the delegate's path
-   # handling, so that defect cannot come back unnoticed.
-   script_runner = "@shell"
-   script = '''
-   set -e
-   ```
-
-4. In the `_run` comment (`:220`), replace `never called from the fixture list below` with `never called from the plugin lists below`.
-
-5. In the comment above `expect_no_fail` (`:248-251`), replace:
-
-   ```text
-   # Each fixture calls exactly one of the three functions below, and each one
-   # runs `_run` itself before reading `$out`/`$got` — the two can no longer be
-   # invoked separately, so there is no way to assert against a previous
-   # fixture's stale output.
-   ```
-
-   with:
-
-   ```text
-   # Each plugin calls exactly one of the functions below, and each one
-   # runs `_run` itself before reading `$out`/`$got` — the two can no longer be
-   # invoked separately, so there is no way to assert against a previous
-   # plugin's stale output.
-   ```
-
-   Then `grep -n "fixture's stale\|Each fixture" Makefile.toml` prints nothing, exit 1.
-
-6. In `_run` (`:228`), replace:
-
-   ```sh
-       out="$(cargo run -q -p claudevs-cli -- check "$root/$plugin" 2>&1)"
-   ```
-
-   with:
-
-   ```sh
-       out="$(cargo run -q -p claudevs-cli -- check "$plugin" 2>&1)"
-   ```
-
-7. Replace each fixture call with its full path, keeping every expectation and the comments between them:
-
-   | Line | Before | After |
-   |---|---|---|
-   | `:297` | `expect_no_fail minimal-plugin 0` | `expect_no_fail crates/claudevs/tests/fixtures/minimal-plugin 0` |
-   | `:298` | `expect_no_fail dead-script-plugin 0` | `expect_no_fail crates/claudevs/tests/fixtures/dead-script-plugin 0` |
-   | `:299` | `expect_stage_fail escape-plugin 1 wiring` | `expect_stage_fail crates/claudevs/tests/fixtures/escape-plugin 1 wiring` |
-   | `:300` | `expect_stage_fail bad-matcher-plugin 1 wiring` | `expect_stage_fail crates/claudevs/tests/fixtures/bad-matcher-plugin 1 wiring` |
-   | `:301` | `expect_stage_fail hooks-array-plugin 1 wiring` | `expect_stage_fail crates/claudevs/tests/fixtures/hooks-array-plugin 1 wiring` |
-   | `:309` | `expect_no_fail project-branch-plugin 0` | `expect_no_fail crates/claudevs/tests/fixtures/project-branch-plugin 0` |
-   | `:314` | `expect_no_fail exec-args-plugin 0` | `expect_no_fail crates/claudevs/tests/fixtures/exec-args-plugin 0` |
-   | `:323` | `expect_stage_fail matcher-routing-plugin 1 test` | `expect_stage_fail crates/claudevs/tests/fixtures/matcher-routing-plugin 1 test` |
-
-8. Confirm no `root` reference is left in the task:
-
-   ```
-   $ grep -n '\$root' Makefile.toml
-   ```
-
-   Expected: no output, exit 1.
-
-9. Re-run the lane:
-
-   ```
-   $ cargo make claudevs-check
-   ```
-
-   Expected: a zero exit and the same eight verdicts as step 1, now naming full paths:
-
-   ```text
-   ok  crates/claudevs/tests/fixtures/minimal-plugin (exit 0, no stage failed)
-   ok  crates/claudevs/tests/fixtures/dead-script-plugin (exit 0, no stage failed)
-   ok  crates/claudevs/tests/fixtures/escape-plugin (FAIL wiring)
-   ok  crates/claudevs/tests/fixtures/bad-matcher-plugin (FAIL wiring)
-   ok  crates/claudevs/tests/fixtures/hooks-array-plugin (FAIL wiring)
-   ok  crates/claudevs/tests/fixtures/project-branch-plugin (exit 0, no stage failed)
-   ok  crates/claudevs/tests/fixtures/exec-args-plugin (exit 0, no stage failed)
-   ok  crates/claudevs/tests/fixtures/matcher-routing-plugin (FAIL test)
-   ```
+`Makefile.toml` is not modified by this chain and keeps testing `crates/claudevs/tests/fixtures/`
+alone, exactly as before this plan started. Task 10 verifies the examples from Rust instead, where a
+stage outcome is a typed value rather than text to grep (spec §4.1, §8 amendment of 2026-09-18).
 
 ### Task 2 — Add 01_hook_decision and the examples marketplace manifest
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/.claude-plugin/marketplace.json`
 - Create `crates/claudevs/examples/01_hook_decision/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/01_hook_decision/hooks/hooks.json`
@@ -201,35 +75,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. Write the expectation first. In `Makefile.toml`, directly after `expect_stage_fail crates/claudevs/tests/fixtures/matcher-routing-plugin 1 test` and before the closing `'''`, add:
-
-   ```sh
-
-   # The example plugins under crates/claudevs/examples/ are the ones the claudevs
-   # docs teach from, and each example's README quotes the outcome asserted here.
-   # The broken ones fail at a named stage on purpose, for the same reason the
-   # must-fail fixtures above exist:
-   #
-   #   02_hook_decision_broken  test              its gate exits 1 where a PreToolUse deny needs 2
-   #   07_wiring_broken         wiring            hooks.json names a script that does not exist
-   #   08_installed_broken      test --installed  its hook reads a file above the plugin root
-   expect_no_fail crates/claudevs/examples/01_hook_decision 0
-   ```
-
-2. Run the lane and confirm it fails on the missing example:
-
-   ```
-   $ cargo make claudevs-check
-   ```
-
-   Expected: the eight fixture lines from Task 1, then on stderr, and a non-zero exit:
-
-   ```text
-   claudevs check crates/claudevs/examples/01_hook_decision: expected exit 0, got 2
-   claudevs: walk plugin `crates/claudevs/examples/01_hook_decision`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/.claude-plugin/marketplace.json`:
+1. Create `crates/claudevs/examples/.claude-plugin/marketplace.json`:
 
    ```json
    {
@@ -240,7 +86,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/01_hook_decision/.claude-plugin/plugin.json`:
+2. Create `crates/claudevs/examples/01_hook_decision/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -251,7 +97,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/01_hook_decision/hooks/hooks.json`:
+3. Create `crates/claudevs/examples/01_hook_decision/hooks/hooks.json`:
 
    ```json
    {
@@ -268,7 +114,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-6. Create `crates/claudevs/examples/01_hook_decision/hooks/protect-env.sh`:
+4. Create `crates/claudevs/examples/01_hook_decision/hooks/protect-env.sh`:
 
    ```sh
    #!/bin/sh
@@ -287,7 +133,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-7. Create `crates/claudevs/examples/01_hook_decision/tests/blocks-env-file.yaml`:
+5. Create `crates/claudevs/examples/01_hook_decision/tests/blocks-env-file.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -299,7 +145,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      stderr_contains: refusing to edit a .env file
    ```
 
-8. Create `crates/claudevs/examples/01_hook_decision/tests/asks-for-secrets.yaml`:
+6. Create `crates/claudevs/examples/01_hook_decision/tests/asks-for-secrets.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -311,7 +157,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      decision: ask
    ```
 
-9. Create `crates/claudevs/examples/01_hook_decision/tests/allows-other-files.yaml`:
+7. Create `crates/claudevs/examples/01_hook_decision/tests/allows-other-files.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -320,35 +166,35 @@ Expected outputs below come from runs of scratch copies of these files (identica
      output: none
    ```
 
-10. Run the example:
+8. Run the example:
 
-    ```
-    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/01_hook_decision; echo "exit=$?"
-    ```
+   ```
+   $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/01_hook_decision; echo "exit=$?"
+   ```
 
-    Expected:
+   Expected:
 
-    ```text
-      ok    validate
-            …
-      ok    wiring
-            0 errors, 0 warnings
-      ok    test
-              ok    allows-other-files
-              ok    asks-for-secrets
-              ok    blocks-env-file
-            3 passed, 0 failed (3 cases, 0 native suites)
-      ok    test --installed
-              ok    allows-other-files
-              ok    asks-for-secrets
-              ok    blocks-env-file
-            3 passed, 0 failed (3 cases, 0 native suites)
+   ```text
+     ok    validate
+           …
+     ok    wiring
+           0 errors, 0 warnings
+     ok    test
+             ok    allows-other-files
+             ok    asks-for-secrets
+             ok    blocks-env-file
+           3 passed, 0 failed (3 cases, 0 native suites)
+     ok    test --installed
+             ok    allows-other-files
+             ok    asks-for-secrets
+             ok    blocks-env-file
+           3 passed, 0 failed (3 cases, 0 native suites)
 
-    4 stages run, 0 failed, 0 skipped
-    exit=0
-    ```
+   4 stages run, 0 failed, 0 skipped
+   exit=0
+   ```
 
-11. Create `crates/claudevs/examples/01_hook_decision/README.md`, pasting the output block from step 10's run (behaviour sources: exit 2 and `permissionDecision` both read as a decision, `semantics.rs:104-115,128-131`; a case's payload is laid over a per-event default, `payload.rs:14-34`, `suite.rs:310-316`):
+9. Create `crates/claudevs/examples/01_hook_decision/README.md`, pasting the output block from step 8's run (behaviour sources: exit 2 and `permissionDecision` both read as a decision, `semantics.rs:104-115,128-131`; a case's payload is laid over a per-event default, `payload.rs:14-34`, `suite.rs:310-316`):
 
     ````markdown
     # 01 — Hook decision
@@ -378,7 +224,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 10's output here, validate detail as …, without the exit= line>
+    <paste step 8's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 0.
@@ -386,22 +232,9 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
     Replace the `<paste …>` line with the real output before saving; the finished file contains no angle-bracket placeholder.
 
-12. Run the lane:
-
-    ```
-    $ cargo make claudevs-check
-    ```
-
-    Expected: a zero exit, the eight fixture lines from Task 1 step 8, then:
-
-    ```text
-    ok  crates/claudevs/examples/01_hook_decision (exit 0, no stage failed)
-    ```
-
 ### Task 3 — Add 02_hook_decision_broken and prove its expectation can fail
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/02_hook_decision_broken/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/02_hook_decision_broken/hooks/hooks.json`
 - Create `crates/claudevs/examples/02_hook_decision_broken/hooks/protect-env.sh`
@@ -412,26 +245,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_no_fail crates/claudevs/examples/01_hook_decision 0`, add:
-
-   ```sh
-   expect_stage_fail crates/claudevs/examples/02_hook_decision_broken 1 test
-   ```
-
-2. Run the lane:
-
-   ```
-   $ cargo make claudevs-check
-   ```
-
-   Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/02_hook_decision_broken: expected exit 1, got 2
-   claudevs: walk plugin `crates/claudevs/examples/02_hook_decision_broken`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/02_hook_decision_broken/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/02_hook_decision_broken/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -442,7 +256,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/02_hook_decision_broken/hooks/hooks.json`:
+2. Create `crates/claudevs/examples/02_hook_decision_broken/hooks/hooks.json`:
 
    ```json
    {
@@ -459,7 +273,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/02_hook_decision_broken/hooks/protect-env.sh`. It is Task 2's script with `exit 2` changed to `exit 1` on the `.env` branch:
+3. Create `crates/claudevs/examples/02_hook_decision_broken/hooks/protect-env.sh`. It is Task 2's script with `exit 2` changed to `exit 1` on the `.env` branch:
 
    ```sh
    #!/bin/sh
@@ -478,7 +292,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-6. Create `crates/claudevs/examples/02_hook_decision_broken/tests/blocks-env-file.yaml`:
+4. Create `crates/claudevs/examples/02_hook_decision_broken/tests/blocks-env-file.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -490,7 +304,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      stderr_contains: refusing to edit a .env file
    ```
 
-7. Create `crates/claudevs/examples/02_hook_decision_broken/tests/asks-for-secrets.yaml`:
+5. Create `crates/claudevs/examples/02_hook_decision_broken/tests/asks-for-secrets.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -502,7 +316,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      decision: ask
    ```
 
-8. Create `crates/claudevs/examples/02_hook_decision_broken/tests/allows-other-files.yaml`:
+6. Create `crates/claudevs/examples/02_hook_decision_broken/tests/allows-other-files.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -511,7 +325,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      output: none
    ```
 
-9. Run the example:
+7. Run the example:
 
    ```
    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/02_hook_decision_broken; echo "exit=$?"
@@ -545,35 +359,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit=1
    ```
 
-10. Run the lane and confirm green:
-
-    ```
-    $ cargo make claudevs-check
-    ```
-
-    Expected: zero exit; after the 01 line:
-
-    ```text
-    ok  crates/claudevs/examples/02_hook_decision_broken (FAIL test)
-    ```
-
-11. Prove the expectation can fail. In `crates/claudevs/examples/02_hook_decision_broken/hooks/protect-env.sh`, change `    exit 1` to `    exit 2`, then run the lane:
-
-    ```
-    $ cargo make claudevs-check
-    ```
-
-    Expected: non-zero exit, with on stderr the line below followed by a report ending `4 stages run, 0 failed, 0 skipped`:
-
-    ```text
-    claudevs check crates/claudevs/examples/02_hook_decision_broken: expected exit 1, got 0
-    ```
-
-    (With `exit 2` the script is Task 2's script, which step 10 of Task 2 shows ends at exit 0.)
-
-12. Restore the defect: change `    exit 2` back to `    exit 1`, then confirm with `grep -n 'exit 1' crates/claudevs/examples/02_hook_decision_broken/hooks/protect-env.sh`. Expected: `8:    exit 1`. Re-run `cargo make claudevs-check`; expected zero exit with the `(FAIL test)` line from step 10.
-
-13. Create `crates/claudevs/examples/02_hook_decision_broken/README.md`, pasting step 9's output (sources: `semantics.rs:104-115,128-131` for what reads as a decision; `suite.rs:38-47` for payload and handler printed only on a failing hook case; `check.rs:108-116` for both suite stages running the same cases):
+8. Create `crates/claudevs/examples/02_hook_decision_broken/README.md`, pasting step 7's output (sources: `semantics.rs:104-115,128-131` for what reads as a decision; `suite.rs:38-47` for payload and handler printed only on a failing hook case; `check.rs:108-116` for both suite stages running the same cases):
 
     ````markdown
     # 02 — Hook decision, broken
@@ -597,7 +383,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 9's output here, validate detail and cwd as …, without the exit= line>
+    <paste step 7's output here, validate detail and cwd as …, without the exit= line>
     ```
 
     The exit code is 1. A failing hook case prints the payload the hook received and the handler that
@@ -610,7 +396,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 4 — Add 03_session_context
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/03_session_context/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/03_session_context/hooks/hooks.json`
 - Create `crates/claudevs/examples/03_session_context/hooks/session-banner.sh`
@@ -622,20 +407,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_stage_fail crates/claudevs/examples/02_hook_decision_broken 1 test`, add:
-
-   ```sh
-   expect_no_fail crates/claudevs/examples/03_session_context 0
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/03_session_context: expected exit 0, got 2
-   claudevs: walk plugin `crates/claudevs/examples/03_session_context`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/03_session_context/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/03_session_context/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -646,7 +418,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/03_session_context/hooks/hooks.json`:
+2. Create `crates/claudevs/examples/03_session_context/hooks/hooks.json`:
 
    ```json
    {
@@ -661,7 +433,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/03_session_context/hooks/session-banner.sh`:
+3. Create `crates/claudevs/examples/03_session_context/hooks/session-banner.sh`:
 
    ```sh
    #!/bin/sh
@@ -669,7 +441,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    echo "session-banner: run the test suite before you commit"
    ```
 
-6. Create `crates/claudevs/examples/03_session_context/hooks/deploy-reminder.sh`:
+4. Create `crates/claudevs/examples/03_session_context/hooks/deploy-reminder.sh`:
 
    ```sh
    #!/bin/sh
@@ -683,7 +455,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-7. Create `crates/claudevs/examples/03_session_context/tests/session-start-injects-banner.yaml`:
+5. Create `crates/claudevs/examples/03_session_context/tests/session-start-injects-banner.yaml`:
 
    ```yaml
    event: SessionStart
@@ -691,7 +463,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      context_contains: run the test suite
    ```
 
-8. Create `crates/claudevs/examples/03_session_context/tests/deploy-prompt-gets-reminder.yaml`:
+6. Create `crates/claudevs/examples/03_session_context/tests/deploy-prompt-gets-reminder.yaml`:
 
    ```yaml
    event: UserPromptSubmit
@@ -701,7 +473,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      context_contains: change ticket
    ```
 
-9. Create `crates/claudevs/examples/03_session_context/tests/ordinary-prompt-stays-silent.yaml`:
+7. Create `crates/claudevs/examples/03_session_context/tests/ordinary-prompt-stays-silent.yaml`:
 
    ```yaml
    event: UserPromptSubmit
@@ -709,41 +481,35 @@ Expected outputs below come from runs of scratch copies of these files (identica
      output: none
    ```
 
-10. Run the example:
+8. Run the example:
 
-    ```
-    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/03_session_context; echo "exit=$?"
-    ```
+   ```
+   $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/03_session_context; echo "exit=$?"
+   ```
 
-    Expected:
+   Expected:
 
-    ```text
-      ok    validate
-            …
-      ok    wiring
-            0 errors, 0 warnings
-      ok    test
-              ok    deploy-prompt-gets-reminder
-              ok    ordinary-prompt-stays-silent
-              ok    session-start-injects-banner
-            3 passed, 0 failed (3 cases, 0 native suites)
-      ok    test --installed
-              ok    deploy-prompt-gets-reminder
-              ok    ordinary-prompt-stays-silent
-              ok    session-start-injects-banner
-            3 passed, 0 failed (3 cases, 0 native suites)
+   ```text
+     ok    validate
+           …
+     ok    wiring
+           0 errors, 0 warnings
+     ok    test
+             ok    deploy-prompt-gets-reminder
+             ok    ordinary-prompt-stays-silent
+             ok    session-start-injects-banner
+           3 passed, 0 failed (3 cases, 0 native suites)
+     ok    test --installed
+             ok    deploy-prompt-gets-reminder
+             ok    ordinary-prompt-stays-silent
+             ok    session-start-injects-banner
+           3 passed, 0 failed (3 cases, 0 native suites)
 
-    4 stages run, 0 failed, 0 skipped
-    exit=0
-    ```
+   4 stages run, 0 failed, 0 skipped
+   exit=0
+   ```
 
-11. Run `cargo make claudevs-check`. Expected: zero exit; after the 02 line:
-
-    ```text
-    ok  crates/claudevs/examples/03_session_context (exit 0, no stage failed)
-    ```
-
-12. Create `crates/claudevs/examples/03_session_context/README.md`, pasting step 10's output (sources: bare stdout is context on events the catalogue marks `stdout_is_context`, `semantics.rs:120-126`, true for `SessionStart` and `UserPromptSubmit` at `contract/event.rs:94,106`; `additionalContext`, `semantics.rs:116-119`; `output: none` fails on any emission, `verdict.rs:141-145`, and is refused outside hook cases, `model.rs:258-267`; default prompt `hello`, `payload.rs:28`):
+9. Create `crates/claudevs/examples/03_session_context/README.md`, pasting step 8's output (sources: bare stdout is context on events the catalogue marks `stdout_is_context`, `semantics.rs:120-126`, true for `SessionStart` and `UserPromptSubmit` at `contract/event.rs:94,106`; `additionalContext`, `semantics.rs:116-119`; `output: none` fails on any emission, `verdict.rs:141-145`, and is refused outside hook cases, `model.rs:258-267`; default prompt `hello`, `payload.rs:28`):
 
     ````markdown
     # 03 — Session context
@@ -771,7 +537,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 10's output here, validate detail as …, without the exit= line>
+    <paste step 8's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 0.
@@ -782,7 +548,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 5 — Add 04_script_and_flow
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/04_script_and_flow/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/04_script_and_flow/skills/notes/SKILL.md`
 - Create `crates/claudevs/examples/04_script_and_flow/scripts/greet.sh`
@@ -796,20 +561,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_no_fail crates/claudevs/examples/03_session_context 0`, add:
-
-   ```sh
-   expect_no_fail crates/claudevs/examples/04_script_and_flow 0
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/04_script_and_flow: expected exit 0, got 2
-   claudevs: walk plugin `crates/claudevs/examples/04_script_and_flow`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/04_script_and_flow/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/04_script_and_flow/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -820,7 +572,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/04_script_and_flow/skills/notes/SKILL.md`. The fenced commands name both scripts, which is what keeps the `invocations` checker from reporting them as referenced by nothing (`wiring/invocations.rs:131-147`):
+2. Create `crates/claudevs/examples/04_script_and_flow/skills/notes/SKILL.md`. The fenced commands name both scripts, which is what keeps the `invocations` checker from reporting them as referenced by nothing (`wiring/invocations.rs:131-147`):
 
    ````markdown
    ---
@@ -843,7 +595,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
       ```
    ````
 
-5. Create `crates/claudevs/examples/04_script_and_flow/scripts/greet.sh`:
+3. Create `crates/claudevs/examples/04_script_and_flow/scripts/greet.sh`:
 
    ```sh
    #!/bin/sh
@@ -851,7 +603,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    printf 'hello, %s\n' "${GREETING_NAME:?GREETING_NAME is required}"
    ```
 
-6. Create `crates/claudevs/examples/04_script_and_flow/scripts/new-note.sh`:
+4. Create `crates/claudevs/examples/04_script_and_flow/scripts/new-note.sh`:
 
    ```sh
    #!/bin/sh
@@ -867,7 +619,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    echo "created notes/$slug.md"
    ```
 
-7. Create `crates/claudevs/examples/04_script_and_flow/tests/greets-by-name.yaml`:
+5. Create `crates/claudevs/examples/04_script_and_flow/tests/greets-by-name.yaml`:
 
    ```yaml
    invocation:
@@ -879,7 +631,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      stdout_contains: hello, claudevs
    ```
 
-8. Create `crates/claudevs/examples/04_script_and_flow/tests/new-note-flow.yaml`:
+6. Create `crates/claudevs/examples/04_script_and_flow/tests/new-note-flow.yaml`:
 
    ```yaml
    project: notes-repo
@@ -900,13 +652,13 @@ Expected outputs below come from runs of scratch copies of these files (identica
        - notes/imported.md
    ```
 
-9. Create the empty marker `crates/claudevs/examples/04_script_and_flow/tests/fixtures/notes-repo/.gitinit`:
+7. Create the empty marker `crates/claudevs/examples/04_script_and_flow/tests/fixtures/notes-repo/.gitinit`:
 
    ```
    $ touch crates/claudevs/examples/04_script_and_flow/tests/fixtures/notes-repo/.gitinit
    ```
 
-10. Create `crates/claudevs/examples/04_script_and_flow/tests/fixtures/notes-repo/README.md`:
+8. Create `crates/claudevs/examples/04_script_and_flow/tests/fixtures/notes-repo/README.md`:
 
     ```markdown
     # Notes repository
@@ -914,13 +666,13 @@ Expected outputs below come from runs of scratch copies of these files (identica
     A fixture project. The `.gitinit` marker beside this file makes claudevs run `git init` in the copy.
     ```
 
-11. Create `crates/claudevs/examples/04_script_and_flow/tests/fixtures/imported-notes/notes/imported.md`:
+9. Create `crates/claudevs/examples/04_script_and_flow/tests/fixtures/imported-notes/notes/imported.md`:
 
     ```markdown
     # Imported note
     ```
 
-12. Run the example:
+10. Run the example:
 
     ```
     $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/04_script_and_flow; echo "exit=$?"
@@ -946,13 +698,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     exit=0
     ```
 
-13. Run `cargo make claudevs-check`. Expected: zero exit; after the 03 line:
-
-    ```text
-    ok  crates/claudevs/examples/04_script_and_flow (exit 0, no stage failed)
-    ```
-
-14. Create `crates/claudevs/examples/04_script_and_flow/README.md`, pasting step 12's output (sources: argv spawned directly, `harness/spawn.rs:3-5`; cwd is the case's temp project, `suite.rs:165-168,243-244`; environment `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR`, `harness/environment.rs`, plus `invocation.env`, `suite.rs:335-338`; `.gitinit` runs `git init` and one empty commit and is not copied, `harness/project.rs:3-5,115-131`; a step's `expect` gates the flow, `suite.rs:376-390`; top-level `expect` judged against the last step that ran, `suite.rs:397-398`; `files_exist` relative to the project, `verdict.rs:174-175`; `tests/fixtures/` is never searched for cases, `case/discover.rs:39,56-62`):
+11. Create `crates/claudevs/examples/04_script_and_flow/README.md`, pasting step 10's output (sources: argv spawned directly, `harness/spawn.rs:3-5`; cwd is the case's temp project, `suite.rs:165-168,243-244`; environment `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PROJECT_DIR`, `harness/environment.rs`, plus `invocation.env`, `suite.rs:335-338`; `.gitinit` runs `git init` and one empty commit and is not copied, `harness/project.rs:3-5,115-131`; a step's `expect` gates the flow, `suite.rs:376-390`; top-level `expect` judged against the last step that ran, `suite.rs:397-398`; `files_exist` relative to the project, `verdict.rs:174-175`; `tests/fixtures/` is never searched for cases, `case/discover.rs:39,56-62`):
 
     ````markdown
     # 04 — Script and flow
@@ -992,7 +738,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 12's output here, validate detail as …, without the exit= line>
+    <paste step 10's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 0.
@@ -1003,7 +749,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 6 — Add 05_lua_cases
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/05_lua_cases/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/05_lua_cases/hooks/hooks.json`
 - Create `crates/claudevs/examples/05_lua_cases/hooks/block-force-push.sh`
@@ -1015,20 +760,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_no_fail crates/claudevs/examples/04_script_and_flow 0`, add:
-
-   ```sh
-   expect_no_fail crates/claudevs/examples/05_lua_cases 0
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/05_lua_cases: expected exit 0, got 2
-   claudevs: walk plugin `crates/claudevs/examples/05_lua_cases`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/05_lua_cases/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/05_lua_cases/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -1039,7 +771,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/05_lua_cases/hooks/hooks.json`:
+2. Create `crates/claudevs/examples/05_lua_cases/hooks/hooks.json`:
 
    ```json
    {
@@ -1056,7 +788,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/05_lua_cases/hooks/block-force-push.sh`:
+3. Create `crates/claudevs/examples/05_lua_cases/hooks/block-force-push.sh`:
 
    ```sh
    #!/bin/sh
@@ -1071,7 +803,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-6. Create `crates/claudevs/examples/05_lua_cases/skills/release/SKILL.md`:
+4. Create `crates/claudevs/examples/05_lua_cases/skills/release/SKILL.md`:
 
    ````markdown
    ---
@@ -1088,7 +820,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
       ```
    ````
 
-7. Create `crates/claudevs/examples/05_lua_cases/scripts/version.sh`:
+5. Create `crates/claudevs/examples/05_lua_cases/scripts/version.sh`:
 
    ```sh
    #!/bin/sh
@@ -1096,7 +828,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json"
    ```
 
-8. Create `crates/claudevs/examples/05_lua_cases/tests/allows-plain-push.yaml`:
+6. Create `crates/claudevs/examples/05_lua_cases/tests/allows-plain-push.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -1109,7 +841,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      output: none
    ```
 
-9. Create `crates/claudevs/examples/05_lua_cases/tests/force_push_test.lua`:
+7. Create `crates/claudevs/examples/05_lua_cases/tests/force_push_test.lua`:
 
    ```lua
    -- Data cases generated from a table, then scripted cases that drive the
@@ -1150,72 +882,66 @@ Expected outputs below come from runs of scratch copies of these files (identica
    return cases
    ```
 
-10. Run the example:
+8. Run the example:
 
-    ```
-    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/05_lua_cases; echo "exit=$?"
-    ```
+   ```
+   $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/05_lua_cases; echo "exit=$?"
+   ```
 
-    Expected:
+   Expected:
 
-    ```text
-      ok    validate
-            …
-      ok    wiring
-            0 errors, 0 warnings
-      ok    test
-              ok    allows-plain-push
-              ok    blocks_force_push_long_flag
-              ok    blocks_force_push_short_flag
-              ok    plain_push_emits_nothing
-              ok    release_skill_prints_the_manifest_version
-            5 passed, 0 failed (5 cases, 0 native suites)
-      ok    test --installed
-              ok    allows-plain-push
-              ok    blocks_force_push_long_flag
-              ok    blocks_force_push_short_flag
-              ok    plain_push_emits_nothing
-              ok    release_skill_prints_the_manifest_version
-            5 passed, 0 failed (5 cases, 0 native suites)
+   ```text
+     ok    validate
+           …
+     ok    wiring
+           0 errors, 0 warnings
+     ok    test
+             ok    allows-plain-push
+             ok    blocks_force_push_long_flag
+             ok    blocks_force_push_short_flag
+             ok    plain_push_emits_nothing
+             ok    release_skill_prints_the_manifest_version
+           5 passed, 0 failed (5 cases, 0 native suites)
+     ok    test --installed
+             ok    allows-plain-push
+             ok    blocks_force_push_long_flag
+             ok    blocks_force_push_short_flag
+             ok    plain_push_emits_nothing
+             ok    release_skill_prints_the_manifest_version
+           5 passed, 0 failed (5 cases, 0 native suites)
 
-    4 stages run, 0 failed, 0 skipped
-    exit=0
-    ```
+   4 stages run, 0 failed, 0 skipped
+   exit=0
+   ```
 
-11. Capture the `migrate` output the README quotes:
+9. Capture the `migrate` output the README quotes:
 
-    ```
-    $ cargo run -q -p claudevs-cli -- migrate crates/claudevs/examples/05_lua_cases/tests/allows-plain-push.yaml; echo "exit=$?"
-    ```
+   ```
+   $ cargo run -q -p claudevs-cli -- migrate crates/claudevs/examples/05_lua_cases/tests/allows-plain-push.yaml; echo "exit=$?"
+   ```
 
-    Expected:
+   Expected:
 
-    ```text
-    return {
-      ["allows-plain-push"] = {
-        event = "PreToolUse",
-        expect = {
-          exit = 0,
-          output = "none",
-        },
-        payload = {
-          tool_input = {
-            command = "git push origin main",
-          },
-          tool_name = "Bash",
-        },
-      },
-    }
-    exit=0
-    ```
+   ```text
+   return {
+     ["allows-plain-push"] = {
+       event = "PreToolUse",
+       expect = {
+         exit = 0,
+         output = "none",
+       },
+       payload = {
+         tool_input = {
+           command = "git push origin main",
+         },
+         tool_name = "Bash",
+       },
+     },
+   }
+   exit=0
+   ```
 
-12. Run `cargo make claudevs-check`. Expected: zero exit; after the 04 line:
-
-    ```text
-    ok  crates/claudevs/examples/05_lua_cases (exit 0, no stage failed)
-    ```
-
-13. Create `crates/claudevs/examples/05_lua_cases/README.md`, pasting steps 10 and 11 (sources: table entries are data cases through the same path as YAML and function entries are scripted, `case/lua.rs:1-5,61-72`; case-file naming, `case/discover.rs:73-78`; case-name characters, `types/case_name.rs:6,24-28`; a scripted case passes by returning, `case/lua.rs:124-125` and `case/runner.rs:37-46`; `t` functions, `harness/t_module.rs:4-14`; confined Lua with zero grants while `t` runs host-side and `t.script` spawns any argv, `harness/t_module.rs:16-24`; `migrate --write` writes `<stem>_test.lua` with `-` turned into `_` and removes the YAML, `claudevs-cli/src/cli.rs:134-153`):
+10. Create `crates/claudevs/examples/05_lua_cases/README.md`, pasting steps 8 and 9 (sources: table entries are data cases through the same path as YAML and function entries are scripted, `case/lua.rs:1-5,61-72`; case-file naming, `case/discover.rs:73-78`; case-name characters, `types/case_name.rs:6,24-28`; a scripted case passes by returning, `case/lua.rs:124-125` and `case/runner.rs:37-46`; `t` functions, `harness/t_module.rs:4-14`; confined Lua with zero grants while `t` runs host-side and `t.script` spawns any argv, `harness/t_module.rs:16-24`; `migrate --write` writes `<stem>_test.lua` with `-` turned into `_` and removes the YAML, `claudevs-cli/src/cli.rs:134-153`):
 
     ````markdown
     # 05 — Lua cases
@@ -1254,7 +980,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
     ```console
     $ cargo run -q -p claudevs-cli -- migrate crates/claudevs/examples/05_lua_cases/tests/allows-plain-push.yaml
-    <paste step 11's output here, without the exit= line>
+    <paste step 9's output here, without the exit= line>
     ```
 
     `claudevs migrate --write` instead writes `allows_plain_push_test.lua` next to the YAML file and
@@ -1267,7 +993,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 10's output here, validate detail as …, without the exit= line>
+    <paste step 8's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 0.
@@ -1278,7 +1004,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 7 — Add 06_native_suite
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/06_native_suite/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/06_native_suite/claudevs.toml`
 - Create `crates/claudevs/examples/06_native_suite/hooks/hooks.json`
@@ -1289,20 +1014,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_no_fail crates/claudevs/examples/05_lua_cases 0`, add:
-
-   ```sh
-   expect_no_fail crates/claudevs/examples/06_native_suite 0
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/06_native_suite: expected exit 0, got 2
-   claudevs: walk plugin `crates/claudevs/examples/06_native_suite`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/06_native_suite/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/06_native_suite/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -1313,14 +1025,14 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/06_native_suite/claudevs.toml`:
+2. Create `crates/claudevs/examples/06_native_suite/claudevs.toml`:
 
    ```toml
    [[native]]
    run = "sh tests/native/syntax-check.sh"
    ```
 
-5. Create `crates/claudevs/examples/06_native_suite/hooks/hooks.json`:
+3. Create `crates/claudevs/examples/06_native_suite/hooks/hooks.json`:
 
    ```json
    {
@@ -1332,14 +1044,14 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-6. Create `crates/claudevs/examples/06_native_suite/hooks/session-banner.sh`:
+4. Create `crates/claudevs/examples/06_native_suite/hooks/session-banner.sh`:
 
    ```sh
    #!/bin/sh
    echo "session-banner: native suite example"
    ```
 
-7. Create `crates/claudevs/examples/06_native_suite/tests/native/syntax-check.sh`:
+5. Create `crates/claudevs/examples/06_native_suite/tests/native/syntax-check.sh`:
 
    ```sh
    #!/bin/sh
@@ -1355,7 +1067,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit $status
    ```
 
-8. Create `crates/claudevs/examples/06_native_suite/tests/session-banner.yaml`:
+6. Create `crates/claudevs/examples/06_native_suite/tests/session-banner.yaml`:
 
    ```yaml
    event: SessionStart
@@ -1363,7 +1075,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      context_contains: native suite example
    ```
 
-9. Run the example:
+7. Run the example:
 
    ```
    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/06_native_suite; echo "exit=$?"
@@ -1389,13 +1101,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit=0
    ```
 
-10. Run `cargo make claudevs-check`. Expected: zero exit; after the 05 line:
-
-    ```text
-    ok  crates/claudevs/examples/06_native_suite (exit 0, no stage failed)
-    ```
-
-11. Create `crates/claudevs/examples/06_native_suite/README.md`, pasting step 9's output (sources: `claudevs.toml` at the plugin root, `run` spawned with `sh -c` in the plugin directory, only the exit code asserted, `native/declared.rs:1-10,55`; `run` is the only accepted key, `native/declared.rs:35-47`; output printed only under a non-zero exit, `report/render.rs:157-168`; case-file naming, `case/discover.rs:73-78`; cases are discovered before native suites run and none found is an error, `suite.rs:90,129` and `case/discover.rs:48-52`, which `claudevs test` turns into exit 2, `claudevs-cli/src/cli.rs:123-126`):
+8. Create `crates/claudevs/examples/06_native_suite/README.md`, pasting step 7's output (sources: `claudevs.toml` at the plugin root, `run` spawned with `sh -c` in the plugin directory, only the exit code asserted, `native/declared.rs:1-10,55`; `run` is the only accepted key, `native/declared.rs:35-47`; output printed only under a non-zero exit, `report/render.rs:157-168`; case-file naming, `case/discover.rs:73-78`; cases are discovered before native suites run and none found is an error, `suite.rs:90,129` and `case/discover.rs:48-52`, which `claudevs test` turns into exit 2, `claudevs-cli/src/cli.rs:123-126`):
 
     ````markdown
     # 06 — Native suite
@@ -1426,7 +1132,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 9's output here, validate detail as …, without the exit= line>
+    <paste step 7's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 0.
@@ -1437,7 +1143,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 8 — Add 07_wiring_broken and prove its expectation can fail
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/07_wiring_broken/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/07_wiring_broken/hooks/hooks.json`
 - Create `crates/claudevs/examples/07_wiring_broken/hooks/session-banner.sh`
@@ -1447,20 +1152,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_no_fail crates/claudevs/examples/06_native_suite 0`, add:
-
-   ```sh
-   expect_stage_fail crates/claudevs/examples/07_wiring_broken 1 wiring
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/07_wiring_broken: expected exit 1, got 2
-   claudevs: walk plugin `crates/claudevs/examples/07_wiring_broken`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/07_wiring_broken/.claude-plugin/plugin.json`:
+1. Create `crates/claudevs/examples/07_wiring_broken/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -1471,7 +1163,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-4. Create `crates/claudevs/examples/07_wiring_broken/hooks/hooks.json`. The `format-on-write.sh` reference on line 9 is the defect:
+2. Create `crates/claudevs/examples/07_wiring_broken/hooks/hooks.json`. The `format-on-write.sh` reference on line 9 is the defect:
 
    ```json
    {
@@ -1489,14 +1181,14 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/07_wiring_broken/hooks/session-banner.sh`:
+3. Create `crates/claudevs/examples/07_wiring_broken/hooks/session-banner.sh`:
 
    ```sh
    #!/bin/sh
    echo "session-banner: wiring example"
    ```
 
-6. Create `crates/claudevs/examples/07_wiring_broken/hooks/format.sh`:
+4. Create `crates/claudevs/examples/07_wiring_broken/hooks/format.sh`:
 
    ```sh
    #!/bin/sh
@@ -1504,7 +1196,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-7. Create `crates/claudevs/examples/07_wiring_broken/tests/session-banner.yaml`:
+5. Create `crates/claudevs/examples/07_wiring_broken/tests/session-banner.yaml`:
 
    ```yaml
    event: SessionStart
@@ -1512,7 +1204,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
      context_contains: wiring example
    ```
 
-8. Run the example:
+6. Run the example:
 
    ```
    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/07_wiring_broken; echo "exit=$?"
@@ -1537,21 +1229,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit=1
    ```
 
-9. Run `cargo make claudevs-check`. Expected: zero exit; after the 06 line:
-
-   ```text
-   ok  crates/claudevs/examples/07_wiring_broken (FAIL wiring)
-   ```
-
-10. Prove the expectation can fail. In `crates/claudevs/examples/07_wiring_broken/hooks/hooks.json`, change `hooks/format-on-write.sh` to `hooks/format.sh`, then run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr the line below followed by a report ending `4 stages run, 0 failed, 0 skipped`:
-
-    ```text
-    claudevs check crates/claudevs/examples/07_wiring_broken: expected exit 1, got 0
-    ```
-
-11. Restore the defect: change `hooks/format.sh` back to `hooks/format-on-write.sh` in `hooks.json`. Confirm with `grep -n 'format-on-write' crates/claudevs/examples/07_wiring_broken/hooks/hooks.json`; expected one match on line 9. Re-run `cargo make claudevs-check`; expected zero exit with the `(FAIL wiring)` line from step 9.
-
-12. Create `crates/claudevs/examples/07_wiring_broken/README.md`, pasting step 8's output (sources: `refs` resolves `${CLAUDE_PLUGIN_ROOT}/…` references in the files Claude Code loads, `wiring/refs.rs:1-3,84-86` and `contract/site.rs:24-39`; a missing target is `Severity::Error` with this message, `wiring/refs.rs:99,121`; wiring runs nothing, `wiring/mod.rs:1`; a failed stage does not stop later stages, `check.rs:28`):
+7. Create `crates/claudevs/examples/07_wiring_broken/README.md`, pasting step 6's output (sources: `refs` resolves `${CLAUDE_PLUGIN_ROOT}/…` references in the files Claude Code loads, `wiring/refs.rs:1-3,84-86` and `contract/site.rs:24-39`; a missing target is `Severity::Error` with this message, `wiring/refs.rs:99,121`; wiring runs nothing, `wiring/mod.rs:1`; a failed stage does not stop later stages, `check.rs:28`):
 
     ````markdown
     # 07 — Wiring, broken
@@ -1575,7 +1253,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 8's output here, validate detail as …, without the exit= line>
+    <paste step 6's output here, validate detail as …, without the exit= line>
     ```
 
     The exit code is 1. Point the command at `hooks/format.sh` and the run ends at 0.
@@ -1586,7 +1264,6 @@ Expected outputs below come from runs of scratch copies of these files (identica
 ### Task 9 — Add 08_installed_broken and prove its expectation can fail
 
 **Files:**
-- Modify `Makefile.toml`
 - Create `crates/claudevs/examples/shared/policy-message.txt`
 - Create `crates/claudevs/examples/08_installed_broken/.claude-plugin/plugin.json`
 - Create `crates/claudevs/examples/08_installed_broken/hooks/hooks.json`
@@ -1596,26 +1273,13 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
 **Steps:**
 
-1. In `Makefile.toml`, after `expect_stage_fail crates/claudevs/examples/07_wiring_broken 1 wiring`, add:
-
-   ```sh
-   expect_stage_fail crates/claudevs/examples/08_installed_broken 1 "test --installed"
-   ```
-
-2. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr:
-
-   ```text
-   claudevs check crates/claudevs/examples/08_installed_broken: expected exit 1, got 2
-   claudevs: walk plugin `crates/claudevs/examples/08_installed_broken`: No such file or directory (os error 2)
-   ```
-
-3. Create `crates/claudevs/examples/shared/policy-message.txt`:
+1. Create `crates/claudevs/examples/shared/policy-message.txt`:
 
    ```text
    blocked-by-policy: recursive deletes are not allowed
    ```
 
-4. Create `crates/claudevs/examples/08_installed_broken/.claude-plugin/plugin.json`:
+2. Create `crates/claudevs/examples/08_installed_broken/.claude-plugin/plugin.json`:
 
    ```json
    {
@@ -1626,7 +1290,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-5. Create `crates/claudevs/examples/08_installed_broken/hooks/hooks.json`:
+3. Create `crates/claudevs/examples/08_installed_broken/hooks/hooks.json`:
 
    ```json
    {
@@ -1641,7 +1305,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    }
    ```
 
-6. Create `crates/claudevs/examples/08_installed_broken/hooks/block-rm-rf.sh`. The unbraced `$CLAUDE_PLUGIN_ROOT/../shared/…` on line 5 is the defect:
+4. Create `crates/claudevs/examples/08_installed_broken/hooks/block-rm-rf.sh`. The unbraced `$CLAUDE_PLUGIN_ROOT/../shared/…` on line 5 is the defect:
 
    ```sh
    #!/bin/sh
@@ -1658,7 +1322,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit 0
    ```
 
-7. Create `crates/claudevs/examples/08_installed_broken/tests/blocks-rm-rf.yaml`:
+5. Create `crates/claudevs/examples/08_installed_broken/tests/blocks-rm-rf.yaml`:
 
    ```yaml
    event: PreToolUse
@@ -1671,13 +1335,13 @@ Expected outputs below come from runs of scratch copies of these files (identica
      stderr_contains: blocked-by-policy
    ```
 
-8. Run the example:
+6. Run the example:
 
    ```
    $ cargo run -q -p claudevs-cli -- check crates/claudevs/examples/08_installed_broken; echo "exit=$?"
    ```
 
-   Expected (temp directories shown as `…`; on Linux the `cat:` wording comes from GNU coreutils and may differ, which the lane does not read):
+   Expected (temp directories shown as `…`; on Linux the `cat:` wording comes from GNU coreutils and may differ, which nothing here asserts):
 
    ```text
      ok    validate
@@ -1698,33 +1362,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
    exit=1
    ```
 
-9. Run `cargo make claudevs-check`. Expected: zero exit; after the 07 line:
-
-   ```text
-   ok  crates/claudevs/examples/08_installed_broken (FAIL test --installed)
-   ```
-
-10. Prove the expectation can fail. Move the message inside the plugin:
-
-    ```
-    $ cp crates/claudevs/examples/shared/policy-message.txt crates/claudevs/examples/08_installed_broken/policy-message.txt
-    ```
-
-    and in `hooks/block-rm-rf.sh` change `"$CLAUDE_PLUGIN_ROOT/../shared/policy-message.txt"` to `"$CLAUDE_PLUGIN_ROOT/policy-message.txt"`. Run `cargo make claudevs-check`. Expected: non-zero exit, with on stderr the line below followed by a report ending `4 stages run, 0 failed, 0 skipped`:
-
-    ```text
-    claudevs check crates/claudevs/examples/08_installed_broken: expected exit 1, got 0
-    ```
-
-11. Restore the defect:
-
-    ```
-    $ rm crates/claudevs/examples/08_installed_broken/policy-message.txt
-    ```
-
-    and change `"$CLAUDE_PLUGIN_ROOT/policy-message.txt"` back to `"$CLAUDE_PLUGIN_ROOT/../shared/policy-message.txt"`. Confirm with `grep -n 'shared/policy-message' crates/claudevs/examples/08_installed_broken/hooks/block-rm-rf.sh`; expected one match on line 5. Re-run `cargo make claudevs-check`; expected zero exit with the `(FAIL test --installed)` line from step 9.
-
-12. Create `crates/claudevs/examples/08_installed_broken/README.md`, pasting step 8's output (sources: the installed copy at `cache/<marketplace>/<plugin>/<version>/` with `CLAUDE_PLUGIN_ROOT` pointed at it, `layout/installed.rs:3-9,51-56` and `suite.rs:136-148`; only the plugin directory is copied, `layout/installed.rs:43-60`; `refs` matches only the braced form, `wiring/refs.rs:29-30`; exit 2 on `PreToolUse` reads as deny, `semantics.rs:128-131`):
+7. Create `crates/claudevs/examples/08_installed_broken/README.md`, pasting step 6's output (sources: the installed copy at `cache/<marketplace>/<plugin>/<version>/` with `CLAUDE_PLUGIN_ROOT` pointed at it, `layout/installed.rs:3-9,51-56` and `suite.rs:136-148`; only the plugin directory is copied, `layout/installed.rs:43-60`; `refs` matches only the braced form, `wiring/refs.rs:29-30`; exit 2 on `PreToolUse` reads as deny, `semantics.rs:128-131`):
 
     ````markdown
     # 08 — Installed layout, broken
@@ -1755,7 +1393,7 @@ Expected outputs below come from runs of scratch copies of these files (identica
     ```
 
     ```text
-    <paste step 8's output here, validate detail and temp paths as …, without the exit= line>
+    <paste step 6's output here, validate detail and temp paths as …, without the exit= line>
     ```
 
     The exit code is 1.
@@ -1763,7 +1401,200 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
     Replace the `<paste …>` line with the real output before saving.
 
-### Task 10 — Write the examples index
+### Task 10 — Build the example gate: crates/claudevs/tests/examples.rs
+
+**Files:**
+- Create `crates/claudevs/tests/examples.rs`
+
+**Steps:**
+
+1. Create `crates/claudevs/tests/examples.rs`:
+
+   ````rust
+   //! The example plugins under `crates/claudevs/examples/` do what their READMEs say.
+   //!
+   //! Each example is teaching material: its README shows a `claudevs check` run and quotes the
+   //! outcome. This test is what keeps that quote true. It runs the same pipeline the binary runs
+   //! and compares the typed stage outcomes against the expectation declared below, so a broken
+   //! example fails `cargo test` rather than being discovered by a reader.
+   //!
+   //! `validate` is excluded from every assertion: it delegates to the `claude` binary and skips
+   //! wherever that binary is absent, which is the documented degradation on CI. The three
+   //! deterministic stages — `wiring`, `test`, `test --installed` — must always have run, because
+   //! `claudevs check` turns three environment gaps into a skipped stage rather than a failure (no
+   //! case files, no marketplace above the plugin, no writable temp dir), and a skip is exactly how
+   //! an example stops exercising what its README documents while still exiting 0.
+
+   #![expect(
+       clippy::panic,
+       reason = "a failing example reports which stage diverged by panicking"
+   )]
+
+   use std::path::{Path, PathBuf};
+
+   use claudevs::check::{CheckReport, StageStatus};
+
+   /// What an example is supposed to do.
+   #[derive(Debug, Clone, Copy)]
+   enum Expectation {
+       /// Every deterministic stage ran and passed.
+       AllOk,
+       /// Every deterministic stage ran, and this one failed.
+       FailsAt(&'static str),
+   }
+
+   /// Every example, and the outcome its README documents.
+   ///
+   /// A new example directory with no row here fails the completeness test below, so this list
+   /// cannot silently fall behind `examples/`.
+   const EXAMPLES: &[(&str, Expectation)] = &[
+       ("01_hook_decision", Expectation::AllOk),
+       ("02_hook_decision_broken", Expectation::FailsAt("test")),
+       ("03_session_context", Expectation::AllOk),
+       ("04_script_and_flow", Expectation::AllOk),
+       ("05_lua_cases", Expectation::AllOk),
+       ("06_native_suite", Expectation::AllOk),
+       ("07_wiring_broken", Expectation::FailsAt("wiring")),
+       (
+           "08_installed_broken",
+           Expectation::FailsAt("test --installed"),
+       ),
+   ];
+
+   /// The stages that run on every machine, whether or not `claude` is installed.
+   const DETERMINISTIC: [&str; 3] = ["wiring", "test", "test --installed"];
+
+   fn examples_dir() -> PathBuf {
+       Path::new(env!("CARGO_MANIFEST_DIR")).join("examples")
+   }
+
+   fn stage<'report>(report: &'report CheckReport, name: &str) -> &'report claudevs::check::Stage {
+       report
+           .stages
+           .iter()
+           .find(|stage| stage.name == name)
+           .unwrap_or_else(|| {
+               panic!(
+                   "stage `{name}` is missing from the report entirely; stages present: {:?}",
+                   report.stages.iter().map(|s| s.name).collect::<Vec<_>>()
+               )
+           })
+   }
+
+   fn check(dir: &Path) -> CheckReport {
+       claudevs::check::run(dir, claudevs::Strictness::Lenient)
+           .unwrap_or_else(|error| panic!("claudevs check {}: {error}", dir.display()))
+   }
+
+   #[test]
+   fn every_example_produces_the_outcome_its_readme_documents() {
+       for (name, expectation) in EXAMPLES {
+           let dir = examples_dir().join(name);
+           assert!(dir.is_dir(), "{} is not a directory", dir.display());
+
+           let report = check(&dir);
+
+           for deterministic in DETERMINISTIC {
+               let stage = stage(&report, deterministic);
+               assert_ne!(
+                   stage.status,
+                   StageStatus::Skipped,
+                   "{name}: stage `{deterministic}` skipped, so the run its README quotes did not \
+                    happen: {}",
+                   stage.detail
+               );
+           }
+
+           match expectation {
+               Expectation::AllOk => {
+                   for deterministic in DETERMINISTIC {
+                       let stage = stage(&report, deterministic);
+                       assert_eq!(
+                           stage.status,
+                           StageStatus::Passed,
+                           "{name}: stage `{deterministic}` did not pass: {}",
+                           stage.detail
+                       );
+                   }
+               }
+               Expectation::FailsAt(expected) => {
+                   let stage = stage(&report, expected);
+                   assert_eq!(
+                       stage.status,
+                       StageStatus::Failed,
+                       "{name}: this example is broken on purpose and `{expected}` is the stage that \
+                        must report it, but it did not: {}",
+                       stage.detail
+                   );
+               }
+           }
+       }
+   }
+
+   #[test]
+   fn every_example_directory_is_covered_by_the_table() {
+       let dir = examples_dir();
+       let mut found: Vec<String> = std::fs::read_dir(&dir)
+           .unwrap_or_else(|error| panic!("read {}: {error}", dir.display()))
+           .filter_map(Result::ok)
+           .filter(|entry| entry.path().is_dir())
+           .map(|entry| entry.file_name().to_string_lossy().into_owned())
+           // The shared marketplace manifest is not an example.
+           .filter(|name| !name.starts_with('.'))
+           // `08_installed_broken` reads a file from this directory; it is not an example either.
+           .filter(|name| name != "shared")
+           .collect();
+       found.sort();
+
+       let mut declared: Vec<String> = EXAMPLES
+           .iter()
+           .map(|(name, _)| (*name).to_owned())
+           .collect();
+       declared.sort();
+
+       assert_eq!(
+           found, declared,
+           "every directory under examples/ needs a row in EXAMPLES, and every row needs a directory"
+       );
+   }
+   ````
+
+2. Prove it red. Move `crates/claudevs/examples/03_session_context/tests` aside (`$ mv crates/claudevs/examples/03_session_context/tests /tmp/aside`), then run:
+
+   ```
+   $ cargo test -p claudevs --test examples --all-features
+   ```
+
+   Expected: `every_example_directory_is_covered_by_the_table` passes, `every_example_produces_the_outcome_its_readme_documents` panics and fails:
+
+   ```text
+   thread 'every_example_produces_the_outcome_its_readme_documents' panicked at crates/claudevs/tests/examples.rs:86:13:
+   assertion `left != right` failed: 03_session_context: stage `test` skipped, so the run its README quotes did not happen: no case files found under `…/crates/claudevs/examples/03_session_context/tests` (cases are `*.yaml`, `*_test.lua` or `test_*.lua` in tests/)
+     left: Skipped
+    right: Skipped
+
+   test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+   ```
+
+   Restore `tests/` (`$ mv /tmp/aside crates/claudevs/examples/03_session_context/tests`).
+
+3. Run it green:
+
+   ```
+   $ cargo test -p claudevs --test examples --all-features
+   ```
+
+   Expected:
+
+   ```text
+   running 2 tests
+   test every_example_directory_is_covered_by_the_table ... ok
+   test every_example_produces_the_outcome_its_readme_documents ... ok
+
+   test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+   ```
+
+### Task 11 — Write the examples index
 
 **Files:**
 - Create `crates/claudevs/examples/README.md`
@@ -1797,8 +1628,8 @@ Expected outputs below come from runs of scratch copies of these files (identica
    | [`07_wiring_broken`](07_wiring_broken/README.md) | a `${CLAUDE_PLUGIN_ROOT}` reference to a file that does not exist | exit 1, `FAIL  wiring` |
    | [`08_installed_broken`](08_installed_broken/README.md) | a hook that works in this checkout and breaks once installed | exit 1, `FAIL  test --installed` |
 
-   `cargo make claudevs-check` runs `claudevs check` over every example and asserts the exit code and
-   the stage in the last column, so an example that stops matching its README fails the build.
+   `crates/claudevs/tests/examples.rs` runs `claudevs check` over every example and asserts the stage
+   in the last column, so an example that stops matching its README fails `cargo test`.
 
    ## Without a `claude` binary
 
@@ -1839,68 +1670,29 @@ Expected outputs below come from runs of scratch copies of these files (identica
    crates/claudevs/examples/08_installed_broken/README.md
    ```
 
-### Task 11 — Name the examples in the CI job and in CLAUDE.md
+### Task 12 — Withdrawn: no CI job or CLAUDE.md change
 
-**Files:**
-- Modify `.github/workflows/ci.yml`
-- Modify `CLAUDE.md`
+This task set out to rename the `claudevs-check` CI job to cover the examples and to have root
+`CLAUDE.md` describe the lane as testing both the fixture corpus and the example plugins. Both
+followed from Task 1's premise that the examples ride `cargo make claudevs-check`, which is withdrawn.
 
-**Steps:**
+`.github/workflows/ci.yml`'s `claudevs-check` job keeps its existing name; it still runs only the
+fixture corpus, unchanged by this chain. Root `CLAUDE.md` is not modified either — spec §5 already
+says so: "the lane still covers the fixture corpus and nothing else." The example gate
+(`crates/claudevs/tests/examples.rs`, Task 10) runs under the existing `cargo test --workspace
+--all-targets --all-features` Definition-of-Done step, which needs no new CI job to name it.
 
-1. In `.github/workflows/ci.yml` (`:65`), replace:
-
-   ```yaml
-       name: claudevs fixture corpus
-   ```
-
-   with:
-
-   ```yaml
-       name: claudevs fixtures and examples
-   ```
-
-   The job id `claudevs-check` (`:64`) stays, because the `dod` job's cache comment names it (`:44`).
-
-2. In `CLAUDE.md`, replace these lines (`:182-185`):
-
-   ```text
-   That same workflow carries two jobs the gate deliberately excludes. `cargo make claudevs-check` runs
-   `claudevs check` over the fixture plugin corpus in `crates/claudevs/tests/fixtures/` in both
-   directions — fixtures that must pass and fixtures that must fail at a named stage — because a corpus
-   of only-passing fixtures would go green the day the checkers stopped reporting. `cargo make deny`
-   ```
-
-   with:
-
-   ```text
-   That same workflow carries two jobs the gate deliberately excludes. `cargo make claudevs-check` runs
-   `claudevs check` over the fixture plugin corpus in `crates/claudevs/tests/fixtures/` and the example
-   plugins in `crates/claudevs/examples/`, in both directions — plugins that must pass and plugins that
-   must fail at a named stage — because a corpus of only-passing plugins would go green the day the
-   checkers stopped reporting. `cargo make deny`
-   ```
-
-3. Verify:
-
-   ```
-   $ grep -n 'claudevs fixtures and examples' .github/workflows/ci.yml
-   $ grep -n 'example$' CLAUDE.md
-   $ grep -n 'plugins in `crates/claudevs/examples/`' CLAUDE.md
-   ```
-
-   Expected: `65:    name: claudevs fixtures and examples`; `183:` ending in `and the example`; one match on line 184.
-
-### Task 12 — Verify the whole plan and hand off for commit
+### Task 13 — Verify the whole plan and hand off for commit
 
 **Steps:**
 
-1. Run the lane (it rebuilds the binary through `cargo run` as needed):
+1. Run the fixture lane, untouched by this plan, and confirm it still passes on its own:
 
    ```
    $ cargo make claudevs-check
    ```
 
-   Expected: zero exit, and these sixteen lines in this order:
+   Expected: zero exit, and these eight lines, naming only the fixtures:
 
    ```text
    ok  crates/claudevs/tests/fixtures/minimal-plugin (exit 0, no stage failed)
@@ -1911,14 +1703,22 @@ Expected outputs below come from runs of scratch copies of these files (identica
    ok  crates/claudevs/tests/fixtures/project-branch-plugin (exit 0, no stage failed)
    ok  crates/claudevs/tests/fixtures/exec-args-plugin (exit 0, no stage failed)
    ok  crates/claudevs/tests/fixtures/matcher-routing-plugin (FAIL test)
-   ok  crates/claudevs/examples/01_hook_decision (exit 0, no stage failed)
-   ok  crates/claudevs/examples/02_hook_decision_broken (FAIL test)
-   ok  crates/claudevs/examples/03_session_context (exit 0, no stage failed)
-   ok  crates/claudevs/examples/04_script_and_flow (exit 0, no stage failed)
-   ok  crates/claudevs/examples/05_lua_cases (exit 0, no stage failed)
-   ok  crates/claudevs/examples/06_native_suite (exit 0, no stage failed)
-   ok  crates/claudevs/examples/07_wiring_broken (FAIL wiring)
-   ok  crates/claudevs/examples/08_installed_broken (FAIL test --installed)
+   ```
+
+   Then run the example gate:
+
+   ```
+   $ cargo test -p claudevs --test examples --all-features
+   ```
+
+   Expected: zero exit, two tests passed:
+
+   ```text
+   running 2 tests
+   test every_example_directory_is_covered_by_the_table ... ok
+   test every_example_produces_the_outcome_its_readme_documents ... ok
+
+   test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
    ```
 
 2. Confirm the outcomes hold without `claude`, as on the CI runner. Run each of these separately:
@@ -1967,37 +1767,94 @@ Expected outputs below come from runs of scratch copies of these files (identica
 
    Expected: no output from any of the four, each exiting 1.
 
-5. Confirm the change set:
+5. Confirm the change set. This plan touches nothing outside `crates/claudevs/examples/` and
+   `crates/claudevs/tests/examples.rs`; `Makefile.toml`, `.github/workflows/ci.yml` and root
+   `CLAUDE.md` are untouched:
 
    ```
-   $ git status --short
+   $ git status --short crates/claudevs/examples crates/claudevs/tests/examples.rs Makefile.toml .github/workflows/ci.yml CLAUDE.md
    ```
 
-   Expected, besides the chain directory `.claudestacks/sdlc/2026-09-13-claudevs-docs/` if it is still uncommitted:
+   Expected — the last three print nothing, so only these two lines appear (other chains may leave
+   further uncommitted work elsewhere in the tree; this step does not check that):
 
    ```text
-    M .github/workflows/ci.yml
-    M CLAUDE.md
-    M Makefile.toml
    ?? crates/claudevs/examples/
+   ?? crates/claudevs/tests/examples.rs
    ```
 
 6. Hand the change to the user. Suggested message, if they commit it:
 
    ```text
-   feat(claudevs): add example plugins asserted by claudevs-check
+   feat(claudevs): add example plugins with a Rust test asserting their outcomes
 
    Eight example plugins under crates/claudevs/examples/, three broken on
-   purpose, each run by `cargo make claudevs-check` with its exit code and
-   stage asserted. The lane takes full plugin paths so fixtures and examples
-   share one set of assertions, and the CI job is renamed to match.
+   purpose, each with a README whose `claudevs check` output is asserted by
+   crates/claudevs/tests/examples.rs against the typed stage outcomes rather
+   than by grepping rendered text. The fixture corpus lane in Makefile.toml
+   is untouched.
    ```
 
 ---
 
 ## Verification summary (plan-level)
 
-- `cargo make claudevs-check` exits 0 with sixteen `ok  …` lines, and each broken example's expectation was seen failing with its defect removed (Tasks 3, 8, 9).
-- The same stage outcomes hold with `claude` absent from `PATH` (Task 12 step 2), which is the CI runner's environment (`ci.yml:88-89`).
-- No example is a Cargo target, and no Rust source or rustdoc changed, so the Definition of Done is unaffected.
+- `cargo make claudevs-check` exits 0 with the eight fixture `ok  …` lines, unchanged by this plan.
+- `cargo test -p claudevs --test examples --all-features` exits 0 with both tests passing, and was
+  proven red first by moving `03_session_context/tests` aside (Task 10).
+- The same per-example stage outcomes hold with `claude` absent from `PATH` (Task 13 step 2), which is
+  the CI runner's environment (`ci.yml:88-89`).
+- No example is a Cargo target; `crates/claudevs/tests/examples.rs` is new Rust source, so the
+  Definition of Done's `clippy`, `doc` and `test` steps all cover it.
 - Shipped READMEs and scripts carry no `file:line`, no banned vocabulary, and no unfilled paste markers.
+
+## Review findings
+
+- premise — the examples were merged into `cargo make claudevs-check`, the fixture corpus's pass/fail
+  lane; the two answer different questions, and the merge put the examples' correctness in shell —
+  `Makefile.toml`, withdrawn Task 1. Raised by the author. Fixed: the lane is byte-identical to its
+  committed state and the examples are verified from Rust.
+- blind spot — `expect_no_fail` could not distinguish a passing stage from a skipped one, so an
+  example could stop exercising the stage its README quotes while the lane stayed green.
+  Superseded by the finding above; `tests/examples.rs` now asserts it.
+- accuracy — `crates/claudevs/README.md` carried four claims the source contradicts, not the one the
+  intent named: matchers compiling via the `regex` crate, references resolving "anywhere in the
+  plugin", the dead-file exemption list, and `doctor` "never exits 2". All four corrected.
+- gap — no example covered `claudevs doctor`, so running it on a deliberately broken plugin reported
+  `0 gaps, 0 warnings` with no explanation anywhere. Fixed by `09_doctor_gaps` and a paragraph in
+  `docs/cli/reference.md`.
+
+## Probe results
+
+- Claim: the example gate can see a stage that stops running. Command:
+  `mv crates/claudevs/examples/03_session_context/tests ...-held` then
+  `cargo test -p claudevs --test examples`. Output:
+  "03_session_context: stage `test` skipped, so the run its README quotes did not happen".
+  Restored, 2 passed. The gate is proven red before green.
+- Claim (AGAINST the plan): `examples/.claude-plugin/marketplace.json` is what keeps `test --installed`
+  from skipping. Command: moved that directory aside and re-ran the lane. Output: it stayed green —
+  the lookup walks ancestors and finds the repo-root manifest (`claudestacks`) instead. What the
+  example manifest actually does is key the installed path as
+  `cache/claudevs-examples/<plugin>/<version>/`. Plan text corrected.
+- Claim: a skipped stage passes `expect_no_fail`. Command: same `tests/` move, then
+  `cargo make claudevs-check`. Output: `skip  test`, `skip  test --installed`,
+  `2 stages run, 0 failed, 2 skipped`, exit 0 — a pass. This is what withdrew Task 1.
+- Claim: hiding the `claude` binary produces a doctor gap. Command:
+  `env PATH=/usr/bin:/bin claudevs doctor crates/claudevs/examples/03_session_context`. Output:
+  "gap   claude binary: cannot run `claude`: No such file or directory (os error 2)",
+  `1 gap, 0 warnings`, exit 1. This is `09_doctor_gaps`'s `no-claude` scenario.
+
+## Deviations
+
+- 2026-09-18 — Task 1 and the CI/CLAUDE.md task withdrawn, `Makefile.toml` left untouched, and the
+  example gate moved to `crates/claudevs/tests/examples.rs`. Authorized by the author, who identified
+  the fixtures/examples merge as the error. Spec 4.1 rewritten and recorded in spec 8.
+- 2026-09-18 — a ninth example, `09_doctor_gaps`, added at the author's request after `doctor` reported
+  `0 gaps, 0 warnings` on `07_wiring_broken` and `08_installed_broken`. It carries
+  `scripts/simulate.sh`, a scenario runner the other examples have no equivalent of. Recorded in spec 8.
+- 2026-09-18 — Tasks 3, 8 and 9 keep the title "and prove its expectation can fail" but no longer carry
+  a per-example red-green step, because that step ran through the withdrawn lane. `tests/examples.rs`
+  proves the mechanism generically; per-example regression proof is not replaced and remains open.
+- 2026-09-18 — Tasks 3 through 13 ran as parallel agents against a fixed plan rather than in the plan's
+  batch order, to meet a same-day deadline. One combined review pass over Tasks 1 and 2 instead of one
+  per batch, since both edited `Makefile.toml`.

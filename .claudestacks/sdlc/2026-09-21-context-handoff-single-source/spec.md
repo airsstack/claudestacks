@@ -355,7 +355,10 @@ Given a file path it returns a list of violations, each a stable identifier plus
 
 | Check | Violation when |
 |---|---|
+| `unreadable` | the file could not be read for any reason but a confinement refusal |
+| `read-denied` | the read was refused by the confinement policy |
 | `frontmatter-missing` | the file does not open with a `---` block |
+| `frontmatter-unterminated` | the file opens with `---` but never closes the block |
 | `agent-missing` / `task-missing` | either required key is absent or empty |
 | `session-unexpected` / `seq-unexpected` | either key is present in a non-session-tier file |
 | `session-missing` / `seq-missing` | either key is absent in a session-tier file |
@@ -363,6 +366,21 @@ Given a file path it returns a list of violations, each a stable identifier plus
 | `summary-unclosed` / `detail-unclosed` | an open tag with no matching close |
 | `detail-repeated` | more than one `<detail>` pair |
 | `summary-empty` | the pair encloses only whitespace |
+
+The two read failures are separate identifiers because they send whoever reads them to different
+places: `read-denied` means the caller's grant does not cover the path, so the fix is the grant.
+It says nothing about whether the file exists — confinement is checked before the filesystem is
+touched, so a path outside the grant is refused whether or not anything is there (probed against
+`airsl` 0.1.2, 2026-09-21, including a path whose parent directory does not exist). `unreadable`
+is everything the runtime attempted and could not hand back — the file is absent, or is a
+directory, or the OS denied it, or its bytes are not UTF-8 — so the fix is the report. Collapsing them tells an agent with a misconfigured grant that its report is malformed.
+`unreadable` is deliberately the fallback: only a real confinement refusal is classified away from
+it, so a read failure nobody anticipated lands on the wider identifier rather than a false one. The runtime distinguishes them in the error text it returns —
+an absent file gives `No such file or directory (os error 2)`, a refusal gives
+`fs.read_lines denied: ... is outside the granted read roots` (probed against `airsl` 0.1.2,
+2026-09-21). `frontmatter-unterminated` is separate for the same reason: `frontmatter-missing`'s
+line is false of a file that does open with `---`, and that line is the reason text the hook hands
+back.
 
 **Tag detection anchors at both ends of the line** — a tag line is exactly `<summary>`,
 `</summary>`, `<detail>` or `</detail>` with no other content. This is the absorbed chain's rule
@@ -446,7 +464,10 @@ the thing, and the two session drivers already use it. `report:` (design, plan, 
 
 1. **The validator's own tests.** `scripts/handoff_report_test.lua` carries one fixture per
    violation identifier in §7 plus one clean report per tier in §4's table — session, exception,
-   `init`-refused — and asserts the exact identifier list. `cargo make plugins-test` runs it. Each
+   `init`-refused — and asserts the exact identifier list. `read-denied` is the one exception and
+   cannot have a fixture: the gate runs `airsl test` with `--allow-read /`, under which no path is
+   refused, so the suite exercises its classifier against the runtime's literal refusal text
+   instead of provoking a live denial. `cargo make plugins-test` runs it. Each
    fixture is written to fail first; a test whose red state was never seen proves nothing.
 2. **Anchoring is tested directly.** A fixture whose `<summary>` body discusses the strings
    `<summary>` and `<detail>` in prose must validate clean, and a fixture with

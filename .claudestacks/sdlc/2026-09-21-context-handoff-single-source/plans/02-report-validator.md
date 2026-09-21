@@ -598,8 +598,12 @@ created: 2026-09-21
    -- Rules live in `lib/handoff_report.lua`. Prose mirror:
    -- `skills/context-handoff/references/protocol.md`.
    --
-   --   airsl run --policy confined --allow-read . \
+   --   airsl run --policy confined --allow-read / \
    --     scripts/handoff_report.lua <path-to-report>
+   --
+   -- The read grant must cover the directory the report sits in. `--allow-read .` does not: an
+   -- exception-tier report is a literal temp path outside the tree, and the denial surfaces as
+   -- `unreadable`, which is indistinguishable from a malformed report.
    --
    -- Prints nothing and exits 0 when the report conforms; otherwise prints one line per violation
    -- to stdout and exits non-zero. Violations go to STDOUT rather than stderr because the hook
@@ -660,7 +664,7 @@ created: 2026-09-21
 
 ---
 
-### Task 8 — Re-anchor the two assertions the absorbed chain left broken
+### Task 8 — Re-anchor the assertions the absorbed chain left broken
 
 **Files:**
 - Modify `.claudestacks/sdlc/2026-08-25-sdlc-agent-tier/plans/01-foundations.md`
@@ -704,7 +708,12 @@ created: 2026-09-21
    The two outputs are then diffed against each other. If the existing step already has a
    report-side command, replace that one and only that one.
 
-4. Confirm neither plan still carries the unanchored count:
+4. `01-foundations.md` carries the same unanchored count a **third** time, at the
+   `chain-reader` step — the plan's Task 1 pointer named only `:562-566`. Re-anchor that one
+   the same way as step 2; step 4's assertion below covers the whole directory and fails
+   otherwise.
+
+5. Confirm neither plan still carries the unanchored count:
 
    ```
    $ grep -rn 'grep -c "<summary>' .claudestacks/sdlc/2026-08-25-sdlc-agent-tier/plans/
@@ -712,7 +721,7 @@ created: 2026-09-21
    exit=1
    ```
 
-5. Both plans are `status: approved` and stay so — this corrects an assertion, it does not
+6. Both plans are `status: approved` and stay so — this corrects an assertion, it does not
    redesign the plan. Commit `fix(repo): re-anchor the handoff assertions in the sdlc-agent-tier plans`.
 
 ---
@@ -754,7 +763,62 @@ created: 2026-09-21
    ```
 
    If the file count is 3, `handoff_report_test.lua` is not being discovered — check the name
-   matches `*_test.lua`.
+   matches `*_test.lua`. Task 10 adds four more assertions on top, taking this to 122 and the
+   whole tree to 313 — run this task again after it.
 
 4. Commit nothing — this task changes no files. If either command is red, the failure belongs to
    an earlier task in this plan and is fixed there.
+
+---
+
+### Task 10 — Report the two failures the schema table left conflated
+
+**Files:**
+- Modify `plugins/claudestacks/scripts/lib/handoff_report.lua`
+- Modify `plugins/claudestacks/scripts/handoff_report_test.lua`
+
+**Why this task exists:** review of Tasks 1–9 found the validator emitting a sentence that is false
+of its input, and one identifier covering two unrelated causes. `spec.md` §7's table was amended
+on 2026-09-21 to add the four rows this task implements; it is the authority, not this plan's
+earlier tasks. Both matter because plan `06`'s hook hands this text to an agent as the reason its
+report was blocked — a wrong reason sends it to hunt the wrong defect.
+
+**Steps:**
+
+1. Write the failing tests first and confirm each is red before touching the module:
+
+   - `an_absent_file_is_unreadable` — a path that does not exist yields `unreadable`.
+   - `a_denied_read_classifies_separately_from_an_absent_file` — the classifier, called directly on
+     the two real `airsl` error strings. The suite runs with `--allow-read /`, so a genuine
+     confinement refusal cannot be provoked from inside it; the classifier is tested against the
+     literal strings instead.
+   - `an_unterminated_frontmatter_is_not_reported_as_missing`
+   - `a_missing_frontmatter_is_not_reported_as_unterminated` — the control. Without it the third
+     test passes just as well against a module that reports everything as unterminated.
+
+2. Split the read failure. `M.check`'s `pcall(fs.read_lines, file)` classifies its error through a
+   new `M.classify_read_error`, which matches on `outside the granted read roots` — the phrase
+   specific to a confinement denial, probed against `airsl` 0.1.2 on 2026-09-21:
+
+   ```
+   fs.read_lines denied: `/private/etc/hosts` is outside the granted read roots: /private/tmp/claude-501
+   read_lines failed on `/private/tmp/claude-501/absent-file.md`: No such file or directory (os error 2)
+   ```
+
+   Match that phrase rather than the bare word `denied`, which an OS-level permission error could
+   carry without being a confinement decision. Anything unmatched stays `unreadable`.
+
+3. Give `M.frontmatter` a third return value so `M.check` can tell its two failures apart:
+   `"missing"` when line 1 is not `---`, `"unterminated"` when a block opened and the loop ran out
+   of lines. Report `frontmatter-unterminated` for the second, with a line that is true of it.
+
+4. Confirm green, and that the counts rose by exactly four:
+
+   ```
+   $ cargo make plugins-check
+   59 file(s) compiled, 0 failed
+   $ cargo make plugins-test
+   313 passed, 0 failed (17 files)
+   ```
+
+5. Commit `fix(repo): tell a denied read and an unterminated block from what they are not`.

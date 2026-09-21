@@ -106,6 +106,11 @@ source. `coder` writes with its `Write` tool. The read-only agents (`explorer`,
 writing the report is a first-class duty, distinct from mutating source, which they still
 must never do.
 
+The report is not a channel for editing anything else. An agent writes its own handoff file and
+no other file through it. A `coder` additionally writes source within its task scope, but that
+is its implementation duty, stated in its own definition — not part of this protocol and not a
+licence any other agent inherits.
+
 ## Session lifecycle (via handoff.lua)
 
 Applies only when a session is minted. A single-subagent flow taking the exception

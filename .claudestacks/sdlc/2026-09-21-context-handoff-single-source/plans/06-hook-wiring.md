@@ -228,14 +228,14 @@ depends-on: [02, 04, 05]
      FAIL  text_with_no_markdown_path_yields_nil
      FAIL  the_last_path_wins
 
-   19 passed, 6 failed (1 files)
+   23 passed, 6 failed (1 files)
    ```
 
 4. Add the function from step 1, run again, and confirm green:
 
    ```
    $ airsl test --allow-read "$TMPDIR" --allow-write "$TMPDIR" --allow-read . plugins/claudestacks/scripts/handoff_report_test.lua
-   25 passed, 0 failed (1 files)
+   29 passed, 0 failed (1 files)
    ```
 
 5. Commit `feat(repo): find a report path in an agent's return text, whatever its tier`.

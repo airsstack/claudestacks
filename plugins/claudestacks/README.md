@@ -35,6 +35,7 @@ Agents are leaves — they never spawn other agents. Chaining lives in `orchestr
 | Skill | Purpose |
 | --- | --- |
 | `orchestrate` | Drives `explorer → coder → reviewer → user` per task; routes findings through the orchestrator; the user is the only commit gate. |
+| `context-handoff` | The driver half of the subagent report protocol: which tier a run's reports land in, the session lifecycle, and the resolved protocol path to hand each spawn. Its `references/protocol.md` is the authority for the file schema and return contract. |
 | `process-guidelines` | Conventional Commits (workspace-aware scope), model-routing, and the agent-orchestration flow. |
 | `concise` | Verbosity-reduction mode (lite / full / ultra). Clean professional terseness that persists across the session. See [Attribution](#attribution). |
 | `snapshot-load` | Reads the project-local snapshot(s) and reports the rehydrated state. No-arg loads the current branch's latest; an explicit topic does a branch-agnostic topic search. |

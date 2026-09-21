@@ -76,7 +76,7 @@ airsl run --policy confined \
 5. Spawn the `journal-curator` subagent (Task / Agent tool,
    `subagent_type: journal-curator`), passing `scope`, the `vault` root, the
    `health_report` temp path, and the literal `${TMPDIR:-/tmp}/journal-curator-review.md`
-   from step 4 as the `handoff_path`. The curator applies its additive edits and
+   from step 4 as the `handoff`. The curator applies its additive edits and
    returns a one-line summary plus its handoff path.
 
 6. Rebuild the derived index so MOCs, typed edges, and new links take effect:

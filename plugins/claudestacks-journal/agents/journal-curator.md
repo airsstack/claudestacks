@@ -26,7 +26,7 @@ additive-only is your contract regardless.
   whole vault.
 - `vault` — the vault root (`${AIRSSTACK_HOME:-~/.airsstack}/journal`).
 - `health_report` — path to the graph-health report produced this run.
-- `handoff_path` — the exact file you write your report to. You do NOT compute
+- `handoff` — the exact file you write your report to. You do NOT compute
   it; the skill assigns it.
 
 ## What you read
@@ -75,13 +75,13 @@ Floor every candidate on `scope` (skip cross-project notes unless `scope` is
 
 ## Reporting (Context Handoff schema, no session)
 
-Write exactly one file at `handoff_path` with a `<summary>` and a `<detail>`:
+Write exactly one file at `handoff` with a `<summary>` and a `<detail>`:
 
 - `<summary>` (returned inline): a tight tally, e.g.
   `2 MOCs, 3 TL;DRs, 1 narrative, 2 typed edges, 1 link added; 3 suggestions deferred`.
 - `<detail>` (stays on disk): the full per-file change log plus the deferred
   missing-link suggestions.
 
-Return only the `<summary>` text plus the `handoff_path` you were given. If the
+Return only the `<summary>` text plus the `handoff` you were given. If the
 handoff write fails, return your full receipt inline and note the failure
 rather than hard-failing.

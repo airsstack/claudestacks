@@ -558,12 +558,16 @@ plugins/claudestacks-sdlc/README.md
 
 2. Confirm three things about what comes back:
    - it returned a `<summary>` plus the report path, **not** the full detail;
-   - the report file exists and contains both a `<summary>` and a `<detail>` tag:
+   - the report file conforms to the handoff protocol. Check it with the conformance checker
+     rather than counting tags — a count is a proxy, and the checker tests the schema directly:
 
      ```
-     $ grep -c "<summary>\|<detail>" "${TMPDIR:-/tmp}/claudestacks-sdlc-2026-08-25-sdlc-agent-tier-spec-01.md"
-     2
+     $ airsl run --policy confined --allow-read / \
+         plugins/claudestacks/scripts/handoff_report.lua \
+         "${TMPDIR:-/tmp}/claudestacks-sdlc-2026-08-25-sdlc-agent-tier-spec-01.md"
      ```
+
+     Expected: no output, exit 0. Every line it prints is one violation, by identifier.
 
    - the findings cite artifact sections (`spec.md §N`), not bare line numbers.
 
@@ -578,14 +582,16 @@ plugins/claudestacks-sdlc/README.md
    report: <TMPDIR>/claudestacks-sdlc-corpus-findings-01.md
    ```
 
-4. Confirm the extraction is verbatim and untransformed:
+4. Confirm the report conforms to the handoff protocol, using the conformance checker rather
+   than a tag count:
 
    ```
-   $ grep -c "<summary>\|<detail>" "${TMPDIR:-/tmp}/claudestacks-sdlc-corpus-findings-01.md"
-   2
+   $ airsl run --policy confined --allow-read / \
+       plugins/claudestacks/scripts/handoff_report.lua \
+       "${TMPDIR:-/tmp}/claudestacks-sdlc-corpus-findings-01.md"
    ```
 
-   Then read the `<detail>` and check it against the source by hand for one matched file:
+   Expected: no output, exit 0. Then read the `<detail>` and check it against the source by hand for one matched file:
 
    ```
    $ sed -n '/^## Review findings/,/^## /p' .claudestacks/sdlc/2026-08-24-sdlc-plugin/plans/03-workflow-skills.md

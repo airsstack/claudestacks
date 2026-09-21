@@ -1,7 +1,7 @@
 -- Context Handoff session manager for the claudestacks orchestration.
 --
 -- Single source of truth (code side) for the handoff tree path, the session liveness lease, and
--- pruning. Prose mirror: `skills/process-guidelines/references/context-handoff.md`. The two MUST
+-- pruning. Prose mirror: `skills/context-handoff/references/protocol.md`. The two MUST
 -- agree — change one, change the other.
 --
 -- Subcommands:

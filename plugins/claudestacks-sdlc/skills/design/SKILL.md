@@ -162,7 +162,7 @@ is visible.
    kind: spec
    draft: <chain>/spec.md
    authority: <chain>/intent.md
-   report: <TMPDIR>/claudestacks-sdlc-<chain>-spec-<NN>.md
+   handoff: <TMPDIR>/claudestacks-sdlc-<chain>-spec-<NN>.md
    ```
 
    Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent

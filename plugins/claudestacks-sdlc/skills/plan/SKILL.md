@@ -222,7 +222,7 @@ You wrote these plans, so you are the weakest available reader of them. Spawn
 kind: plan-set
 draft: <chain>/plans/NN-*.md      — every draft plan in the set
 authority: <chain>/spec.md        — or <chain>/intent.md on the spec-skip path
-report: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
+handoff: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
 ```
 
 Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives

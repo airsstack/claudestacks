@@ -29,7 +29,7 @@ do not substitute a checklist of your own.
 | `kind` | `spec` or `plan-set` |
 | `draft` | path(s) to the draft artifact(s) under review |
 | `authority` | `intent.md` for `kind: spec`; `spec.md`, or `intent.md` on the spec-skip path, for `kind: plan-set` |
-| `report` | the full write-path for your report |
+| `handoff` | the full write-path for your report |
 
 Read the authority in full before you read the draft. You are judging whether the draft
 answers what the authority asked for, and you cannot do that from the draft alone.

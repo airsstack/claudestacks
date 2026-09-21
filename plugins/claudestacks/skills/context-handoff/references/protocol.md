@@ -31,10 +31,9 @@ snapshot store, which uses the common-dir to *share* memory; handoff is ephemera
 ```markdown
 ---
 agent: reviewer
-session: 20260621-153012-a1b2
-seq: 03
-task: <one-line task description>
-created: 2026-06-21 15:31:40
+task: <one line — what this report is of>
+session: 20260621-153012-a1b2   # session-tier files only
+seq: 03                         # session-tier files only
 ---
 <summary>
 Returned to the main thread. The verdict / index — cheap, scannable. Always present.
@@ -47,6 +46,25 @@ or the main thread would need to operate on this work. Omitted when the report i
 
 `<summary>` is always written; `<detail>` is gated — omit it when the summary already
 says everything.
+
+`agent:` and `task:` are always present. `task:` is composed from the brief the agent already
+receives; no brief carries a field to supply it.
+
+`session:` and `seq:` are present exactly when the file sits under a minted session tree. The
+protocol has three tiers:
+
+| Tier | Path | `session:` / `seq:` |
+|---|---|---|
+| session tree | `<root>/.airsstack/cc/plugins/claudestacks/handoff/<sid>/` | present |
+| single-subagent exception (below) | a literal temp path | absent |
+| `init`-refused fallback (below) | `<session-scratch>/handoff/` | absent |
+
+The third tier keeps the `<NN>-<agent>-<slug>.md` naming but mints no session and writes no
+lease, so there is no session identifier to record. Classifying it with the exception rather
+than with the session tree is deliberate, and is what the validator's path test implements.
+
+There is no `created:` key. The file's own modification time carries it, and requiring one
+would oblige every writer agent to gain a clock for a value nothing consults.
 
 ### Exception: single-subagent flows may skip the session tree
 

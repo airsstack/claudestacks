@@ -185,9 +185,14 @@ created: 2026-09-21
    $ grep -rln "handoff:" plugins/ | wc -l
    ```
 
-   Before this plan that count is 7 (`execute/SKILL.md`, `orchestrate/SKILL.md`, `agents/coder.md`,
-   `agents/explorer.md`, `agents/reviewer.md`, `scripts/handoff.lua`, and the protocol reference).
-   After this plan it must be strictly greater, because four more files now carry the name. A count
+   Before this plan that count is 8 (`execute/SKILL.md`, `orchestrate/SKILL.md`, `agents/coder.md`,
+   `agents/explorer.md`, `agents/reviewer.md`, `scripts/handoff.lua`,
+   `skills/context-handoff/SKILL.md`, and the protocol reference). Plan `01` raised it from 7 to 8
+   by adding the driver skill, which carries the field name; this plan was written before `01`
+   landed. After this plan it must be strictly greater, and the measured value is 11: of the seven
+   files Tasks 2–4 touch, three gain a line matching `handoff:` with the colon
+   (`design/SKILL.md`, `plan/SKILL.md`, `distill/SKILL.md` — the spawn-brief lines). The other
+   four rename a bare `handoff_path` or a table cell, which this pattern does not match. A count
    that did not grow means the renames in Tasks 2–4 did not land.
 
 3. Commit nothing.

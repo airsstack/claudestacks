@@ -1,9 +1,18 @@
 ---
-status: approved
+status: dropped
 created: 2026-08-26
 ---
 
 # Intent: agent report shapes are specified twice and agree nowhere
+
+> **Dropped 2026-09-21 — absorbed by `2026-09-21-context-handoff-single-source`.** This
+> chain fixed two of the seven agents that restate the handoff contract, and its `spec.md`
+> §6 had to interpret the protocol's mandated frontmatter rather than settle it, recording
+> that an amendment to `context-handoff.md` "is its own chain" (`spec.md:190-192`). That
+> chain now exists and covers all seven agents, the protocol itself, and the six driver
+> skills. Nothing here is lost: this intent and its drafted spec are named inputs to the
+> successor, which carries forward the `## Report` contract, the §6 interpretation, and the
+> two plan-file corrections in §2.
 
 ## Problem
 

@@ -49,7 +49,7 @@ accumulates, while the answer stays a short table. Spawn
 ```
 glob: .claudestacks/sdlc/*/plans/*.md
 heading: ## Review findings
-report: <TMPDIR>/claudestacks-sdlc-corpus-findings-<NN>.md
+handoff: <TMPDIR>/claudestacks-sdlc-corpus-findings-<NN>.md
 ```
 
 Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives

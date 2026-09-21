@@ -65,7 +65,7 @@ answers and the caller acts on them differently.
 
 ## Context handoff
 
-Your brief gives you a report write-path. Write your report there as ONE file built from
+Your brief gives you a `handoff` write-path. Write your report there as ONE file built from
 two literal tags: `<summary>…</summary>` wrapping the cheap, scannable index — how many
 files the glob matched and how many carried the heading — and `<detail>…</detail>`
 wrapping the verbatim extraction itself. Return ONLY the `<summary>` plus that path, never

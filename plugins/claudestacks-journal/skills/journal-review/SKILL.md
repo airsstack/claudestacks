@@ -61,23 +61,16 @@ airsl run --policy confined \
   "${CLAUDE_PLUGIN_ROOT}/scripts/graph-health.lua" > "${TMPDIR:-/tmp}/journal-health.md"
    ```
 
-4. The curator's write-path is one literal temp file — no Context Handoff session:
+4. Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. This review
+   spawns exactly one subagent, so it takes a literal temp path and mints no session:
 
    `${TMPDIR:-/tmp}/journal-curator-review.md`
 
-   The handoff session tree's lease, heartbeat and pruning exist to stop
-   concurrent multi-agent pipelines from colliding over one directory; this
-   review spawns exactly one subagent and has nothing to collide with. Minting
-   a session would also mean running the sibling `claudestacks` plugin's
-   `handoff.lua`, whose install path carries that plugin's version — a value no
-   environment variable exposes, so any path spelled here would be wrong the
-   moment either plugin is bumped.
-
-5. Spawn the `journal-curator` subagent (Task / Agent tool,
-   `subagent_type: journal-curator`), passing `scope`, the `vault` root, the
-   `health_report` temp path, and the literal `${TMPDIR:-/tmp}/journal-curator-review.md`
-   from step 4 as the `handoff`. The curator applies its additive edits and
-   returns a one-line summary plus its handoff path.
+5. Spawn the `journal-curator` subagent (`subagent_type: journal-curator`), passing `scope`, the
+   `vault` root, the `health_report` temp path, the literal
+   `${TMPDIR:-/tmp}/journal-curator-review.md` from step 4 as `handoff`, and the protocol path
+   from step 4 as `handoff-protocol`. The curator applies its additive edits and returns a
+   one-line summary plus its handoff path.
 
 6. Rebuild the derived index so MOCs, typed edges, and new links take effect:
 

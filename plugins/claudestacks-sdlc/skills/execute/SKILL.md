@@ -93,26 +93,15 @@ of the plan approval already earned, not a new decision.
 
 ## Context handoff
 
-Subagent detail stays on disk; only summaries reach you. The protocol — file schema, return
-contract, retention — is the `claudestacks` plugin's
-`skills/process-guidelines/references/context-handoff.md`. Drive it:
+Subagent detail stays on disk; only summaries reach you. Invoke
+`/claudestacks:context-handoff` once at the top of the run and follow it — it owns the tier
+decision, which session calls to make, and the protocol path every brief carries.
 
-1. **Once, at the top of the run:** `handoff.lua init` (full invocation in that reference).
-   It prints the session dir and id, prunes stale sessions, and writes the `.active` lease.
-   Keep both values. If it is refused or fails, fall back as that reference's **When init
-   cannot run** says — `<session-scratch>/handoff/`, no lease, no prune — and record the
-   deviation in the plan's execution record.
-2. **Per spawn:** assign `<NN>-<agent>-<slug>.md` under the session dir and pass that **full
-   write-path** in the brief. Call `handoff.lua beat <session-dir>` so a long run is never
-   pruned by a concurrent session.
-3. **On return:** the agent gives you its `<summary>` plus the path. Route off the summary.
-   Open the `<detail>` only when you personally must judge it.
-4. **Downstream needs upstream detail:** pass the upstream `handoff:` path plus a targeted
-   `need:` pointer. The next agent reads its own slice; the detail never transits you.
-5. **At close:** `handoff.lua end <session-dir>`.
+This run holds several agents in flight at once, so it takes the session tier.
 
-This run holds several agents in flight at once, so it uses the session tree — the
-single-subagent exception in that reference does not apply here.
+What is local to you: the batching rules below, one handoff file per spawn, and never two
+concurrent coders on the same file. When a coder needs a task's verbatim text, pass the
+upstream `handoff:` path plus a `need:` pointer rather than paraphrasing it.
 
 ## The agents
 

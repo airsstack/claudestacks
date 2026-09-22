@@ -163,11 +163,12 @@ is visible.
    draft: <chain>/spec.md
    authority: <chain>/intent.md
    handoff: <TMPDIR>/claudestacks-sdlc-<chain>-spec-<NN>.md
+   handoff-protocol: <the path /claudestacks:context-handoff gave you>
    ```
 
-   Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent
-   receives its brief as literal text and runs no shell over it, so an unexpanded
-   variable would reach it as a filename. The report is always `01`.
+   Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. This flow
+   spawns exactly one subagent, so it takes a literal temp path and mints no session. Expand
+   `${TMPDIR:-/tmp}` yourself before the path enters the brief. The report is always `01`.
 
    **Exactly one review round. Never a second.** Fix the findings and go to the author.
    Do not re-spawn the reviewer over the revised draft, and do not spawn it again after

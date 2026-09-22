@@ -8,9 +8,28 @@ depends-on: [01, 03]
 
 **Goal:** Every driver reaches the handoff procedure by invoking the `context-handoff` skill instead of restating it.
 
-**Architecture:** Six skills across three plugins each carry their own account of the protocol — two describing the session lifecycle in full, four explaining independently why they skip it. Each is cut to an invocation of `/claudestacks:context-handoff` plus what is genuinely local: which spawns it makes, in what order, and where its reports land. This plan also owns the three references to the protocol's old path that plan `01` deliberately left behind, at `orchestrate/SKILL.md:107`, `:122` and `execute/SKILL.md:98`, because all three sit inside sections replaced here.
+**Architecture:** Six skills across three plugins each carry their own account of the protocol — two describing the session lifecycle in full, four explaining independently why they skip it. Each is cut to an invocation of `/claudestacks:context-handoff` plus what is genuinely local: which spawns it makes, in what order, and where its reports land. This plan also owns three of the eight references to the protocol's old path that plan `01` deliberately left behind — `orchestrate/SKILL.md:107`, `:122` and `execute/SKILL.md:98` — because those three sit inside sections replaced here. The other five sit in agent definitions and belong to plan `04`; see Task 7 step 4.
 
 **Tech Stack:** Markdown skill definitions.
+
+**Amended during execution, 2026-09-22.** This plan was corrected while being executed; the
+text below is the corrected text, not what was originally approved. Five changes, each measured
+against the tree rather than reasoned:
+
+- The Architecture paragraph and Task 7 step 4 both said plan `01` left three stale references to
+  the protocol's old path. It left eight; five are in agent definitions and belong to plan `04`,
+  so Task 7 step 4 passes only once both plans have landed.
+- Task 4 steps 1 and 3 put `design/SKILL.md`'s rationale paragraph at `:169-171`. It is `:168-170`;
+  following the original would have orphaned `:168`.
+- Task 4 step 5's pattern `an agent receives its brief as literal text` wraps across a line break
+  in both files, so it read `0` before the edit as well and proved nothing. Replaced with
+  `runs no shell over it`, which reads `1` in each file beforehand. Its predicted post-edit count
+  of `claudestacks:context-handoff` was `1`; it is `2`, because the replacement text carries that
+  substring twice.
+- Task 4's `plan-set` replacement block dropped `plan/SKILL.md`'s two inline annotations. They are
+  restored, with the reason the `authority:` one is behaviour rather than decoration.
+- Task 6 step 2 claimed the deleted versioned-install-path reasoning "is now the protocol's own".
+  It is not — it survives nowhere. Corrected to say it is dropped, and why dropping it is safe.
 
 ---
 
@@ -182,7 +201,7 @@ depends-on: [01, 03]
 **Steps:**
 
 1. In `design/SKILL.md`, confirm the two ranges. The brief block sits at `:161-166` **inside
-   numbered item 9, at a three-space indent**; the rationale paragraph follows at `:169-171`:
+   numbered item 9, at a three-space indent**; the rationale paragraph follows at `:168-170`:
 
    ```
    $ sed -n '159,171p' plugins/claudestacks-sdlc/skills/design/SKILL.md
@@ -199,7 +218,7 @@ depends-on: [01, 03]
       handoff-protocol: <the path /claudestacks:context-handoff gave you>
    ```
 
-3. Replace the rationale paragraph at `:169-171`, at the same indent:
+3. Replace the rationale paragraph at `:168-170`, at the same indent:
 
    ```markdown
       Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. This flow
@@ -216,11 +235,17 @@ depends-on: [01, 03]
 
    ```
    kind: plan-set
-   draft: <chain>/plans/NN-*.md
-   authority: <chain>/spec.md
+   draft: <chain>/plans/NN-*.md      — every draft plan in the set
+   authority: <chain>/spec.md        — or <chain>/intent.md on the spec-skip path
    handoff: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
    handoff-protocol: <the path /claudestacks:context-handoff gave you>
    ```
+
+   Both inline annotations are kept. The `authority:` one is behaviour, not decoration: this
+   skill's own state gate (`plan/SKILL.md:39-40`, `:46`) admits a chain whose intent carries
+   `spec: skipped` and which therefore has no `spec.md`, so a block naming only `spec.md` tells
+   the driver to cite a file that does not exist. Spec §6 authorizes collapsing the handoff
+   section and §9 the one new field; neither authorizes editing these.
 
    and the rationale, flush left:
 
@@ -231,16 +256,23 @@ depends-on: [01, 03]
    ```
 
 5. Confirm neither skill still argues the exception for itself, and that both now invoke the skill.
-   The pattern is a phrase each file carries today:
+   The pattern is a phrase each file carries today, on one line. It is not
+   `an agent receives its brief as literal text`: that phrase wraps across a line break in both
+   files, so `grep` reads `0` before the edit as well and would prove nothing.
 
    ```
-   $ grep -c "an agent receives its brief as literal text" plugins/claudestacks-sdlc/skills/design/SKILL.md plugins/claudestacks-sdlc/skills/plan/SKILL.md
+   $ grep -c "runs no shell over it" plugins/claudestacks-sdlc/skills/design/SKILL.md plugins/claudestacks-sdlc/skills/plan/SKILL.md
    plugins/claudestacks-sdlc/skills/design/SKILL.md:0
    plugins/claudestacks-sdlc/skills/plan/SKILL.md:0
    $ grep -c "claudestacks:context-handoff" plugins/claudestacks-sdlc/skills/design/SKILL.md plugins/claudestacks-sdlc/skills/plan/SKILL.md
-   plugins/claudestacks-sdlc/skills/design/SKILL.md:1
-   plugins/claudestacks-sdlc/skills/plan/SKILL.md:1
+   plugins/claudestacks-sdlc/skills/design/SKILL.md:2
+   plugins/claudestacks-sdlc/skills/plan/SKILL.md:2
    ```
+
+   Two, not one: the replacement text in steps 2 and 3 carries that substring twice — once inside
+   the `handoff-protocol: <the path /claudestacks:context-handoff gave you>` placeholder, once in
+   the `Invoke \`/claudestacks:context-handoff\`` sentence. `distill` reads `2` after Task 5 for the
+   same reason.
 
    Run the first command before the edits; both files return `1`.
 
@@ -313,8 +345,13 @@ depends-on: [01, 03]
    ```
 
 2. Replace step 4's body. The reasoning it carried — that a sibling plugin's path cannot be spelled
-   because its version is not exposed — is now the protocol's own, and the skill it invokes solves
-   the problem rather than working around it:
+   because its version is not exposed — is dropped, not relocated: `grep -rn "no environment
+   variable exposes\|carries that plugin's version" plugins/` returns nothing afterwards, and
+   `protocol.md` covers `${CLAUDE_PLUGIN_ROOT}` only against the worktree guard, which is a
+   different problem. Dropping it is safe here because its conclusion is what survives — this
+   skill takes a literal temp path and mints no session, so it never needs to name the sibling
+   plugin's `handoff.lua` at all. `context-handoff/SKILL.md` carries the nearest general statement,
+   that an agent in another plugin resolves the variable to its own plugin's root:
 
    ```markdown
    4. Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. This review
@@ -402,8 +439,11 @@ depends-on: [01, 03]
    A control against `git grep … HEAD` does **not** work here: no `SKILL.md` has ever carried this
    string, so such a control returns nothing and proves nothing.
 
-4. Confirm no reference to the protocol's old path survives anywhere in the tree, now that this
-   plan has cleared the three plan `01` left:
+4. Confirm no reference to the protocol's old path survives anywhere in the tree. Plan `01` left
+   eight references behind, not three: this plan clears the three in `orchestrate` and `execute`,
+   and plan `04` clears the five in `explorer.md`, `coder.md`, `reviewer.md`, `chain-reader.md`
+   and `artifact-reviewer.md` as it rewrites each stub's pointer. So this step passes only once
+   `04` has landed too — run it after both, not after this plan alone:
 
    ```
    $ grep -rn "references/context-handoff.md" plugins/

@@ -188,25 +188,10 @@ the policy and every suppression in `deny.toml`. It is its own job — invoking 
 directly, without cargo-make — because it compiles nothing and answers to a moving advisory
 database, so it can fail on a commit that changed nothing.
 
-A second pair answers the same question against plugins nobody here wrote. `cargo make corpus-fetch`
-clones the 13 pinned repositories in `crates/claudevs/tests/corpus/corpus.toml` into `target/corpus`
-— the only step in this repository that touches the network — and `cargo make corpus-check` sweeps
-every one of their 156 plugin roots, rendering one row per root. Neither joins `cargo make dod` or
-CI: the corpus is pinned by commit SHA rather than vendored, so `corpus-check` needs a prior
-`corpus-fetch` and cannot run on a bare checkout. Run both before a release. A repository that has
-since been deleted, made private, or force-pushed prints `UNFETCHABLE` to stderr, is skipped rather
-than failing the fetch outright, and has its slug recorded in `target/corpus/.unfetchable` — the
-record `corpus-check` consults so that repository's row can legitimately read `ABSENT` without
-failing the sweep. Any other absence — a repository the fetch never reached, or lost after a
-previous fetch — has no such record, and fails `corpus-check` instead of rendering as a quieter,
-shorter pass. Both lanes handle third-party code: `corpus-fetch` clones from 13 repositories nobody
-here controls and `corpus-check` runs `claudevs check` over what they ship. Today that stops short of
-executing it: no pinned repository ships a case file, established by searching the checkouts for
-`claudevs.toml`, `tests/*.yaml`, `tests/*.yml`, `_test.lua` and `test_*.lua` rather than read off the
-`test=Skipped` column, since `check.rs:164` also skips on a malformed marketplace or layout. A corpus
-plugin that did carry one would have its suite run, its
-Lua under `Policy::confined()` and any declared native suite through an unconfined shell. Repin only
-what you are willing to execute.
+The third-party corpus lanes — `cargo make corpus-fetch` and `cargo make corpus-check`, which run
+`claudevs check` over 156 plugin roots in 13 pinned repositories nobody here controls — are the
+`corpus-sweep` skill. Run both before a release; invoke that skill for how to read their rows and
+what repinning commits you to.
 
 The plugin suite has its own check for a different reason: `cargo make plugins` runs `airsl check`
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed

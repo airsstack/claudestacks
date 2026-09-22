@@ -67,6 +67,7 @@ Spawn `claudestacks-sdlc:task-briefer` in `ledger` mode:
 mode: ledger
 plan: <chain>/plans/NN-<topic>.md
 handoff: <session-dir>/01-task-briefer-ledger.md
+handoff-protocol: <the path /claudestacks:context-handoff gave you>
 ```
 
 It returns one row per task — number, title, files, verification commands — plus the goal,
@@ -154,6 +155,7 @@ For each batch, in order:
    plan: <chain>/plans/NN-<topic>.md
    task: <N>
    handoff: <session-dir>/<NN>-task-briefer-task<N>.md
+   handoff-protocol: <the path /claudestacks:context-handoff gave you>
    ```
 
    You get back each task's files, verifications, and Asserted facts. You do not get the
@@ -164,6 +166,7 @@ For each batch, in order:
 
 4. **Implement.** Spawn one `coder` per task, concurrently. Each brief carries:
    - `handoff: <session-dir>/<NN>-coder-<slug>.md` — its own report path;
+   - `handoff-protocol: <the path /claudestacks:context-handoff gave you>` — the protocol;
    - `need: <the task-briefer handoff path>` — it reads its task's verbatim `<detail>`
      itself, and builds from that text, not from your paraphrase;
    - the stack guideline to load (e.g. `claudestacks-guideline-rust:rust-guidelines`) and

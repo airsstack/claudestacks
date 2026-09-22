@@ -12,6 +12,23 @@ depends-on: [01, 03]
 
 **Tech Stack:** Markdown agent definitions.
 
+**Amended during execution, 2026-09-22.** This plan was corrected while being executed; the
+text below is the corrected text, not what was originally approved. Five changes, each measured
+against the tree rather than reasoned:
+
+- Task 2 step 3's md5 comparison was replaced. The original `sed -n` script issued no `p`, so it
+  emitted zero bytes for every file and the three "equal" hashes were all `md5("")` — it reported
+  success whatever the files held.
+- Task 2 step 4 named two different sections for one insertion. Resolved to `## Boundaries`.
+- Task 5's `<summary>` and `<detail>` templates omitted three behavioural rules the old
+  `## Output` carried — the two zero-case rules, `in glob order`, and the `<summary>`'s glob echo.
+  All three are now in the block, with their destinations cited. They were lost in the tree first
+  and restored in the fix round.
+- Task 6's `<detail>` template is unchanged, and spec §5.3 was amended instead to authorize the
+  section-per-tier shape. The author took that decision; see §5.3's exception paragraphs.
+- Task 7 step 3's second `grep` pattern was shortened to `path in your`. The stub wraps after that
+  word, so `path in your brief` spans a line break and matched none of the four files.
+
 ---
 
 ### Task 1 — Convert `explorer`, and fix the clause that does not belong to it
@@ -85,17 +102,28 @@ Do not start Task 2 until the author says continue.
 
 2. Replace `reviewer.md` lines `106-117` with the same eight lines.
 
-3. Confirm all three `claudestacks` agents now carry identical stub bodies. Strip the heading and
-   compare:
+3. Confirm all three `claudestacks` agents now carry identical stub bodies. Extract the body and
+   hash it — the same extraction Task 7 step 1 uses, because it is the one that emits anything:
 
    ```
    $ for f in coder explorer reviewer; do
-       sed -n '/^## Context handoff$/,/^$/!d;/^## Context handoff$/d' plugins/claudestacks/agents/$f.md | md5
+       sed -n '/^When your brief gives you a handoff write-path/,/Full protocol:/p' plugins/claudestacks/agents/$f.md | sed '$d' | md5
      done
    ```
 
-   All three hashes must be equal. They were byte-identical before this plan and must stay so —
-   what changed is that the shared text no longer contains a rule belonging to one of them.
+   All three hashes must be equal, over a non-empty extraction — confirm the byte count first:
+
+   ```
+   $ sed -n '/^When your brief gives you a handoff write-path/,/Full protocol:/p' plugins/claudestacks/agents/explorer.md | sed '$d' | wc -c
+        377
+   ```
+
+   Do **not** use `sed -n '/^## Context handoff$/,/^$/!d;/^## Context handoff$/d'` for this. Under
+   `-n` that script issues no `p`, so it emits zero bytes for every file and the three "equal"
+   hashes are all `md5("")`. It reports success whatever the files contain.
+
+   They were byte-identical before this plan and must stay so — what changed is that the shared
+   text no longer contains a rule belonging to one of them.
 
 4. The coder's source-writing latitude lived **only** inside the block just deleted
    (`coder.md:101`), so after step 1 it is gone from this file. It is an implementation duty, not a
@@ -103,8 +131,10 @@ Do not start Task 2 until the author says continue.
    `protocol.md`; state it here too, in the coder's own scope terms, because a coder must not have
    to open the protocol to learn what it may write.
 
-   Add to `coder.md`'s existing scope section — the one that already bounds what the agent may
-   touch, immediately before `## Context handoff`:
+   Add it to `## Boundaries` (`:68-75`), as a new final bullet with these two sentences as the
+   bullet's text. That is the section which already bounds what the agent may touch. The section
+   sitting immediately before `## Context handoff` is `## Security` (`:90-92`), which is not a
+   scope section and is not where this goes:
 
    ```markdown
    Your handoff report is one file and is not a channel for editing anything else. Source files
@@ -247,7 +277,17 @@ Do not start Task 2 until the author says continue.
    contract survives an unread pointer, then pins the two shapes. The `<detail>` template
    reproduces extracted text byte for byte — no indent, because the two-space indent the old
    `## Output` used silently drops the blank line between a heading and its first body line, which
-   is a layout rule editing content:
+   is a layout rule editing content.
+
+   Three things in the old `## Output` are behaviour, not layout, and the block below carries each
+   one. The two zero-case rules sit immediately after the `<summary>` template, unchanged in
+   wording, which is the destination `2026-08-26-agent-report-shape/spec.md:105-110` names. `in
+   glob order` stays in the `<detail>` prose — output ordering is the whole product of an agent
+   whose job is an ordered extraction, and the `<summary>` counts give a consumer no way to detect
+   a reordering. The `<summary>` keeps the glob echo the carried-over template at that source's
+   `:82` states, because the counts mean nothing without the pattern that produced them. Dropping
+   any of the three breaches spec §5.3's carried-forward guarantee that no rule in either file is
+   lost:
 
    ````markdown
    ## Report
@@ -263,16 +303,20 @@ Do not start Task 2 until the author says continue.
    holds what, and error handling come from the protocol; do not restate them here or anywhere
    else in this definition.
 
-   Your `<summary>` is the index and nothing else — how many files the glob matched, and how many
-   carried the heading:
+   Your `<summary>` is the index and nothing else — the glob, how many files it matched, and how
+   many carried the heading:
 
    ```
-   matched 12 files; 7 carried `## Review findings`
+   Glob <glob> matched <N> files; <M> carried <heading>.
    ```
 
-   Your `<detail>` is the extraction itself. One `### <path>` heading per file, then that file's
-   section reproduced byte for byte — every interior blank line, every indent, exactly as it
-   appears in the source. No separator, no commentary, no summary line:
+   If the glob matches files but none carries the heading, say so in one line and list
+   nothing. If the glob matches no files at all, say that instead — those are different
+   answers and the caller acts on them differently.
+
+   Your `<detail>` is the extraction itself. One `### <path>` heading per file, in glob order, then
+   that file's section reproduced byte for byte — every interior blank line, every indent, exactly
+   as it appears in the source. No separator, no commentary, no summary line:
 
    ```
    ### .claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-retry-core.md
@@ -463,14 +507,15 @@ Do not start Task 2 until the author says continue.
    ```
 
 3. Confirm the two pointer forms are used exactly where they belong — three in-plugin, four by
-   brief field:
+   brief field. The second pattern stops at `path in your`: the stub wraps after that word, so
+   `path in your brief` spans a line break and `grep` would return nothing for all four files:
 
    ```
    $ grep -rl "CLAUDE_PLUGIN_ROOT}/skills/context-handoff/references/protocol.md" plugins/*/agents/ | sort
    plugins/claudestacks/agents/coder.md
    plugins/claudestacks/agents/explorer.md
    plugins/claudestacks/agents/reviewer.md
-   $ grep -rl "the \`handoff-protocol:\` path in your brief" plugins/*/agents/ | sort
+   $ grep -rl "the \`handoff-protocol:\` path in your" plugins/*/agents/ | sort
    plugins/claudestacks-journal/agents/journal-curator.md
    plugins/claudestacks-sdlc/agents/artifact-reviewer.md
    plugins/claudestacks-sdlc/agents/chain-reader.md

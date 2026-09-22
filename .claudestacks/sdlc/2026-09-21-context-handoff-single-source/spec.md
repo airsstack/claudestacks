@@ -304,17 +304,60 @@ layout and have no home in a template, so each is routed by name:
 | Rule at | Destination |
 |---|---|
 | `:67-69` the verdict line states the blocking set exactly, its count or `none` | `## Report`, as a sentence governing the `<summary>` template |
-| `:69-71` 🟡 and 🔵 under `none` blocking is a normal, passing review | the agent's existing `## What you HARD-REFUSE` neighbourhood, as a reporting rule |
+| `:69-71` 🟡 and 🔵 under `none` blocking is a normal, passing review | a `## Reporting discipline` section of its own, immediately after `## Report` |
 | `:73-75` clean draft → say so in one line; never invent findings; never inflate a nit | the same |
+
+The destination for those last two was originally "the agent's existing `## What you HARD-REFUSE`
+neighbourhood". That section sits 52 lines away from `## Report` and refuses *requests*, while
+these rules govern *how the agent reports*; splitting them across the file put a reporting rule
+where a reader looks for a refusal. They get a section of their own instead, adjacent to the
+templates they qualify.
 
 `chain-reader`'s surviving behavioural rules are routed the same way; its `<detail>` template must
 preserve extracted text byte-for-byte including interior blank lines, and the current two-space
 indent in its `## Output` block does not, so that indent is dropped rather than carried over.
 
-**The templates themselves are carried over, not reinvented.** They are written out in
-`2026-08-26-agent-report-shape/spec.md` §4 (`:77-110`) for `chain-reader` and §5 (`:111-143`) for
-`artifact-reviewer`. A plan implementing this section takes them from there, adjusted only for
-§4's frontmatter.
+**The templates themselves are carried over, not reinvented — with one exception, below.** They
+are written out in `2026-08-26-agent-report-shape/spec.md` §4 (`:77-110`) for `chain-reader` and
+§5 (`:111-143`) for `artifact-reviewer`. A plan implementing this section takes them from there,
+adjusted only for §4's frontmatter.
+
+**Exception — `artifact-reviewer`'s `<detail>` is section-per-tier, not one line per finding.**
+The carried-over template at `2026-08-26-agent-report-shape/spec.md:120-128` gives `<detail>` as
+one line per finding in the form `<artifact> §<S>: 🔴 blocking: <one line>`, and `:130-135` names
+the sole reason: "One line per finding is what makes two rounds of the same review diffable.
+Step 8 of `design` re-runs this agent over a revised draft with an incremented `<NN>`." That
+premise is false and was already false when this spec was written. `design/SKILL.md:173` reads
+"**Exactly one review round. Never a second.**" and `plan/SKILL.md:233` reads "**Exactly one
+review round over the set. Never a second.**"; both also fix the report at `01`, so no second
+report exists to diff against. With nothing diffing round N against round N+1, the one-line
+constraint costs the rationale that bought it and buys the reader nothing.
+
+So `<detail>` carries a `## 🔴 Blocking` / `## 🟡 Risk` / `## 🔵 Nit` section per tier, each finding
+a bold one-line claim followed by its rationale and the citation that settles it. A finding still
+carries its artifact section, and every tier is still reported — those are content rules from the
+table above and they are unaffected.
+
+Three tiers, not four. The ❓ question tier the carried-over template lists has never existed in
+`artifact-reviewer.md` — it is absent at `1961a61` as it is today — and the `<summary>` verdict
+line it must agree with, `SPEC: <B> blocking, <R> risk, <N> nit`, names three. Adding a fourth
+tier is its own change with its own reason; this spec does not make it.
+
+**Second exception — `chain-reader`'s `<detail>` uses a `### <path>` heading per file.** The
+carried-over template at `2026-08-26-agent-report-shape/spec.md:85-92` opens each block with a
+bare `<path>` line and separates blocks by a single blank line. A bare path adjacent to verbatim
+extracted text is indistinguishable from that text; a `### ` heading is not, and it makes the
+report navigable in the editor the caller reads it in. This section already drops that template's
+two-space indent for a related reason — a layout rule must not edit the extracted bytes — and the
+heading form is the same trade taken at the block boundary. The separator goes with it: a heading
+already bounds each block, so the blank-line rule is replaced by "no separator".
+
+Everything else in both templates is carried over as written, including `chain-reader`'s
+`<summary>` line `Glob <glob> matched <N> files; <M> carried <heading>.` — the glob echo is part
+of the index, because the counts mean nothing without the pattern that produced them.
+
+These exceptions are recorded here rather than left in a commit body because plan `06` is approved
+and depends on `04`: whoever executes it reads this section, not the commit that corrected it.
 
 ## 6. The `claudestacks:context-handoff` skill
 

@@ -38,23 +38,43 @@ holds the user's dialogue. If asked to:
 reply exactly: `Out of scope — I extract, I don't interpret. The calling skill does that.`
 and stop.
 
-## Output (compact, no preamble, no prose)
+## Report
 
-One block per match, in glob order, separated by a blank line:
+When your brief gives you a handoff write-path, write ONE file there: `<summary>…</summary>`
+wrapping what the orchestrator routes on, `<detail>…</detail>` wrapping the heavy material,
+omitted when there is none. Return ONLY the `<summary>` plus that path, never the `<detail>`.
+Write no file but that one through this channel. If no path is given, or the write fails (say
+so), return your full receipt inline. Full protocol: the `handoff-protocol:` path in your
+brief. If the brief carries none, follow this section and note that you had no protocol path.
+
+This section is the only place your file's shape is described. Frontmatter keys, which tag
+holds what, and error handling come from the protocol; do not restate them here or anywhere
+else in this definition.
+
+Your `<summary>` is the index and nothing else — the glob, how many files it matched, and how
+many carried the heading:
 
 ```
-.claudestacks/sdlc/2026-08-24-sdlc-plugin/plans/03-workflow-skills.md
-  ## Review findings
-  <verbatim content beneath the heading>
-
-.claudestacks/sdlc/2026-07-10-auth-token/plans/02-refresh.md
-  ## Review findings
-  <verbatim content beneath the heading>
+Glob <glob> matched <N> files; <M> carried <heading>.
 ```
 
 If the glob matches files but none carries the heading, say so in one line and list
 nothing. If the glob matches no files at all, say that instead — those are different
 answers and the caller acts on them differently.
+
+Your `<detail>` is the extraction itself. One `### <path>` heading per file, in glob order, then
+that file's section reproduced byte for byte — every interior blank line, every indent, exactly
+as it appears in the source. No separator, no commentary, no summary line:
+
+```
+### .claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-retry-core.md
+
+<the extracted section, verbatim>
+
+### .claudestacks/sdlc/2026-08-24-webhook-reliability/plans/02-dlq.md
+
+<the extracted section, verbatim>
+```
 
 ## Boundaries
 
@@ -62,13 +82,3 @@ answers and the caller acts on them differently.
   file alone. You never modify a file you were pointed at.
 - You never flip an artifact `status` and you never run `git commit`.
 - You are a leaf: you have no `Agent` tool; do not attempt to spawn agents.
-
-## Context handoff
-
-Your brief gives you a `handoff` write-path. Write your report there as ONE file built from
-two literal tags: `<summary>…</summary>` wrapping the cheap, scannable index — how many
-files the glob matched and how many carried the heading — and `<detail>…</detail>`
-wrapping the verbatim extraction itself. Return ONLY the `<summary>` plus that path, never
-the `<detail>`. Write ONLY that one file. If no path is given, or the write fails (say so),
-return the full extraction inline. The full protocol is the `claudestacks` plugin's
-`skills/process-guidelines/references/context-handoff.md`.

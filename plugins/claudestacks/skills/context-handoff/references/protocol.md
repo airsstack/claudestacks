@@ -185,3 +185,21 @@ never pruned, and a crashed one self-heals after the grace window. Pruning runs 
   the orchestrator re-supplies inline or re-routes.
 - No handoff path in the brief (agent run standalone) → the agent returns its receipt
   inline, exactly as without this protocol. Backward-compatible.
+
+## What enforces this
+
+The file schema above is not model obedience. `scripts/lib/handoff_report.lua` is the
+validator: given a report file it returns every way that file violates the schema, each as
+a stable identifier plus one line of prose. `scripts/handoff_report.lua` runs it over a
+path from the command line; the `claudestacks` plugin registers it as a hook on three
+events, so a non-conforming report is caught as it is written and again before it reaches
+the orchestrator, rather than when a reader happens to notice.
+
+A report cited by a path that is not under a handoff root — the session tree above, or the
+temp root the exception and `init`-refused tiers use — is not checked, and an agent that
+states no such path at all is never held. That is the standalone case this file's error
+handling already guarantees, and the enforcement must not take it away.
+
+The validator is the single implementation of these rules. When this file and the
+validator disagree, that is a defect in one of them to be reconciled, not a choice for the
+reader — nothing downstream re-derives the schema from this prose.

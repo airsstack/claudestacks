@@ -1,9 +1,25 @@
 ---
-status: draft
+status: dropped
 created: 2026-08-29
 ---
 
 # Intent: an engineer with an existing plugin has no path to adopt claudevs
+
+> **Dropped 2026-10-04 — superseded by its own dependencies, not by a change of mind.**
+> Most of this problem statement was solved by two chains that landed after it was written.
+> `2026-08-29-claudevs-plugin-correctness` (`a984a27`, 2026-08-31) added `CaseKind::Flow` with
+> `apply_fixture` steps, which is the per-case setup this intent says does not exist, and
+> `expect.output: "none"`, which is the negative assertion it says cannot be written —
+> `crates/claudevs/examples/03_session_context/tests/ordinary-prompt-stays-silent.yaml` is now
+> exactly the silent-hook case named here as untestable. `2026-09-13-claudevs-docs` (`#7`) gave the
+> case format a home in `crates/claudevs/docs/cli/how-to.md` and `reference.md` and shipped nine
+> runnable example plugins, against this intent's claim that the format "is documented nowhere" and
+> that an author has "no starting command, no example".
+>
+> Three findings survive and are not addressed here: `CaseKind::Hook` still carries no `env` map,
+> `Expectations` still has no negative file assertion, and the five plugins under `plugins/` still
+> carry zero case files. Whoever picks those up should open a fresh intent rather than revive this
+> one, because what is left is a much smaller problem than this file describes.
 
 ## Problem
 

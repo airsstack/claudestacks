@@ -533,13 +533,24 @@ the return contract where the orchestrator can see it.
 escapes the early signal. It does not escape either gate leg, which read the file from disk
 however it got there. P8 rules out `FileChanged` as an alternative.
 
-**Known gap (residual, 2026-10-04).** The handoff-root test narrows but does not eliminate
-mistaken identity: an agent whose report text ends on some *other* `.md` file that happens to sit
-under the temp root — a documentation page fetched to the session scratchpad, say — has that file
-validated against the report schema. The session tree has no such ambiguity, because nothing but
-handoff reports is written there. This is accepted rather than fixed: the alternative is to key on
-driver-minted names, which is the shape-keying this section rejects above, and the failure is a
-spurious notice on a report that is itself conforming rather than a missed violation.
+**The temp root is two named shapes, not "anywhere under `/tmp`".** A path qualifies on the temp
+branch only when it is a **direct child** of `$TMPDIR` (the exception tier,
+`${TMPDIR}/<driver>-<slug>.md`) or carries a `/handoff/` segment (the `init`-refused tier,
+`<session-scratch>/handoff/<NN>-<agent>-<slug>.md`). The `.md` extension is part of the root test
+in every tier, not a filter at one call site.
+
+Both halves of that sentence were learned the hard way, on the gate's first day live. An earlier
+draft of this section described the residual risk as "another `.md` file under the temp root" and
+the delivered code tested only the root, having replaced the `%.md$` filter rather than adding to
+it. The result: a commit-message `.txt` written to `<session-scratch>/msgs3/9.txt` was validated
+as a handoff report and its violations attached to the write. Every session's scratchpad lives
+under `/tmp`, so the false-positive surface was every file any session writes there.
+
+**Known gap (residual).** A report-shaped file that genuinely sits at one of those two addresses
+but is not a report would still be checked. Nothing writes such a file today, and the session tree
+has no ambiguity at all because nothing but reports is written there. Accepted rather than fixed:
+the alternative is keying on driver-minted names, which is the shape-keying this section rejects
+above, and the failure mode is a spurious notice rather than a missed violation.
 
 ## 9. One brief field
 

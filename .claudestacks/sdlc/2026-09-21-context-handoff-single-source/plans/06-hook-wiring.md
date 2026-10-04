@@ -1,5 +1,5 @@
 ---
-status: executing
+status: done
 created: 2026-09-21
 depends-on: [02, 04, 05]
 ---
@@ -14,8 +14,9 @@ depends-on: [02, 04, 05]
 
 **Amended during execution, 2026-10-04.** This plan was corrected while being executed; the text
 below is the corrected text, not what was originally approved. Two of its steps implemented a spec
-premise that execution disproved, two of its expected outputs were wrong, and one of its tasks
-cannot be completed in the session that ran it.
+premise that execution disproved, two of its expected outputs were wrong, and its final task could
+not be verified from the worktree that ran it — only after the branch reached `main`, and then in
+one of its two modes.
 
 - **Tasks 1 and 2 faithfully implemented a wrong rule, and spec §8 was amended rather than the
   plan's reasoning.** The entry's `%.md$` filter on the `PostToolUse` leg, and `path_in`'s
@@ -43,7 +44,30 @@ cannot be completed in the session that ran it.
 - **Task 2's trailing-punctuation strip is dead code.** `(%S+%.md)` captures a run ending in the
   literal characters `md`, so the second `gsub`'s `[%)%]`"'.,]+$` can never match, and
   `a_trailing_period_is_not_part_of_the_path` passes for a reason other than the one it names.
-- **Task 7 cannot be verified from a worktree at all, and step 1's premise is wrong.** Step 1 says
+- **Task 7 passed once the branch reached the main checkout, in one of its two modes.** After the
+  merge and a `/reload-plugins` reporting `9 hooks` (up from `6`), a probe subagent wrote a
+  deliberately frontmatter-less report under the session tree and reported:
+
+  ```
+  post-write-notice:   frontmatter-missing: the file does not open with a `---` block
+  handback-attempt-1:  BLOCKED — handoff report does not conform to the protocol:
+                       frontmatter-missing: the file does not open with a `---` block
+  handback-attempt-2:  BLOCKED — same text
+  conforming-handback: PASSED
+  ```
+
+  So the `PostToolUse` early signal fires, the `PreToolUse` gate blocks and states a reason the
+  agent can act on, and the hand-back succeeded only after the file was made conforming. The
+  orchestrator received that hand-back, which is the proof of the last line rather than the
+  agent's word for it, and the validator reads the final file as `exit 0`.
+
+  **The `SubagentStop` leg remains unverified, and step 5 requires that to be written down rather
+  than reported as working.** Every subagent in the verifying session delivered through
+  `SubagentHandback`, so that leg never fired. It is proven at the launcher — the exception-tier
+  payload exits 2 with the right reason — and unproven through Claude Code's own dispatch. Closing
+  it needs a session where the hand-back tool is not in play.
+
+- **Step 1's premise about reloading is wrong, and cost one failed verification round.** Step 1 says
   "This marketplace is a local directory, so edits take effect at the next session start or
   `/reload-plugins`, with no version bump needed for in-place development." That holds for the
   checkout the marketplace points at and fails for every worktree of it.
@@ -59,15 +83,27 @@ cannot be completed in the session that ran it.
   checkout lacks `hooks/handoff-check.sh` and `scripts/handoff_check_hook.lua` entirely, and its
   `hooks.json` contains zero occurrences of `handoff-check.sh`.
 
-  The control is what separates "the gate is broken" from "the gate is absent": the same payloads
-  fed to `hooks/handoff-check.sh` in this worktree by hand exit 2 with the right reason, and the
-  seven launcher cases all behave as specified. So **both legs are proven at the launcher level and
-  remain unproven through Claude Code's own dispatch**, exactly as step 5 requires to be recorded.
+  The control is what separated "the gate is broken" from "the gate is absent": the same payloads
+  fed to `hooks/handoff-check.sh` in this worktree by hand exited 2 with the right reason, and all
+  seven launcher cases behaved as specified.
 
-  Closing Task 7 requires this branch to reach the checkout the marketplace points at. It is not a
-  reload, not a version bump, and not something a session in this worktree can do to itself.
+  Closing Task 7 therefore required the branch to reach the checkout the marketplace points at —
+  not a reload, not a version bump, and not anything a session in a worktree can do to itself. It
+  was merged to `main` as `f43766f` and verified from there, as the Task 7 bullet above records.
+  Step 1 should say that a worktree cannot verify this task.
 - **Task 8 changed nothing.** `git tag --list` is empty, so `claudestacks-v0.1.6` was never
   published and the version correctly stays `0.1.6`, per the task's own condition.
+- **The live gate found a false positive in itself within minutes of Task 7 passing, and that is
+  the strongest evidence in this record that it works.** Writing a commit-message `.txt` to
+  `<session-scratch>/msgs3/9.txt` produced
+  `frontmatter-missing … summary-missing`, attached to the write. Two causes, both now fixed with
+  red-before-green tests: the fix round had *replaced* the `%.md$` filter with the root test
+  rather than requiring both, so `PostToolUse` validated any file whatever its extension; and the
+  temp branch tested `under(path, "/tmp")` at any depth, which is where every session's scratchpad
+  lives. The temp root is now the two shapes the protocol actually mints — a direct child of
+  `$TMPDIR`, or a path carrying a `/handoff/` segment — and `.md` is part of the root test in
+  every tier. Spec §8 is corrected too; its residual-gap paragraph had described the risk as
+  `.md`-scoped when the code scoped nothing.
 
 ---
 

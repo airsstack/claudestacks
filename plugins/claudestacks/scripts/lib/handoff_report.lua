@@ -42,6 +42,26 @@ local function under(candidate, root)
   return c == r or c:sub(1, #r + 1) == r .. "/"
 end
 
+-- Whether `candidate` sits DIRECTLY in `root`, with no intervening directory.
+--
+-- `under` is too loose for the temp tiers. The exception tier is `${TMPDIR}/<driver>-<slug>.md`
+-- — a direct child by construction — whereas `under` admits anything at any depth below `/tmp`,
+-- which is where every session's scratchpad lives. That cost a live false positive: a `.txt`
+-- commit-message file written to `<scratch>/msgs3/9.txt` was validated as a handoff report and
+-- its violations attached to the write.
+local function direct_child(candidate, root)
+  root = root:gsub("/+$", "")
+  if root == "" then
+    return false
+  end
+  local c, r = tmp_alias(candidate), tmp_alias(root)
+  if c:sub(1, #r + 1) ~= r .. "/" then
+    return false
+  end
+  local rest = c:sub(#r + 2)
+  return rest ~= "" and not rest:find("/", 1, true)
+end
+
 -- Makes `file` absolute, resolving a relative path against `cwd` first, or nil when there is
 -- nothing to resolve it against.
 --
@@ -80,18 +100,41 @@ function M.under_handoff_root(file, cwd)
   if not resolved then
     return false
   end
+
+  -- A report is a Markdown file in every tier the protocol defines, so the extension is part of
+  -- the root test rather than a separate filter at one call site. `M.path_in_root` only ever
+  -- offers `.md` candidates, so this is a no-op for the two gate legs; it is load-bearing for
+  -- `PostToolUse`, which is handed an arbitrary `tool_input.file_path`. Dropping it there was
+  -- defect B's second half: the fix round replaced the `%.md$` filter with the root test instead
+  -- of requiring both, so every file written anywhere under `/tmp` was checked as a report.
+  if resolved:sub(-3) ~= ".md" then
+    return false
+  end
+
+  -- Session tree: the segment `handoff.lua` itself mints. Unambiguous — nothing but reports is
+  -- written there.
   if resolved:find(handoff.HANDOFF_REL, 1, true) then
     return true
   end
+
+  -- `init`-refused fallback: `<session-scratch>/handoff/<NN>-<agent>-<slug>.md`. The segment is
+  -- what distinguishes it from the rest of a session scratchpad, which is not reports.
+  if resolved:find("/handoff/", 1, true) then
+    return true
+  end
+
+  -- Exception tier: `${TMPDIR}/<driver>-<slug>.md`, a DIRECT child. Not `under`, which would
+  -- re-admit every nested scratchpad file — see `direct_child`.
+  --
   -- `pcall`ed: `env.get` is a capability like any other, and this suite's own test grant
   -- (`cargo make plugins-test`) does not include `--allow-env TMPDIR`. A denial here falls back
   -- to the `/tmp` check below rather than raising, so the function keeps the "never an error"
   -- contract its own doc comment promises for a bad path and extends it to a withheld grant.
   local ok, tmpdir = pcall(env.get, "TMPDIR")
-  if ok and tmpdir and tmpdir ~= "" and under(resolved, tmpdir) then
+  if ok and tmpdir and tmpdir ~= "" and direct_child(resolved, tmpdir) then
     return true
   end
-  return under(resolved, "/tmp")
+  return direct_child(resolved, "/tmp")
 end
 
 -- `file`, resolved and root-qualified, or nil. Shared by `M.path_in_root` and

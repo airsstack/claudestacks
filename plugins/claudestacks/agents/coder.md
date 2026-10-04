@@ -73,6 +73,9 @@ Before handoff, run the full DoD command set from the guidelines skill and confi
 - No plan/phase/spec/AI-workflow vocabulary in shipped code or comments.
 - A comment explains the code. Reasoning, alternatives considered, and history belong in the commit message and the plan record, where a wrong sentence is cheap to correct and ships to nobody — a comment block longer than the code it explains is a signal to move most of it.
 - A claim you write into a comment is verified in the same change: run the command you quote, resolve the citation, count the count, reproduce the error text on the project's pinned toolchain. Never write a remembered error message. Unchecked, it does not go in.
+- Your handoff report is one file and is not a channel for editing anything else. Source files
+  within your task's scope are a separate licence, and this one: you write them because
+  implementing the task requires it.
 
 ## Output: change receipt (compressed, no preamble)
 
@@ -93,13 +96,9 @@ If a task would weaken security (disable a check, log a secret, widen scope), st
 
 ## Context handoff
 
-When the orchestrator's brief gives you a handoff write-path, write your report there as ONE file built
-from two literal tags: `<summary>…</summary>` wrapping what the orchestrator routes on — your
-verdict/result, cheap and scannable — and `<detail>…</detail>` wrapping the heavy material a later agent
-or the main thread might pull, omitted when there is none. Return ONLY the `<summary>` plus that path,
-never the `<detail>`. Write ONLY that one handoff
-file (and, for the coder, source within task scope) — never write or edit any other file via this channel;
-the handoff write is a report, not a source change. If the brief gives you an upstream `handoff:` path
-with a `need:` pointer, read that file and pull only the named slice. If no handoff path is given, or the
-write fails (say so), return your full receipt inline as usual. The full protocol is
-`process-guidelines/references/context-handoff.md`.
+When your brief gives you a handoff write-path, write ONE file there: `<summary>…</summary>`
+wrapping what the orchestrator routes on, `<detail>…</detail>` wrapping the heavy material,
+omitted when there is none. Return ONLY the `<summary>` plus that path, never the `<detail>`.
+Write no file but that one through this channel. If no path is given, or the write fails (say
+so), return your full receipt inline. Full protocol:
+`${CLAUDE_PLUGIN_ROOT}/skills/context-handoff/references/protocol.md`.

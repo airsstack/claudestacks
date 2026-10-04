@@ -28,7 +28,7 @@ end
 -- grant — the same directory, not necessarily the same spelling: a relative `gitdir:` pointer
 -- yields an uncanonicalised path here, which `project_base` canonicalises before it is used. A
 -- worktree-isolated Claude Code session cannot pass that flag (the `claudestacks` plugin's
--- `skills/process-guidelines/references/context-handoff.md` has the full account). The answer is
+-- `skills/context-handoff/references/protocol.md` has the full account). The answer is
 -- on disk either way — `.git` is a directory in a plain checkout, and in a linked
 -- worktree a file holding `gitdir: <main>/.git/worktrees/<name>`, whose `worktrees/<name>` tail is
 -- dropped to reach the one `.git` every worktree of the repository shares.

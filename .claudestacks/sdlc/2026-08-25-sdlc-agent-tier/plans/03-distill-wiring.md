@@ -195,13 +195,21 @@ not automated by this plan and nothing here claims it is.
    - the plan bodies do **not** appear in the main thread. Only the extracted findings do.
      If whole plan files show up, the skill read them itself and the wiring did not take.
 
-3. Confirm the extraction is verbatim rather than summarized. Compare one file by hand:
+3. Confirm the extraction is verbatim rather than summarized. Compare the two sides by hand.
+   The source side is the reference:
 
    ```
    $ sed -n '/^## Review findings/,/^## /p' .claudestacks/sdlc/2026-08-24-sdlc-plugin/plans/03-workflow-skills.md
    ```
 
-   The corresponding block in the agent's `<detail>` must match this output. If the agent
+   The report side is its counterpart — the agent's `<detail>` body, with the two tag lines
+   stripped:
+
+   ```
+   $ sed -n '/^<detail>$/,/^<\/detail>$/p' <report> | sed '1d;$d'
+   ```
+
+   Diff the two outputs against each other. If the agent
    grouped, re-worded, or condensed anything, its HARD-REFUSE section is not binding hard
    enough — fix `agents/chain-reader.md` and re-run.
 

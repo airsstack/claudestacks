@@ -31,10 +31,9 @@ snapshot store, which uses the common-dir to *share* memory; handoff is ephemera
 ```markdown
 ---
 agent: reviewer
-session: 20260621-153012-a1b2
-seq: 03
-task: <one-line task description>
-created: 2026-06-21 15:31:40
+task: <one line — what this report is of>
+session: 20260621-153012-a1b2   # session-tier files only
+seq: 03                         # session-tier files only
 ---
 <summary>
 Returned to the main thread. The verdict / index — cheap, scannable. Always present.
@@ -47,6 +46,25 @@ or the main thread would need to operate on this work. Omitted when the report i
 
 `<summary>` is always written; `<detail>` is gated — omit it when the summary already
 says everything.
+
+`agent:` and `task:` are always present. `task:` is composed from the brief the agent already
+receives; no brief carries a field to supply it.
+
+`session:` and `seq:` are present exactly when the file sits under a minted session tree. The
+protocol has three tiers:
+
+| Tier | Path | `session:` / `seq:` |
+|---|---|---|
+| session tree | `<root>/.airsstack/cc/plugins/claudestacks/handoff/<sid>/` | present |
+| single-subagent exception (below) | a literal temp path | absent |
+| `init`-refused fallback (below) | `<session-scratch>/handoff/` | absent |
+
+The third tier keeps the `<NN>-<agent>-<slug>.md` naming but mints no session and writes no
+lease, so there is no session identifier to record. Classifying it with the exception rather
+than with the session tree is deliberate, and is what the validator's path test implements.
+
+There is no `created:` key. The file's own modification time carries it, and requiring one
+would oblige every writer agent to gain a clock for a value nothing consults.
 
 ### Exception: single-subagent flows may skip the session tree
 
@@ -87,6 +105,11 @@ source. `coder` writes with its `Write` tool. The read-only agents (`explorer`,
 `reviewer`) carry `Write` **scoped by instruction** to the handoff directory only —
 writing the report is a first-class duty, distinct from mutating source, which they still
 must never do.
+
+The report is not a channel for editing anything else. An agent writes its own handoff file and
+no other file through it. A `coder` additionally writes source within its task scope, but that
+is its implementation duty, stated in its own definition — not part of this protocol and not a
+licence any other agent inherits.
 
 ## Session lifecycle (via handoff.lua)
 
@@ -162,3 +185,21 @@ never pruned, and a crashed one self-heals after the grace window. Pruning runs 
   the orchestrator re-supplies inline or re-routes.
 - No handoff path in the brief (agent run standalone) → the agent returns its receipt
   inline, exactly as without this protocol. Backward-compatible.
+
+## What enforces this
+
+The file schema above is not model obedience. `scripts/lib/handoff_report.lua` is the
+validator: given a report file it returns every way that file violates the schema, each as
+a stable identifier plus one line of prose. `scripts/handoff_report.lua` runs it over a
+path from the command line; the `claudestacks` plugin registers it as a hook on three
+events, so a non-conforming report is caught as it is written and again before it reaches
+the orchestrator, rather than when a reader happens to notice.
+
+A report cited by a path that is not under a handoff root — the session tree above, or the
+temp root the exception and `init`-refused tiers use — is not checked, and an agent that
+states no such path at all is never held. That is the standalone case this file's error
+handling already guarantees, and the enforcement must not take it away.
+
+The validator is the single implementation of these rules. When this file and the
+validator disagree, that is a defect in one of them to be reconciled, not a choice for the
+reader — nothing downstream re-derives the schema from this prose.

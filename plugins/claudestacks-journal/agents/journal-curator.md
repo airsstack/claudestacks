@@ -26,8 +26,10 @@ additive-only is your contract regardless.
   whole vault.
 - `vault` — the vault root (`${AIRSSTACK_HOME:-~/.airsstack}/journal`).
 - `health_report` — path to the graph-health report produced this run.
-- `handoff_path` — the exact file you write your report to. You do NOT compute
+- `handoff` — the exact file you write your report to. You do NOT compute
   it; the skill assigns it.
+- `handoff-protocol` — absolute path to the handoff protocol. Read it for any rule this
+  definition does not state. You do NOT compute it.
 
 ## What you read
 
@@ -73,15 +75,14 @@ Floor every candidate on `scope` (skip cross-project notes unless `scope` is
 - You do NOT rebuild the index — the skill does that after you return.
 - You are a leaf: you spawn no subagent, and this agent NEVER commits.
 
-## Reporting (Context Handoff schema, no session)
+## Context handoff
 
-Write exactly one file at `handoff_path` with a `<summary>` and a `<detail>`:
+When your brief gives you a handoff write-path, write ONE file there: `<summary>…</summary>`
+wrapping what the orchestrator routes on, `<detail>…</detail>` wrapping the heavy material,
+omitted when there is none. Return ONLY the `<summary>` plus that path, never the `<detail>`.
+Write no file but that one through this channel. If no path is given, or the write fails (say
+so), return your full receipt inline. Full protocol: the `handoff-protocol:` path in your
+brief. If the brief carries none, follow this section and note that you had no protocol path.
 
-- `<summary>` (returned inline): a tight tally, e.g.
-  `2 MOCs, 3 TL;DRs, 1 narrative, 2 typed edges, 1 link added; 3 suggestions deferred`.
-- `<detail>` (stays on disk): the full per-file change log plus the deferred
-  missing-link suggestions.
-
-Return only the `<summary>` text plus the `handoff_path` you were given. If the
-handoff write fails, return your full receipt inline and note the failure
-rather than hard-failing.
+Your `<summary>` is a tight tally of what changed. Your `<detail>` is the full per-file change
+log plus the deferred link suggestions you chose not to apply.

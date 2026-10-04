@@ -49,14 +49,14 @@ accumulates, while the answer stays a short table. Spawn
 ```
 glob: .claudestacks/sdlc/*/plans/*.md
 heading: ## Review findings
-report: <TMPDIR>/claudestacks-sdlc-corpus-findings-<NN>.md
+handoff: <TMPDIR>/claudestacks-sdlc-corpus-findings-<NN>.md
+handoff-protocol: <the path /claudestacks:context-handoff gave you>
 ```
 
-Expand `${TMPDIR:-/tmp}` yourself before the path enters the brief — an agent receives
-its brief as literal text and runs no shell over it, so an unexpanded variable would
-reach it as a filename. The `corpus` segment stands where a chain name goes in the
-report-path shape, because this scan spans every chain rather than one. `<NN>` starts at
-`01` and increments on each re-scan.
+Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. One subagent,
+so a literal temp path and no session. Expand `${TMPDIR:-/tmp}` yourself before the path enters
+the brief. The `corpus` segment stands where a chain name goes, because this scan spans every
+chain rather than one. `<NN>` starts at `01` and increments on each re-scan.
 
 The agent returns a summary — how many files the glob matched, how many carried the
 heading — plus that path. Read the `<detail>` yourself: the extraction is exactly what

@@ -80,7 +80,7 @@ end
 --
 -- Read rather than run: `--allow-exec git` cannot be passed from a worktree-isolated Claude Code
 -- session (full account in the `claudestacks` plugin's
--- `skills/process-guidelines/references/context-handoff.md`), and this runs on every hook
+-- `skills/context-handoff/references/protocol.md`), and this runs on every hook
 -- dispatch. Ascends because the hook's cwd is rarely the repository root.
 local function dot_git(cwd)
   local current = M.realpath(cwd) or cwd

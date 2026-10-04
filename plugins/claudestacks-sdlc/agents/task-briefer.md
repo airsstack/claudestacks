@@ -28,6 +28,7 @@ coder never has to be handed a file it would have to search.
 | `plan` | path to the plan file |
 | `task` | task number — required for `mode: brief`, ignored for `ledger` |
 | `handoff` | full write-path for your report — assigned by the orchestrator, never computed by you |
+| `handoff-protocol` | absolute path to the handoff protocol — read it for any rule this definition does not state |
 
 If `handoff` is absent, return your output inline instead and say the handoff path was
 missing. That is not an error.
@@ -50,8 +51,9 @@ Then, below the table, three lines:
 
 Nothing else. No commentary on the tasks, no ordering advice, no risk assessment.
 
-Write the same table to the `handoff` path in the schema below and return it inline as
-well — a ledger is small enough that the orchestrator needs it in hand.
+Write the same table to the `handoff` path in the shape `## Context handoff` below
+describes, and return it inline as well — a ledger is small enough that the orchestrator
+needs it in hand.
 
 ## Mode `brief`
 
@@ -94,30 +96,14 @@ you do not flag one as suspicious, you do not rank them. Listing is the whole du
 orchestrator decides which need proving. A list you have pre-filtered is a list that hid the
 one that mattered.
 
-## Report schema
+## Context handoff
 
-Write exactly one file, at the `handoff` path you were given, in the context-handoff schema:
-
-```markdown
----
-agent: task-briefer
-session: <session id from the brief, or "none">
-seq: <NN from the brief, or "none">
-task: <plan path> task <N> — <mode>
-created: <YYYY-MM-DD HH:MM:SS>
----
-<summary>
-...
-</summary>
-<detail>
-...
-</detail>
-```
-
-For `mode: ledger`, `<detail>` may be omitted — the summary is the whole product.
-
-Return to the orchestrator: your `<summary>` text plus the handoff path. Never the
-`<detail>`.
+When your brief gives you a handoff write-path, write ONE file there: `<summary>…</summary>`
+wrapping what the orchestrator routes on, `<detail>…</detail>` wrapping the heavy material,
+omitted when there is none. Return ONLY the `<summary>` plus that path, never the `<detail>`.
+Write no file but that one through this channel. If no path is given, or the write fails (say
+so), return your full receipt inline. Full protocol: the `handoff-protocol:` path in your
+brief. If the brief carries none, follow this section and note that you had no protocol path.
 
 ## What you HARD-REFUSE
 

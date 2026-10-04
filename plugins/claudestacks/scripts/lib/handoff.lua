@@ -1,7 +1,7 @@
 -- The Context Handoff session tree: minting sessions, the liveness lease, and pruning.
 --
 -- Single source of truth (code side) for the handoff tree path, the session liveness lease, and
--- pruning. Prose mirror: `skills/process-guidelines/references/context-handoff.md`. The two MUST
+-- pruning. Prose mirror: `skills/context-handoff/references/protocol.md`. The two MUST
 -- agree — change one, change the other.
 --
 -- Split from the driver so pruning can be exercised against a directory of stub sessions. Pruning
@@ -28,7 +28,7 @@ M.LEASE = ".active"
 -- `root` is the caller's own answer and wins outright. It exists because the git probe below needs
 -- `--allow-exec git`, which a worktree-isolated Claude Code session cannot pass — its guard
 -- refuses the whole command over that operand. Full account, once, in the plugin's
--- `skills/process-guidelines/references/context-handoff.md`. Without a root, such a session has
+-- `skills/context-handoff/references/protocol.md`. Without a root, such a session has
 -- only `cwd`.
 --
 -- The caller wants the source as well as the root because the `cwd` answer is right only when the

@@ -43,15 +43,29 @@ cannot be completed in the session that ran it.
 - **Task 2's trailing-punctuation strip is dead code.** `(%S+%.md)` captures a run ending in the
   literal characters `md`, so the second `gsub`'s `[%)%]`"'.,]+$` can never match, and
   `a_trailing_period_is_not_part_of_the_path` passes for a reason other than the one it names.
-- **Task 7 is NOT verified, in either mode, and is recorded here as step 5 requires.** Plugin hooks
-  load at session start, so the registrations Task 6 wrote are not live in the session that wrote
-  them; `/reload-plugins` or a fresh session is required and that is the author's action. A probe
-  subagent was handed a deliberately non-conforming report and its hand-back was **not**
-  intercepted, which is the expected outcome of an unloaded registration rather than evidence about
-  the hook. The control passed: that agent's real return text, fed to the launcher directly, exits
-  2 with the right reason. The `SubagentStop` leg is additionally unreachable here, because every
-  subagent in this session delivered through `SubagentHandback`. Both legs are therefore proven at
-  the launcher level and unproven through Claude Code's own dispatch.
+- **Task 7 cannot be verified from a worktree at all, and step 1's premise is wrong.** Step 1 says
+  "This marketplace is a local directory, so edits take effect at the next session start or
+  `/reload-plugins`, with no version bump needed for in-place development." That holds for the
+  checkout the marketplace points at and fails for every worktree of it.
+  `~/.claude/plugins/known_marketplaces.json` registers `claudestacks` as
+  `{"source": "directory", "path": "/Users/hiraq/Projects/airsstack/claudestacks"}` — the main
+  checkout. A worktree's `plugins/` tree is never read, so no reload can make a change made here
+  live.
+
+  Measured after a `/reload-plugins` that reported `5 plugins · 27 skills · 16 agents · 6 hooks`:
+  a probe subagent wrote a deliberately frontmatter-less report under the session tree and
+  reported `post-write-notice: NONE`, `handback-attempt-1: NOT BLOCKED`; a `Write` of the same
+  shape from the main thread produced no notice either. The cause is not the hook — the main
+  checkout lacks `hooks/handoff-check.sh` and `scripts/handoff_check_hook.lua` entirely, and its
+  `hooks.json` contains zero occurrences of `handoff-check.sh`.
+
+  The control is what separates "the gate is broken" from "the gate is absent": the same payloads
+  fed to `hooks/handoff-check.sh` in this worktree by hand exit 2 with the right reason, and the
+  seven launcher cases all behave as specified. So **both legs are proven at the launcher level and
+  remain unproven through Claude Code's own dispatch**, exactly as step 5 requires to be recorded.
+
+  Closing Task 7 requires this branch to reach the checkout the marketplace points at. It is not a
+  reload, not a version bump, and not something a session in this worktree can do to itself.
 - **Task 8 changed nothing.** `git tag --list` is empty, so `claudestacks-v0.1.6` was never
   published and the version correctly stays `0.1.6`, per the task's own condition.
 

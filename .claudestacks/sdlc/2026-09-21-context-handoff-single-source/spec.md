@@ -444,22 +444,62 @@ Exit code 0 with no output when clean; non-zero with one line per violation othe
 ## 8. Hook wiring
 
 Two files, matching the split `enforce.sh`/`enforce.lua` already uses: `hooks/handoff-check.sh` is
-a launcher that resolves `airsl` and its own directory, and `hooks/handoff-check.lua` reads the
-payload with `airsstack.hook.payload()` and calls the validator. JSON parsing belongs in Lua
-because that is where the payload helper lives.
+a launcher that resolves `airsl` and its own directory, and the entry reads the payload with
+`airsstack.hook.payload()` and calls the validator. JSON parsing belongs in Lua because that is
+where the payload helper lives.
+
+> **Amended during execution, 2026-10-04 (entry location).** This section specified the entry at
+> `hooks/handoff-check.lua`. It is delivered at `scripts/handoff_check_hook.lua`, because `airsl`
+> resolves `require` relative to the script's own directory and the validator is
+> `scripts/lib/handoff_report.lua` — an entry under `hooks/` could not reach it at all. Plan 06's
+> Architecture paragraph states and justifies the move and was approved carrying it; this records
+> it so the spec stops naming a file that does not exist.
 
 **The report path must be recognised for every tier, not only the session tree.** An
 exception-tier report is named by its driver and carries no `<NN>-<agent>-<slug>` prefix and no
 `handoff/` segment — `journal-review`'s is `${TMPDIR}/journal-curator-review.md`. A matcher keyed
 on either shape would leave the gate silently off for all four single-subagent drivers while
-reporting nothing wrong, which is the exact failure this chain exists to remove. The entry
-therefore takes the last `.md` path appearing in the agent's report text, and treats "no `.md`
-path at all" — not "no path of a recognised shape" — as the standalone case that must not be held.
+reporting nothing wrong, which is the exact failure this chain exists to remove.
+
+The entry therefore takes **the last `.md` path in the agent's report text that lies under a
+handoff root** — the session tree `.airsstack/cc/plugins/claudestacks/handoff/`, or the temp root
+the exception and `init`-refused tiers use (`$TMPDIR`, falling back to `/tmp`). A relative path is
+resolved against the payload's `cwd` field before that test. "No such path" — not "no `.md` path
+at all", and not "no path of a recognised shape" — is the standalone case that must not be held.
+
+> **Amended during execution, 2026-10-04 (path rule).** This section specified "the last `.md`
+> path appearing in the agent's report text", with "no `.md` path at all" as the standalone case.
+> Execution disproved it: a hand-back that states its handoff path correctly and then cites
+> evidence — which `CLAUDE.md` § *Never assert what you have not checked* mandates, as
+> `file:line` — has the citation taken as the report path. Measured against the delivered code: a
+> report text ending `The decision table sits at hooks.md:1011` yields
+> `unreadable: cannot read hooks.md` and exit 2, blocking a conforming hand-back with a violation
+> the agent cannot satisfy. A trailing doc URL and a trailing absolute `CLAUDE.md` reference fail
+> the same way, and on the `SubagentStop` leg `hooks.md:2417` makes that stderr the agent's next
+> instruction, so it loops.
+>
+> The root test replaces the bare last-`.md` rule because it answers the objection this section
+> raised against shape-keying. Location, unlike name shape, covers both tiers: the session tree is
+> a known relative segment and the exception tier is by definition a temp path. A citation
+> (`hooks.md`, `plans/01-foo.md`), a documentation URL, or `CLAUDE.md` lies under neither and is
+> ignored rather than validated.
+>
+> Resolving a relative path against `cwd` is part of the same fix, not a separate one.
+> `protocol.md:90-92` requires a session-tree path to be returned **relative to the worktree
+> root**, so the specified normal case is a relative path — while `hooks.md:597` states that path
+> placeholders exist "regardless of the working directory when the hook runs", and `hooks.md:607`
+> is explicit that in a worktree session `${CLAUDE_PROJECT_DIR}` stays at the main checkout and the
+> worktree path reaches a hook only as the payload's `cwd`. Measured: the same relative handoff
+> path yields `frontmatter-missing` from the worktree root and
+> `unreadable: cannot read .airsstack/...` from any other directory — both exit 2, so a conforming
+> report is refused whenever the hook's cwd is not the directory the path was written against.
 
 Three registrations in `hooks.json`, which already holds five hook groups across four event keys:
 
 - **`PostToolUse`, matcher `Write`** — the early signal. It takes `tool_input.file_path`
-  (absolute, P5), returns immediately when the path is not a handoff report, and otherwise emits
+  (absolute, P5), returns immediately when the path fails the handoff-root test above — a `.md`
+  extension alone is not that test, and treating it as one false-flags every markdown write in
+  every session — and otherwise emits
   `{"decision": "block", "reason": "<violations>"}`. By P6 this blocks nothing; it puts the
   violations next to the write result so the agent sees them at the moment it wrote the file and
   can rewrite before returning. It fires inside the subagent by P5.
@@ -473,16 +513,33 @@ Three registrations in `hooks.json`, which already holds five hook groups across
   (anchored plugin-scoped form, P9) — the same gate for sessions where `SubagentHandback` is not
   in play, reading the path from `last_assistant_message` and exiting 2 on a violation (P6).
 
-The two gate legs are mutually exclusive in effect, not redundant: P7 makes
-`last_assistant_message` carry the report only when the hand-back tool was not used. Each leg
-exits 0 when it finds no path, because an agent legitimately without one — the standalone case —
-must not be held, and an agent that omitted a path it owed has already broken the return contract
-where the orchestrator can see it.
+The two legs overlap rather than being mutually exclusive, and the overlap is harmless. Each leg
+exits 0 when it finds no qualifying path, because an agent legitimately without one — the
+standalone case — must not be held, and an agent that omitted a path it owed has already broken
+the return contract where the orchestrator can see it.
+
+> **Amended during execution, 2026-10-04 (leg overlap).** This section claimed the two gate legs
+> "are mutually exclusive in effect", on the reading that P7 makes `last_assistant_message` carry
+> the report only when the hand-back tool was not used. The artifact does not say that.
+> `hooks.md:2396` says `last_assistant_message` "holds the subagent's closing text, if any, which
+> is not the delivered report" — the field is repurposed, not suppressed, and `SubagentStop` still
+> fires. So in auto mode both legs run, and the `SubagentStop` leg applies the path matcher to
+> closing prose rather than to a report. Under the bare last-`.md` rule that was a second source
+> of false blocks; under the handoff-root test closing prose yields no qualifying path and the leg
+> exits 0, which is why the overlap is now harmless rather than merely unlikely.
 
 **Known gap.** `hooks.md:2000`: Claude Code does not run a `PostToolUse` hook matching
 `Edit|Write` when a `Bash` command rewrites the file. A report written through `Bash` therefore
 escapes the early signal. It does not escape either gate leg, which read the file from disk
 however it got there. P8 rules out `FileChanged` as an alternative.
+
+**Known gap (residual, 2026-10-04).** The handoff-root test narrows but does not eliminate
+mistaken identity: an agent whose report text ends on some *other* `.md` file that happens to sit
+under the temp root — a documentation page fetched to the session scratchpad, say — has that file
+validated against the report schema. The session tree has no such ambiguity, because nothing but
+handoff reports is written there. This is accepted rather than fixed: the alternative is to key on
+driver-minted names, which is the shape-keying this section rejects above, and the failure is a
+spurious notice on a report that is itself conforming rather than a missed violation.
 
 ## 9. One brief field
 

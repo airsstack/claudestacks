@@ -226,6 +226,31 @@ return {
     assert(report.path_in("read plans/01-foo.md; report at /tmp/out.md") == "/tmp/out.md")
   end,
 
+  -- The two false positives the live gate caught on its first day, both at `PostToolUse`, which
+  -- is handed an arbitrary `tool_input.file_path` rather than a `.md` candidate.
+
+  a_non_markdown_file_in_the_temp_root_is_not_a_report = function()
+    -- Measured: a commit-message `.txt` under the session scratchpad was validated as a handoff
+    -- report and its violations attached to the write. The fix round had replaced the `%.md$`
+    -- filter with the root test instead of requiring both.
+    assert(report.under_handoff_root("/tmp/msgs3/9.txt", nil) == false)
+    assert(report.under_handoff_root("/private/tmp/claude-501/s/scratchpad/m/9.txt", nil) == false)
+  end,
+
+  a_nested_markdown_file_in_the_temp_root_is_not_a_report = function()
+    -- A doc page curled into the session scratchpad is Markdown and sits under /tmp, but is not
+    -- a report. The exception tier is a DIRECT child of the temp root; the `init`-refused tier
+    -- carries a `handoff/` segment. Neither admits an arbitrary nested path.
+    assert(report.under_handoff_root("/tmp/claude-501/sess/scratchpad/hooks.md", nil) == false)
+  end,
+
+  the_init_refused_fallback_tier_is_still_a_report = function()
+    -- `<session-scratch>/handoff/<NN>-<agent>-<slug>.md` — nested, so it qualifies on the
+    -- segment rather than on being a direct child.
+    assert(report.under_handoff_root(
+      "/tmp/claude-501/sess/scratchpad/handoff/03-reviewer-diff.md", nil) == true)
+  end,
+
   -- `under_handoff_root` — defect A/B/C's fix. A file qualifies only when it resolves (against
   -- `cwd`, if relative) under the session tree's `HANDOFF_REL` segment or under the temp root.
 

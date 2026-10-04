@@ -16,7 +16,9 @@ depends-on: [02, 04, 05]
 below is the corrected text, not what was originally approved. Two of its steps implemented a spec
 premise that execution disproved, two of its expected outputs were wrong, and its final task could
 not be verified from the worktree that ran it — only after the branch reached `main`, and then in
-one of its two modes.
+one of its two modes. One more correction came after the chain had merged: Task 8's bump condition
+read a missing git tag as "unpublished", so the version stayed `0.1.6` while a fix shipped under
+it. Task 8 and its record below now carry the corrected condition, and `claudestacks` is `0.1.7`.
 
 - **Tasks 1 and 2 faithfully implemented a wrong rule, and spec §8 was amended rather than the
   plan's reasoning.** The entry's `%.md$` filter on the `PostToolUse` leg, and `path_in`'s
@@ -91,8 +93,14 @@ one of its two modes.
   not a reload, not a version bump, and not anything a session in a worktree can do to itself. It
   was merged to `main` as `f43766f` and verified from there, as the Task 7 bullet above records.
   Step 1 should say that a worktree cannot verify this task.
-- **Task 8 changed nothing.** `git tag --list` is empty, so `claudestacks-v0.1.6` was never
-  published and the version correctly stays `0.1.6`, per the task's own condition.
+- **Task 8's condition was wrong, and the version it left in place shipped stale.** `git tag
+  --list` is empty, so the task read `0.1.6` as unpublished and changed nothing. But a tag is not
+  what publishes this plugin: the marketplace entry's `source` is `./plugins/claudestacks`, so
+  whatever `main` carries is the release. `0.1.6` reached `main` with `f43766f` (#9), and the
+  false-positive fix below reached it afterwards with `399895b` (#10) — a change to
+  `scripts/lib/handoff_report.lua` under a version consumers already had. Task 8's other premise,
+  that every plan lands before the release ships, failed the same way: the chain merged in two
+  PRs. Corrected after the fact to `0.1.7`; Task 8 below now keys the bump on `main`, not tags.
 - **The live gate found a false positive in itself within minutes of Task 7 passing, and that is
   the strongest evidence in this record that it works.** Writing a commit-message `.txt` to
   `<session-scratch>/msgs3/9.txt` produced
@@ -676,15 +684,16 @@ every session. Do not start Task 5 until the author says continue.
      "version": "0.1.6",
    ```
 
-2. Leave it at `0.1.6`. One version covers one release, and every plan in this chain lands before
-   that release ships — plan `01`'s bump already moves consumers off the stale cache. Bump again
-   only if `0.1.6` was published between plan `01` and this plan, which for a local-directory
-   marketplace means a tag or release exists naming it:
+2. One version covers one release, and the marketplace publishes whatever `main` carries — its
+   entry's `source` is `./plugins/claudestacks`, and no tag is involved. Check whether `main`
+   already has `0.1.6`:
 
    ```
-   $ git tag --list 'claudestacks-v0.1.6'
+   $ git show main:plugins/claudestacks/.claude-plugin/plugin.json | grep '"version"'
    ```
 
-   Output means it shipped and this plan needs `0.1.7`; no output means leave it.
+   `0.1.6` there means it shipped, and this plan needs `0.1.7`. Anything older means plan `01`'s
+   bump has not reached `main` yet and covers this plan too; leave it.
 
-3. Commit nothing if the version is unchanged.
+3. If the version changed, commit `chore(repo): bump claudestacks for the hook wiring`; otherwise
+   commit nothing.

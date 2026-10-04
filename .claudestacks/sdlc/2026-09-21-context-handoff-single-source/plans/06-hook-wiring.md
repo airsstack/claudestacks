@@ -16,7 +16,9 @@ depends-on: [02, 04, 05]
 below is the corrected text, not what was originally approved. Two of its steps implemented a spec
 premise that execution disproved, two of its expected outputs were wrong, and its final task could
 not be verified from the worktree that ran it — only after the branch reached `main`, and then in
-one of its two modes.
+one of its two modes. One more correction came after the chain had merged: Task 8's bump condition
+read a missing git tag as "unpublished", so the version stayed `0.1.6` while a fix shipped under
+it. Task 8 and its record below now carry the corrected condition, and `claudestacks` is `0.1.7`.
 
 - **Tasks 1 and 2 faithfully implemented a wrong rule, and spec §8 was amended rather than the
   plan's reasoning.** The entry's `%.md$` filter on the `PostToolUse` leg, and `path_in`'s

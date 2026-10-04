@@ -49,6 +49,37 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/enforce.sh\""
           }
         ]
+      },
+      {
+        "matcher": "^SubagentHandback$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^claudestacks:(coder|explorer|reviewer)$|^claudestacks-sdlc:(task-briefer|chain-reader|artifact-reviewer)$|^claudestacks-journal:journal-curator$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          }
+        ]
       }
     ]
   }

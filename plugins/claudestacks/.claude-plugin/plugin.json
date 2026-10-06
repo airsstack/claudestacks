@@ -22,6 +22,12 @@
       "title": "Re-send reply rules every prompt",
       "description": "Re-send the communication protocol's reply rules with every prompt. When off, they are still sent at every session start, /clear and compaction.",
       "default": true
+    },
+    "archive_keep": {
+      "type": "number",
+      "title": "Discussions kept per project",
+      "description": "How many /claudestacks:discuss discussions to keep per project besides the current one. Older ones are removed when a new one starts.",
+      "default": 20
     }
   }
 }

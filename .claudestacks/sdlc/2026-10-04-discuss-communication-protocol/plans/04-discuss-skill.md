@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-10-04
 depends-on: [01, 03]
 ---
@@ -263,3 +263,37 @@ Facts this plan encodes, each checked on 2026-10-04:
 - `claude plugin validate plugins/claudestacks` passes.
 - The live acceptance session runs at the end of plan 05, after the version bump makes the change installable (spec P16). A `--plugin-dir` session alongside the installed `claudestacks` was not probed for which copy wins, so it is not used here.
 - Checkpoint: stop here for the author's review before plan 05.
+
+## Review findings
+
+One reviewer pass over all three tasks; it named one blocking finding. One fix round (`cargo make plugins` → `399 passed, 0 failed`, the drop from 417 being plan 05 Task 1 deleting `concise_test.lua`'s 18 tests concurrently; `claude plugin validate plugins/claudestacks` → `✔ Validation passed`).
+
+Fixed:
+- correctness (blocking) — "A command that fails prints one line on stdout" was false: `add` prints one line per violation (3 seen), and an airsl/fs error prints nothing on stdout (start under a not-yet-existing `/var` root: exit 1, empty stdout), so "show the stdout line, not the traceback" left nothing to show. Reworded to: reason on stdout, one line per violation for `add`; if stdout is empty, show the first stderr line — `skills/discuss/SKILL.md:35-37`; the same false claim corrected in the CLI header comment — `scripts/discuss.lua` header (closes plan 03's open doc-accuracy finding).
+- test strength — `every_command_is_named` was satisfied by prose (removing the add line or the show/done/list rows left 4/4 green). Needles now anchor on the command line / table cell (e.g. "| ` list` |"); each of the four removals, run one at a time, gives `FAIL  every_command_is_named` — `scripts/discuss_skill_test.lua:40`.
+
+Left open (non-blocking):
+- unguarded — `archive_keep` removed from a copy of plugin.json still validates; nothing reads it in a test; `number` supports `min`/`max` (plugins-reference.md:439) and none is set — `.claude-plugin/plugin.json`
+- test diagnostics — the two positive asserts carry no message — `scripts/discuss_skill_test.lua:35-36`
+- test coverage — the negative check catches only `$CLAUDE_PLUGIN_ROOT/`, not an unbraced `$CLAUDE_SESSION_ID` — `scripts/discuss_skill_test.lua:37`
+- precision — `<sid8>/<number>` resolves only against other discussions (`M.resolve` searches `M.others`) — `skills/discuss/SKILL.md:45`
+- consistency — the refusal's `Use:` list omits `<sid8>/<id>` and the bare id — `skills/discuss/SKILL.md:47`
+- precision — `add` output is `%3d  %s`, not `<id> <title>` — `skills/discuss/SKILL.md:55`
+- spec drift — plan Task 2's verbatim block carries the false "one line on stdout" sentence, contradicting spec §5.2 "printed one per line"; recorded under Deviations — plan 04 Task 2 step 1
+- process — coder handoff reports 23 and 24 were not written to the session dir; the reviewer re-derived every red-first step (unquoted placeholder → `FAIL every_user_config_placeholder_is_single_quoted`; no `disable-model-invocation` → `FAIL only_the_author_can_invoke_it`; quoted start → exit 0; unquoted → `bad substitution`)
+
+## Probe results
+
+- `${user_config.KEY}` reaches skill text — raw `plugins-reference.md` (curl of `https://code.claude.com/docs/en/plugins-reference.md`, 42023 bytes) :495 "substituted in MCP server config, LSP server config, exec-form hook `args`, and skill and agent content" — as the plan assumes.
+- `${CLAUDE_SESSION_ID}` and `${CLAUDE_PLUGIN_ROOT}` are skill substitutions — raw `skills.md` (104030 bytes) :452, :456 — as assumed.
+- `number` is a valid `userConfig` type — raw `plugins-reference.md:431` "One of `string`, `number`, `boolean`, `directory`, or `file`" — as assumed.
+- referenced files exist — `ls plugins/claudestacks/skills/discuss/references/ plugins/claudestacks/scripts/install-airsl.sh` → `protocol.md`, `install-airsl.sh` — as assumed.
+- Task 3 start line — temp script under `sh` with `AIRSSTACK_HOME` in the temp dir → `started discussion plan04-c (0 topics)` / `exit=0`; unquoted `--keep` → `line 4: ${user_config.archive_keep}: bad substitution` / `exit=1` — as the plan expects.
+
+## Deviations
+
+- 2026-10-06 — Tasks 1–2 and Task 3 ran as two concurrent coders (disjoint files).
+- 2026-10-06 — No per-task commits; the author holds the commit gate. The plan commits Task 1's test together with Task 2 (`feat(repo): add the /claudestacks:discuss skill`), then Task 3 (`feat(repo): declare the discuss archive_keep option`).
+- 2026-10-06 — Task 2: the SKILL.md sentence at :35 departs from the plan's "exactly this content" block — the block's "prints one line on stdout" was disproven (see Review findings); the plan text at Task 2 step 1 is superseded by this entry and by `skills/discuss/SKILL.md:35-37`.
+- 2026-10-06 — Task 1: `every_command_is_named` needles differ from the plan's (anchored on command lines/table cells) so that removing a command fails the test.
+- 2026-10-06 — The end-of-plan checkpoint was not held: the author's standing goal for this run was to carry plans 03–05 through without pausing.

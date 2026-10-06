@@ -15,5 +15,13 @@
     "code-review",
     "agents",
     "orchestration"
-  ]
+  ],
+  "userConfig": {
+    "style_reinject": {
+      "type": "boolean",
+      "title": "Re-send reply rules every prompt",
+      "description": "Re-send the communication protocol's reply rules with every prompt. When off, they are still sent at every session start, /clear and compaction.",
+      "default": true
+    }
+  }
 }

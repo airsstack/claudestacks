@@ -100,8 +100,8 @@ the same axes, a file layout — draw it as an ASCII diagram, tree, or table ins
 Keep a sentence or two of prose around it for the outcome. A single fact stays a sentence — a box
 around one fact costs more than the sentence it replaced.
 
-**Load the `claudestacks:concise` skill before answering if it is not already loaded this session.**
-Its level and rules govern reply style; the guidance in this section sits on top of it.
+**The `claudestacks` plugin's hooks deliver the communication protocol's reply rules every
+session; there is nothing to load.** The guidance in this section sits on top of them.
 
 Write at full precision, never compressed, for exact error text, shell commands, code, wire formats,
 security warnings, and irreversible actions.
@@ -197,7 +197,7 @@ The plugin suite has its own check for a different reason: `cargo make plugins` 
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different
 questions — `check` compiles every file including the drivers no test loads, `test` runs the
-266 assertions across 16 files — and either can be run alone as `cargo make plugins-check` /
+399 tests across 20 files — and either can be run alone as `cargo make plugins-check` /
 `cargo make plugins-test`. They are separate jobs in `.github/workflows/lua.yml`, a workflow of its
 own filtered to `plugins/**`, because it gates the Lua rather than the Rust workspace. If either
 workflow file is missing, add it by hand: a session whose GitHub token lacks the `workflow` scope
@@ -225,7 +225,7 @@ plugin skills and references — invoke the relevant skill rather than expecting
 
 | Plugin | What it provides |
 |---|---|
-| `claudestacks` | coder, reviewer, explorer; orchestration driver; process guidelines; project-local snapshot memory; concise output mode |
+| `claudestacks` | coder, reviewer, explorer; orchestration driver; process guidelines; project-local snapshot memory; /discuss communication protocol |
 | `claudestacks-sdlc` | AI-native SDLC workflow: committed intent → spec → plan → execute chain with distill/triage loops (`.claudestacks/sdlc/`) |
 | `claudestacks-guideline-rust` | Rust engineering guidelines and the Definition of Done |
 | `claudestacks-journal` | Obsidian-compatible journal vault kept outside the repo, written by isolated subagents |

@@ -37,7 +37,7 @@ Agents are leaves — they never spawn other agents. Chaining lives in `orchestr
 | `orchestrate` | Drives `explorer → coder → reviewer → user` per task; routes findings through the orchestrator; the user is the only commit gate. |
 | `context-handoff` | The driver half of the subagent report protocol: which tier a run's reports land in, the session lifecycle, and the resolved protocol path to hand each spawn. Its `references/protocol.md` is the authority for the file schema and return contract. |
 | `process-guidelines` | Conventional Commits (workspace-aware scope), model-routing, and the agent-orchestration flow. |
-| `concise` | Verbosity-reduction mode (lite / full / ultra). Clean professional terseness that persists across the session. See [Attribution](#attribution). |
+| `discuss` | `/claudestacks:discuss` opens, browses and closes a topic-indexed discussion: agents hand back a short summary plus numbered topics, the detail stays on disk until a topic is opened, and closed discussions are archived per project. Its `references/protocol.md` is the communication protocol, reply rules included. |
 | `snapshot-load` | Reads the project-local snapshot(s) and reports the rehydrated state. No-arg loads the current branch's latest; an explicit topic does a branch-agnostic topic search. |
 | `snapshot-save` | Captures a conversation snapshot (session summary + key snippets) into the project-local snapshot store, with a durability gate so thin sessions write nothing. No-arg captures the whole session; an explicit topic focuses the capture and tags it. |
 | `statusline` | Installs, inspects, or removes the Lua status line for Claude Code — a two-line render of path, git branch, context meter, output tokens, model, and rate limits. Gates on the `airsl` binary, refuses to overwrite a `statusLine` it does not own, and backs up `settings.json`. |
@@ -46,14 +46,16 @@ Agents are leaves — they never spawn other agents. Chaining lives in `orchestr
 
 - `SessionStart` (startup / resume / clear) → nudge to run `/claudestacks:snapshot-load`.
 - `SessionEnd` → nudge to run `/claudestacks:snapshot-save`.
-- `UserPromptSubmit` → re-inject the active `concise` level each turn (persistent concise mode; no-op
-  when no level is active).
+- `SessionStart` (every source) and `UserPromptSubmit` → print the communication protocol's reply
+  rules (per prompt unless the `style_reinject` option is off).
+- `PostToolUse` `Write`, `PreToolUse` `SubagentHandback`, `SubagentStop` → check communication
+  protocol reports, beside the Context Handoff check.
 
 The session hooks **nudge only** — you (the model) keep the selection and durability judgment.
 
-### Concise hook runtime
+### Hook runtime
 
-The `UserPromptSubmit` hook — like every other airsl-backed hook in the suite (`enforce.lua`,
+The reply-rules hook — like every other airsl-backed hook in the suite (`enforce.lua`,
 `rearm.lua`, SDD layout provisioning, the journal orientation card) — runs on
 [`airsl`](https://github.com/airsstack/airsl), the embedded Lua runtime, and its launcher exits
 silently when the `airsl` binary is not installed, so that hook's own effect disappears with no
@@ -62,7 +64,7 @@ error at the point it fires. That per-hook silence is no longer the whole story:
 way the other hook wrappers do and, if that resolution fails, prints a `STATUS:` / `Disabled:` /
 `FIX:` block plus the install command — so a machine without it still gets one signal per session
 start, even though every individual hook stays quiet. The `Disabled:` line names the four hooks
-with a user-visible effect (rule enforcement, the concise tracker, SDD layout provisioning, the
+with a user-visible effect (rule enforcement, the reply rules, SDD layout provisioning, the
 journal orientation card); `rearm.lua` is equally inert without `airsl` and is left off
 deliberately, because naming every hook would bury the ones that change what a session does.
 
@@ -78,7 +80,7 @@ PATH — set `AIRSL_BIN` to the binary's full path.
 
 `snapshot-save` writes timestamped conversation snapshots (session summary + key snippets) to a
 store **outside the repo**, at `${AIRSSTACK_HOME:-~/.airsstack}/snapshots/<project-key>/` (same
-user-global root the `concise` hook uses), with a custom `index.md`. `<project-key>` is derived from
+user-global root the `discuss` archive uses), with a custom `index.md`. `<project-key>` is derived from
 `git rev-parse --git-common-dir`, so **all worktrees of one repo share a single store** and snapshots
 survive worktree teardown, branch churn, `target/` cleans, and `/clear`. Because it lives outside the
 repo, it can never be accidentally committed.
@@ -222,11 +224,10 @@ falling through to a false "repo and cache agree".
 
 ## Attribution
 
-The `concise` skill is **inspired by the [caveman](https://github.com/juliusbrussee/caveman)
-plugin** — claudestacks's professional-terseness take on the same idea. The adjustment is
-deliberate: where caveman compresses to caveman-speak, `concise` keeps readable prose and never
-touches code, shell, error text, or careful safety-critical instructions. The persistent
-level-based hook (lite / full / ultra) is claudestacks's own.
+The reply rules in the `discuss` skill's communication protocol replace an earlier terseness
+mode that was inspired by the [caveman](https://github.com/juliusbrussee/caveman) plugin.
+That earlier mode kept its state in `~/.airsstack/cc/concise.json`. Nothing reads that file any
+more; it can be deleted.
 
 ## License
 

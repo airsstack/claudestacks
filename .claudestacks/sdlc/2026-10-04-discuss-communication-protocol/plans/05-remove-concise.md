@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-10-04
 depends-on: [01, 02, 03, 04]
 ---
@@ -329,3 +329,35 @@ The installed `claudestacks` is read from the marketplace's checkout, not this w
 - `cargo make plugins` green with the expected totals; `claude plugin validate` passes.
 - Version `0.2.0` in `plugin.json`.
 - Live acceptance (Task 5) passes once installable.
+
+## Review findings
+
+One reviewer pass over Tasks 1–4; blocking set empty, so no fix round. Reviewer re-ran: `cargo make plugins` → `399 passed, 0 failed (20 files)`; `claude plugin validate plugins/claudestacks` → `✔ Validation passed`; closing grep → no output, also clean with `--untracked`; `target/debug/claudevs check plugins/claudestacks` → `ok wiring`, 0 errors.
+
+Left open (non-blocking):
+- reversion guard — nothing in CI catches a re-added `concise-tracker.sh` entry (dangling path) or skill reference; the closing grep is one-off and CI runs `claudevs check` only over the fixture corpus (Makefile.toml:167) — `hooks/hooks.json`
+- doc accuracy — the "lost without airsl" list omits the report checks (`comm-check.sh`, `handoff-check.sh` also exit 0 silently); same gap at :41 and README:67 — `hooks/preflight.sh:12`
+- doc accuracy — "beside the Context Handoff check" names a hook the Hooks list never lists; `enforce.sh` on PreToolUse is also unlisted — `plugins/claudestacks/README.md:52`
+- doc accuracy — "The session hooks **nudge only**" now follows a bullet about comm-check, which blocks (exit 2 on gate events, block decision on PostToolUse) — `plugins/claudestacks/README.md:54`
+- doc accuracy — the old state path is given as `~/.airsstack/cc/concise.json`, but the deleted code honoured `$AIRSSTACK_HOME`; spec §9 uses the same wording — `plugins/claudestacks/README.md:229`
+- doc accuracy — "deliver the reply rules every session; there is nothing to load" holds only with airsl installed (`style.sh` exits 0 silently without it) — `CLAUDE.md:103`
+- consistency — `/discuss` (plan-mandated) where every other surface says `/claudestacks:discuss`; whether the bare form resolves is not verified — `CLAUDE.md:228`
+- amendment hygiene — the plan text still quotes `\d+` and expects 387 / 17 + 28; recorded under Deviations — plan Tasks 2–4
+- coverage — the closing grep as written skips untracked files, so plans 03/04's uncommitted files were outside it until the reviewer re-ran with `--untracked` (clean); closes once committed — plan Task 4 step 2
+
+## Probe results
+
+- control grep before editing — the Task 1 step 1 `git grep` (excluding the files Task 1 deletes) listed the plan's hits exactly, except `plugins/claudestacks/hooks/hooks.json:46` where the plan says `:38` (plan 01 added the `style.sh` entries above it) — line number against the plan; text unchanged.
+- comm_report topic regex — `plugins/claudestacks/scripts/lib/comm_report.lua:16` reads `regex.compile([[^([0-9]+)\. (\S.*)$]])` — **against the plan's Task 2 step 2 quote** (`\d+`, changed by plan 02's fix round).
+- closing grep after Task 4 — `git grep … -- . ':!crates' ':!.claudestacks'; echo "exit=$?"` → `exit=1`, no output — as the plan expects.
+- gate totals — `cargo make plugins` → `67 file(s) compiled, 0 failed` / `399 passed, 0 failed (20 files)` — **against the plan's 387**: plan 02 shipped 19 comm_report tests (17 planned) and plan 03 shipped 38 discuss tests (28 planned); 387 + 2 + 10 = 399.
+
+## Deviations
+
+- 2026-10-06 — One coder for Tasks 1–4, run concurrently with plan 04's fix round on disjoint files.
+- 2026-10-06 — No per-task commits; the author holds the commit gate. Messages, one per task: `refactor(repo): remove the concise skill and its prompt tracker`, `docs(repo): reword the claudestacks plugin's concise mentions`, `docs(repo): reword the repository's concise mentions` (body: the CLAUDE.md figure is the gate's 399/20, not the plan's 387, because plans 02 and 03 shipped 19 + 38 tests, not 17 + 28), `chore(repo): bump claudestacks to 0.2.0 for the discuss protocol`.
+- 2026-10-06 — Task 1 step 2: files deleted with plain `rm`, not `git rm`, so nothing is staged; `git status` shows them as ` D`.
+- 2026-10-06 — Edits anchored on the quoted text rather than the line numbers, which drifted (see Probe results).
+- 2026-10-06 — Task 2 step 2: the `enforce_test.lua` comment quotes the actual `comm_report.lua:16` regex, `[0-9]+`, not the plan's `\d+`. The plan text at Task 2 step 2 is superseded by this entry.
+- 2026-10-06 — Task 3 step 3 / Task 4 step 3: `CLAUDE.md:200` says `399 tests across 20 files`, the gate's figure, as the step allows.
+- 2026-10-06 — Task 5 (live acceptance) not run: it needs the marketplace checkout to hold this branch, then `claude plugin update claudestacks@claudestacks` and a new session. It is the author's by-hand step.

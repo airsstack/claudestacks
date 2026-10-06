@@ -40,7 +40,7 @@ project's spec-driven, review-gated development methodology for
 
 | Plugin | What it provides |
 | --- | --- |
-| **`claudestacks`** | Execution engine: a TDD `coder`, a merged code+spec `reviewer`, a read-only `explorer`, an `orchestrate` driver, process guidelines, project-local snapshot memory, and a `concise` output mode. |
+| **`claudestacks`** | Execution engine: a TDD `coder`, a merged code+spec `reviewer`, a read-only `explorer`, an `orchestrate` driver, process guidelines, project-local snapshot memory, and `/claudestacks:discuss`, a communication protocol with topic-indexed agent output. |
 | **`claudestacks-sdlc`** | AI-native SDLC workflow: a committed `intent` → `design` → `plan` → `execute` chain under `.claudestacks/sdlc/`, with `distill`/`triage` feedback loops and a `status` board. |
 | **`claudestacks-guideline-rust`** | Rust engineering guidelines plus a strict Definition-of-Done, delivered as a single lazily-loaded skill the execution agents consult when they touch Rust. |
 | **`claudestacks-journal`** | Transparent, note-based experiential memory: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index (`capture` / `note` / `recall` / `link` / `review` / `helped`). |
@@ -58,8 +58,9 @@ lineages — the stage model and `distill`/`triage` feedback loops implement Ant
 [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook), while the
 `design` → `plan` → `execute` discipline (gated design dialogue, TDD plan format, checkpointed
 execution) descends from the retired `claudestacks-sdd`, itself adapted from the
-[superpowers](https://github.com/obra/superpowers) plugin. The `concise` skill in `claudestacks`
-is inspired by [caveman](https://github.com/juliusbrussee/caveman).
+[superpowers](https://github.com/obra/superpowers) plugin. The reply rules in `claudestacks`'s
+communication protocol replace an earlier terseness mode inspired by
+[caveman](https://github.com/juliusbrussee/caveman).
 
 ## Commands
 

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-10-04
 depends-on: [02]
 ---
@@ -1300,3 +1300,65 @@ end
 - `cargo make plugins` green, with the twenty-eight `discuss_test.lua` tests among the passes, each seen failing first.
 - Task 10 step 3 transcript reproduced, including a non-zero exit for an unknown topic and a `start` that survives the unset-option placeholder.
 - Checkpoints: after Task 5 and at the end of the plan.
+
+## Review findings
+
+Two reviewer passes (Tasks 1–5, Tasks 6–10), one fix round each. Both named the blocking set empty.
+
+Tasks 1–5 (fixed in fix round 1; `cargo make plugins-test` → `395 passed, 0 failed (20 files)`):
+- unguarded fix — `add` running `handoff.check` had no guard; added a base-schema-only refusal test, red with `handoff.check(file)` → `{}` — `scripts/discuss_test.lua`
+- unguarded fix — `start` calling `prune` had no guard; added a start-prunes test, red with the `M.prune(...)` call deleted — `scripts/lib/discuss.lua` `M.start`
+- correctness — `add` duplicate check compared raw strings, so `/var/…` and `/private/var/…` spellings of one report were added twice; now canonicalized at the top of `M.add` and stored canonical; seen red first — `scripts/lib/discuss.lua` `M.add`
+- amendment hygiene — the approved Task 3 test deviation was not written into the plan; recorded under Deviations below — plan Task 3
+
+Tasks 1–5, left open (non-blocking):
+- data loss, edge — `M.load` returns nil for both missing and corrupt index.json, so `start` overwrites a corrupt index with an empty one and orphans `reports/` — `scripts/lib/discuss.lua` `M.load`/`M.start`
+- edge — `keep("1e309")` is `inf` (pruning off); `"0x10"` → 16; `"1e3"` → float — `scripts/lib/discuss.lua` `M.keep`
+- nit — `report(dir, name, titles, extra)` helper's `extra` is never passed — `scripts/discuss_test.lua`
+- citation hygiene — comment cites `hooks/lib/enforce.lua:35-174` while plan header and spec §5.4 cite `85-174` — `scripts/lib/discuss.lua`
+- determinism — prune sort on `touched` alone has no tie-break; a non-numeric `touched` raises in the comparator — `scripts/lib/discuss.lua` `M.prune`
+- consistency — `add` parses topics from line 1 while `comm.check_lines` parses from `body_from` — `scripts/lib/discuss.lua` `M.add`
+- spec drift — spec §5.1 index schema says `"closed": <ts>|null`; the file omits the key while open — spec §5.1
+- report accuracy — coder report said 14 tests, file had 16 — handoff report 07
+
+Tasks 6–10 (fixed in fix round 2; `cargo make plugins` → `69 file(s) compiled, 0 failed` / `413 passed, 0 failed (20 files)`):
+- correctness — `done` compared the canonical stored path against a non-canonical `reports` dir, so under a symlinked root a main-thread report was copied again as `02-01-…`; `reports` now canonicalized; seen red first (`01-main-why.md, 02-01-main-why.md`) — `scripts/lib/discuss.lua` `M.done`
+- correctness — `M.section` matched the heading on any line, so a `## 1. alpha` line in `<summary>` made `show` return summary text; matching now starts after `<detail>`; seen red first — `scripts/lib/discuss.lua` `M.section`
+- unguarded behaviour — `done` on a closed discussion and `done` leaving reports already in `reports/`; guard tests added (second covered by the symlinked-root test), red under the reviewer's mutations — `scripts/lib/discuss.lua` `M.done`
+- unguarded behaviour — `report_path` closed-state refusal and session check; guard tests added, red under the reviewer's mutations — `scripts/lib/discuss.lua` `M.report_path`
+
+Tasks 6–10, left open (non-blocking):
+- doc accuracy — CLI header says "On failure prints one line on stdout"; `add` prints one line per violation and a lib-raised error prints nothing to stdout — `scripts/discuss.lua:7`
+- argument parsing — `--session`/`--keep` take the next token unconditionally (`start --session --keep 5` opens a discussion named `--keep`) — `scripts/discuss.lua:33`
+- argument parsing — unknown flags and extra positionals are ignored (`list --archiv` lists the current session, exit 0) — `scripts/discuss.lua:36`
+- risk — with neither AIRSSTACK_HOME nor HOME readable, the root falls back to a relative `.airsstack` inside the working directory — `scripts/discuss.lua:55`
+- UX — `show` with no id prints `unknown topic: ` — `scripts/discuss.lua:93`
+- unguarded behaviour — `section` dropping trailing blank lines has no test — `scripts/lib/discuss.lua` `M.section`
+- edge — any `<sid8>` prefix length is accepted and the newest match wins, so two sessions sharing 8 chars shadow the older — `scripts/lib/discuss.lua` `M.resolve`
+- question — `show <sid8>/<n>` saves the other discussion's index, bumping its `touched` (retention) in an unlocked read-modify-write — `scripts/lib/discuss.lua` `M.show`
+- edge — `next_number` matches `^(%d%d)%-`, so past 99 reports it repeats a number — `scripts/lib/discuss.lua` `M.next_number`
+- spec drift — spec §11 says `discuss_test.lua` covers every command's exit cases; the CLI layer has no automated test (plan Task 10: by design) — spec §11
+- spec drift — spec §5.2 lists `list --archive` fields as `<sid8>/<n>`, title, state; the output is `<sid8>/<n>  <state>  <title>` — spec §5.2
+- amendment hygiene — the approved Task 7/8 deviations were not written into the plan; recorded under Deviations below — plan Tasks 7–8
+
+## Probe results
+
+- airsl module surface — `airsl run --policy confined --allow-read / p03probe.lua` → `fs: … list,mkdir,read,read_lines,remove,remove_dir,rename,…,tempdir,…,write`; `hash: hash_file,hex,sha1,sha256`; `json: decode,encode,encode_pretty`; `path: absolute,basename,dirname,ext,is_absolute,join,normalize,relative_to,stem`; `env: all,get,set`; `stdio: error,isatty,lines,read,write` — as the plan assumes.
+- `fs.mkdir` creates parents; empty `topics` round-trips — `airsl run --policy confined --allow-read / --allow-write /private/var/folders p03probe2.lua` → `mkdir parents: true true`; encode gives `"topics": {}`; `decode ok: true table 0`; `ipairs count: 0` — as the plan assumes.
+- `json.decode` raises on bad input — same run → `decode bad: false lua error in <json>: key must be a string at line 1 column 2` — as assumed (Task 3 wraps it in pcall).
+- `fs.list` returns name strings; `fs.remove_dir` removes a non-empty tree — same run → `list type: table string a`; `remove_dir non-empty: true false` — as assumed.
+- `fs.list` raises on a missing dir — `p03probe3.lua` → `list missing: false list failed on \`…/p03-no-such-dir-xyz\`: No such file or directory (os error 2)` — as Task 8 assumes.
+- reference key constant — `printf '%s' '/Users/someone/my repo/.git' | shasum | cut -c1-8` → `73a3d285`; `printf '%s' 'my repo' | LC_ALL=C tr -c 'A-Za-z0-9._-' '-'` → `my-repo` — matches Task 2's `my-repo-73a3d285`.
+- snapshot-save anchor — `sed -n 71,75p skills/snapshot-save/SKILL.md` shows "`sanitize` character class and an 8-hex-digit hash; `claudestacks-journal`'s" at :73 — present (plan said line 74).
+- Task 10 runtime — `airsl run --policy confined --allow-env HOME --allow-read / p03probe4.lua start --session x` → `time: table function 1791253202`; `env.get ungranted: false env.get denied: \`AIRSSTACK_HOME\` is not granted — the allowed names are HOME`; `env.get granted HOME: true /Users/hiraq`; `arg: start --session` — as assumed.
+- **Against the plan:** Task 3's `a_session_id_with_a_path_separator_is_refused` stayed green under its own step-4 mutation (`check_session` pattern → `"^.+$"`): `384 passed, 0 failed`. The coder's probe showed the `..` refusal came from the sandbox — `cannot resolve <tmp>/discussions/repo-00000000/../evil to check it against the policy: it climbs through a directory that does not exist` — raised by `fs.mkdir` in `M.save`, because `project()` had not been created.
+
+## Deviations
+
+- 2026-10-06 — One coder per batch (Tasks 1–5, Tasks 6–10) rather than one per task: every task writes the same two files, so they could not run concurrently.
+- 2026-10-06 — No per-task commits; the author holds the commit gate. Messages that would have been used: `feat(repo): parse the discuss archive keep count`, `feat(repo): port the per-repository key into lib/discuss`, `feat(repo): start or resume a discussion`, `feat(repo): prune old discussions when one starts`, `feat(repo): add a report's topics to the discussion index`, `feat(repo): list a discussion's topics and the archive`, `feat(repo): show one discussion topic`, `feat(repo): close a discussion and archive its reports`, `feat(repo): give main-thread discussion reports a path`, `feat(repo): add the discuss command line`.
+- 2026-10-06 — Task 3 step 1: `a_session_id_with_a_path_separator_is_refused` now runs `fs.mkdir(dir)` before its two pcalls. The plan's version passed for the wrong reason (see Probe results); with the directory present the `"^.+$"` mutation goes red. Step 2's explanation in the task text is superseded by this entry.
+- 2026-10-06 — Task 5 checkpoint not held: the author's standing goal for this run was to carry plans 03–05 through without pausing; the batch was reviewed and presented in the run log instead.
+- 2026-10-06 — `M.add` canonicalizes the report path and stores the canonical form (review fix, Tasks 1–5). Consequences: `M.done` canonicalizes `reports` before comparing (review fix, Tasks 6–10), and two plan tests assert against the stored path rather than the raw one — `show_names_a_vanished_report` expects `"report gone: " .. index.topics[1].report`; `done_records_a_vanished_report_and_still_closes` captures the stored path before `fs.remove`.
+- 2026-10-06 — Task 7: `M.section` trims trailing whitespace on each line before comparing it to the heading and the terminators (comm_report trims both titles and detail headings, so `add` accepts what the plan's exact match would not find), and matches only after `<detail>`. Added `show_finds_a_heading_that_carries_trailing_spaces` and a summary-heading test, each seen red first. The `</detail>` trim is unreachable through `add` and untested.
+- 2026-10-06 — Test count: the verification summary's "twenty-eight `discuss_test.lua` tests" is now 38 — the plan's 28 plus 10 added by the fix rounds and the Task 7 deviation.

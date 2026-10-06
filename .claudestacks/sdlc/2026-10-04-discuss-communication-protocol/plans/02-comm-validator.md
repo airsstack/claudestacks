@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-10-04
 ---
 
@@ -681,3 +681,34 @@ Facts this plan encodes, each checked on 2026-10-04:
 - Task 5 step 4: a non-conforming protocol report exits 2 with `topics-missing` on the gate event and yields the block JSON on `PostToolUse`; a report without `protocol:` exits 0.
 - `claude plugin validate plugins/claudestacks` passes.
 - Checkpoint: stop here for the author's review before plan 03.
+
+## Review findings
+
+One `claudestacks:reviewer` pass (2026-10-06; a first spawn died on an expired login before reporting). Verdict SPEC: COMPLIANT; DoD re-run green (373 passed, 0 failed). Blocking set: the two lines marked fixed below.
+
+- correctness (🔴 bug) — TOPIC regex `^(\d+)\. (\S.*)$` matches Unicode digits; `１. a` gave `tonumber` nil and `comm_report.lua:113: attempt to concatenate a nil value (field 'n')`, which `--fail-open … || exit 0` turned into exit 0 on both gate events — `scripts/lib/comm_report.lua:16` — FIXED: regex is `^([0-9]+)\. (\S.*)$`; new test `a_non_ascii_digit_topic_is_malformed_not_a_crash`, red with the old regex: `FAIL  a_non_ascii_digit_topic_is_malformed_not_a_crash`; verified by `cargo make --cwd <worktree> plugins-test` → `375 passed, 0 failed (19 files)`.
+- correctness (🟡 risk) — `<detail>` lines stored untrimmed while topic titles are trimmed, so `## 1. a ` raised a false `topic-heading-missing` — `scripts/lib/comm_report.lua:120` — FIXED: `present[line:match("^(.-)%s*$")] = true`; new test `a_detail_heading_with_trailing_space_still_matches`, red without the trim: `FAIL  a_detail_heading_with_trailing_space_still_matches`; same gate run → `375 passed, 0 failed (19 files)`.
+- comment vs code (🟡 risk) — `M.block` comment claimed the base validator reports a missing close; false for `<topics>`, so an unclosed `<topics>` after `</detail>` passes both validators — `scripts/lib/comm_report.lua:18-21` — comment corrected; behaviour unchanged (a new violation id would need spec §4 + protocol.md amendment). OPEN.
+- comment accuracy (🔵) — "same three events … beside it", but SubagentStop group has no matcher, wider than handoff-check's — `scripts/comm_check_hook.lua:4` — not fixed.
+- correctness edge (🔵) — `01. a` normalises to n=1, then heading check demands `## 1. a` — `scripts/lib/comm_report.lua:48` — not fixed.
+- comment claim (🔵) — forward reference to `discuss.lua add` (plan 03) — `scripts/lib/comm_report.lua:60` — not fixed; true once plan 03 lands.
+- consistency (🔵) — a second `<topics>` block is silently ignored; no `topics-repeated` — `scripts/lib/comm_report.lua:96` — not fixed.
+- question (❓) — empty `<topics></topics>` with a `<detail>` passes; intended? — `scripts/lib/comm_report.lua:97` — open for the author.
+- unit-test coverage (🔵) — surviving mutations: numbering-loop `break`, `declared == ""` guard, early return after `protocol-unknown`, pcall in `M.check`, `from` in `M.block` — `scripts/comm_report_test.lua` — not fixed.
+- reversion guard (🔵) — nothing in `cargo make plugins` exercises driver, launcher, or hooks.json registration (spec §11 by design) — `hooks/hooks.json`, `hooks/comm-check.sh`, `scripts/comm_check_hook.lua` — not fixed.
+- (🔵) SubagentStop has no matcher and driver ignores `stop_hook_active` (`hooks.md:2426`); whether the Stop continuation cap bounds SubagentStop is not verified — `hooks/hooks.json` — not fixed.
+- spec drift (🔵) — spec §4 `topics-missing` is "no `<topics>` pair"; unclosed `<topics>` counts as present — spec §4 — not fixed.
+- known deviation (🔵) — no per-task commits — plan tasks 1–5 — see Deviations.
+
+## Probe results
+
+- Claim: `regex.compile([[^(\d+)\. (\S.*)$]]).captures` returns `[1]`,`[2]` on match, nil otherwise. Command: `airsl run --policy confined --allow-read /private/tmp/claude-501 <scratch>/rx.lua` over `"12. hello world"`, `"12.hello"`, `"x. y"`. Output: `12	hello world` / `nil` / `nil`. Agrees with plan.
+- Claim (reviewer probe, AGAINST PLAN): the same regex is ASCII-only. Input `１. a`; output `comm_report.lua:112: attempt to concatenate a nil value (field 'n')`. `\d` is Unicode in airsl's regex; the plan's Task 1 code was wrong.
+- Structural: `handoff_report.lua` frontmatter `:157-172`, tag-alone `:206-209`, `file_from_payload` `:362-378`, `M.check` `:228`; `handoff_check_hook.lua:59-60` emit; `handoff-check.sh` exit rules; hooks.json groups `:66`, `:77`, `:88` — all as the plan states (read 2026-10-06).
+
+## Deviations
+
+- 2026-10-06 — One coder ran tasks 1–5 in order (each with its own red-green and mutation) instead of one coder per task; the tasks share `comm_report.lua`/`comm_report_test.lua` and are strictly sequential.
+- 2026-10-06 — Per-task commits not made; the user holds the commit gate. Messages, in order: `feat(repo): parse the communication protocol's topics block`; `feat(repo): check the communication protocol's report additions`; `test(repo): pin that a communication report stays a valid handoff report`; `feat(repo): choose the communication check's output per hook event`; `feat(repo): register the communication protocol report hook`.
+- 2026-10-06 — Task 1's TOPIC regex changed from `^(\d+)\. (\S.*)$` to `^([0-9]+)\. (\S.*)$` (review fix); detail headings trimmed before lookup. The suite has 19 `comm_report_test.lua` tests, not 17. The spec (`N. <title>`) is unaffected. Plan 05 Task step at `05-remove-concise.md:155` still quotes the old regex.
+- 2026-10-06 — `hooks/comm-check.sh` is mode 755 (siblings mixed: `handoff-check.sh` 755, `style.sh` 644); invoked via `sh`, so mode does not affect behaviour.

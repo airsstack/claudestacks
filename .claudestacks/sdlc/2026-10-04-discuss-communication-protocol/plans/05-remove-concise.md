@@ -1,5 +1,5 @@
 ---
-status: executing
+status: done
 created: 2026-10-04
 depends-on: [01, 02, 03, 04]
 ---
@@ -351,6 +351,7 @@ Left open (non-blocking):
 - comm_report topic regex — `plugins/claudestacks/scripts/lib/comm_report.lua:16` reads `regex.compile([[^([0-9]+)\. (\S.*)$]])` — **against the plan's Task 2 step 2 quote** (`\d+`, changed by plan 02's fix round).
 - closing grep after Task 4 — `git grep … -- . ':!crates' ':!.claudestacks'; echo "exit=$?"` → `exit=1`, no output — as the plan expects.
 - gate totals — `cargo make plugins` → `67 file(s) compiled, 0 failed` / `399 passed, 0 failed (20 files)` — **against the plan's 387**: plan 02 shipped 19 comm_report tests (17 planned) and plan 03 shipped 38 discuss tests (28 planned); 387 + 2 + 10 = 399.
+- spec P3 on a marketplace install — P3 was probed only with `--plugin-dir` and said "A marketplace-installed plugin was not probed". In the Task 5 session (marketplace install, 0.2.0, `archive_keep` never set), the session reported that the skill "handed me --keep with ${user_config.archive_keep} left in literally" and that `discuss.keep` fell back to 20. So an unset option stays literal on a marketplace install too; the single-quoting and the fallback (spec P3a, §5.3) handle it as designed.
 
 ## Deviations
 
@@ -360,4 +361,4 @@ Left open (non-blocking):
 - 2026-10-06 — Edits anchored on the quoted text rather than the line numbers, which drifted (see Probe results).
 - 2026-10-06 — Task 2 step 2: the `enforce_test.lua` comment quotes the actual `comm_report.lua:16` regex, `[0-9]+`, not the plan's `\d+`. The plan text at Task 2 step 2 is superseded by this entry.
 - 2026-10-06 — Task 3 step 3 / Task 4 step 3: `CLAUDE.md:200` says `399 tests across 20 files`, the gate's figure, as the step allows.
-- 2026-10-06 — Task 5 (live acceptance) not run: it needs the marketplace checkout to hold this branch, then `claude plugin update claudestacks@claudestacks` and a new session. It is the author's by-hand step.
+- 2026-10-06 — Task 5 (live acceptance) run by the author after PR #12 merged (`f217373`), on the updated 0.2.0 install. Observed: the session's reply followed the reply rules (outcome first, an ASCII tree for the layout, short prose), and `/claudestacks:discuss` ran `start` with the unset option passed literally and defaulting to 20 (see Probe results). Steps 3–6 were not reported one by one; the author judged the run good enough and accepted it. Step 7 (record in the PR body) is replaced by this entry, since PR #12 had already merged.

@@ -9,7 +9,7 @@
 # states what is broken, what is disabled, and how to fix it, with nothing aimed at the model — hook
 # stdout is model-visible context, not a place to steer the model's next reply. Every other hook in
 # the suite is guarded to exit silently without airsl, so a machine that lacks it loses rule
-# enforcement, the concise tracker, SDD layout provisioning and the journal orientation card — all
+# enforcement, the reply rules, SDD layout provisioning and the journal orientation card — all
 # with no signal anywhere. This is still the right place for the check, because it needs nothing but
 # POSIX sh and so works precisely on the machines where every airsl-backed hook is dead.
 #
@@ -38,7 +38,7 @@ if [ -z "$AIRSL" ]; then
   DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || DIR=""
   echo
   echo 'STATUS: the airsl runtime was not found, so every claudestacks plugin hook is inert.'
-  echo 'Disabled: rule enforcement, the concise tracker, SDD layout provisioning, and the'
+  echo 'Disabled: rule enforcement, the reply rules, SDD layout provisioning, and the'
   echo 'journal orientation card.'
   echo 'FIX: install airsl, then start a new session.'
   if [ -n "$DIR" ]; then

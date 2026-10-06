@@ -1,7 +1,7 @@
 {
   "name": "claudestacks",
-  "version": "0.1.7",
-  "description": "Execution engine: a TDD coder, a merged code+spec reviewer, and a read-only explorer, plus an orchestration driver, process guidelines, project-local memory, and a concise response mode (inspired by the caveman plugin, github.com/juliusbrussee/caveman).",
+  "version": "0.2.0",
+  "description": "Execution engine: a TDD coder, a merged code+spec reviewer, and a read-only explorer, plus an orchestration driver, process guidelines, project-local memory, and /claudestacks:discuss — a communication protocol that keeps agent detail on disk behind numbered topics.",
   "author": {
     "name": "rstlix0x0",
     "email": "rstlix.dev@gmail.com"
@@ -15,5 +15,19 @@
     "code-review",
     "agents",
     "orchestration"
-  ]
+  ],
+  "userConfig": {
+    "style_reinject": {
+      "type": "boolean",
+      "title": "Re-send reply rules every prompt",
+      "description": "Re-send the communication protocol's reply rules with every prompt. When off, they are still sent at every session start, /clear and compaction.",
+      "default": true
+    },
+    "archive_keep": {
+      "type": "number",
+      "title": "Discussions kept per project",
+      "description": "How many /claudestacks:discuss discussions to keep per project besides the current one. Older ones are removed when a new one starts.",
+      "default": 20
+    }
+  }
 }

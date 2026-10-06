@@ -42,7 +42,7 @@ ${AIRSSTACK_HOME:-~/.airsstack}/snapshots/<project-key>/
 
 Why outside the repo: snapshots are per-user **local persistence** — they must survive worktree
 teardown, branch churn, `target/` cleans, and `/clear`, and must never be accidentally committed.
-Keeping them in `~/.airsstack` (same root the `concise` hook uses) gives one user-global state
+Keeping them in `~/.airsstack` (same root the `discuss` archive uses) gives one user-global state
 location, shared across every worktree of the same repo. Intentionally NOT shareable via git.
 
 The index file is named `index.md` **on purpose** — never name it `MEMORY.md`. `MEMORY.md` is the
@@ -71,7 +71,9 @@ Compute it the same way every time so all worktrees of one repo map to one store
 
 Concretely (this block is the reference form, and it is ported elsewhere — keep them in sync).
 `hooks/lib/enforce.lua`'s `M.project_key` computes the identical key in Lua, down to the same
-`sanitize` character class and an 8-hex-digit hash; `claudestacks-journal`'s
+`sanitize` character class and an 8-hex-digit hash; `scripts/lib/discuss.lua`'s `M.project_key`
+is a second Lua copy, kept because `airsl` cannot `require` across `hooks/` and `scripts/`;
+`claudestacks-journal`'s
 `scripts/lib/vault.lua` `M.project_base` repeats the worktree-collapsing half without the hash.
 `snapshot-load/SKILL.md` and the plugin `README.md` describe this key in prose rather than
 restating it:

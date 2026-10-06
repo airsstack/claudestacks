@@ -62,7 +62,7 @@ local function resolve(overrides)
   return enforce.resolve(context)
 end
 
--- Splits `text` into lines. Every driver under `plugins/` (`enforce.lua`, `concise-tracker.lua`,
+-- Splits `text` into lines. Every driver under `plugins/` (`enforce.lua`, `style.lua`,
 -- `session-start.lua`, ...) is not `require`-able as a module — each reads stdin/its payload and
 -- runs at load time — so a driver's own emission call cannot be exercised directly from here.
 -- Reading its source and asserting on it is the crude but honest alternative: the property being
@@ -122,8 +122,8 @@ end
 -- uses exactly that construct, e.g. `enforce.lua`'s `"--show-toplevel"` — is not mistaken for a
 -- comment opener, which is how the previous version of this guard missed code written after such
 -- a string on the same line. Long bracket strings are tracked for the same reason, and they are
--- not hypothetical: `lib/concise.lua` builds its patterns with them (`regex.compile([[\bnormal
--- mode\b]])` and seven more), so a `--` inside one would truncate a real line of this suite.
+-- not hypothetical: `scripts/lib/comm_report.lua` builds its topic pattern with one
+-- (`regex.compile([[^([0-9]+)\. (\S.*)$]])`), so a `--` inside one would truncate a real line.
 --
 -- Long brackets are tracked at their own level (`[[`, `[=[`, `[==[` … each closed only by a `]`
 -- with the same run of `=`), in both forms Lua gives them: `--[==[ … ]==]` is a block comment and

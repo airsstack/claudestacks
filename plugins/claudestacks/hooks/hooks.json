@@ -18,6 +18,14 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/rearm.sh\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/style.sh\""
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -35,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/concise-tracker.sh\""
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/style.sh\" --turn"
           }
         ]
       }
@@ -56,6 +64,10 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/comm-check.sh\""
           }
         ]
       }
@@ -67,6 +79,10 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/comm-check.sh\""
           }
         ]
       }
@@ -78,6 +94,14 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-check.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/comm-check.sh\""
           }
         ]
       }

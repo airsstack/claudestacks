@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-10-14
 depends-on: [05, 06]
 built-on: a5a235079e03
@@ -392,3 +392,71 @@ printed `✔ Validation passed` on the unchanged plugin on 2026-10-14.
   `.claude-plugin` still reads `0.1.2`.
 - The Lua test count in `CLAUDE.md` is the count the suite printed.
 - Every board string quoted in the plugin README appears in `lib/status.lua`.
+
+## Review findings
+
+One `claudestacks:reviewer` spawn over the five files, 2026-10-14. Verdict:
+`SPEC: COMPLIANT-WITH-AMENDMENTS`, blocking set none. It re-ran `cargo make plugins`
+(`72 file(s) compiled, 0 failed`, `506 passed, 0 failed (22 files)`,
+`fingerprint gate: 8 cases passed`) and `claude plugin validate --strict` (`✔ Validation passed`),
+and found no `0.1.2` under `plugins/claudestacks-sdlc` or `.claude-plugin`. It checked the
+README's claims about the hook, the fingerprint, the roll-up and the skills against the code,
+and confirmed that commit 99eaddf's `plan` bullet and Attribution section survive. One fix round
+by a fresh coder followed, on the plugin README only, and applied all nine findings marked
+"sent to the fix round" below. Each board string the README now quotes was found by grep in
+`lib/status.lua` (`:349`, `:352`, `:370`, `:372`, `:397`, `:237`, `:257`). After the round,
+`cargo make plugins` read `506 passed, 0 failed (22 files)` with the fingerprint gate passed,
+and `claude plugin validate --strict` read `✔ Validation passed`.
+
+- correctness — the `execute` bullet omits that `intent disproven by plan NN` also holds the
+  walk-up on spec-skip chains — `plugins/claudestacks-sdlc/README.md:59-61` — sent to the fix round.
+- correctness — the sync table omits `intent disproven by plan NN`, which `intent` clears —
+  `README.md:110` — sent to the fix round. The plan's own table drops the spec-skip forms of
+  spec §3.2, so the defect starts in this plan's Task 1 text.
+- wording — rows hard-code `approved` and miss `stale (intent changed)` — `README.md:108-109`
+  — sent to the fix round.
+- wording — `chain complete` is called a disagreement with no next step — `README.md:103,112`
+  — sent to the fix round.
+- wording — the list of skills that read the board omits `intent` — `README.md:115` — sent to
+  the fix round.
+- wording — "refuses … out of sync" overstates the gate — `README.md:116` — sent to the fix
+  round.
+- wording — a pre-0.2.0 chain reads `INVALID` only with an approved spec or a live plan —
+  `README.md:116-117` — sent to the fix round.
+- wording — the hook prints the open row under a dropped parent, not the dropped row —
+  `README.md:141-142` — sent to the fix round.
+- wording, pre-existing — "Refuses a plan that isn't `approved`" contradicts execute's
+  draft-as-approval rule — `README.md:49-50` — sent to the fix round.
+- unguarded — nothing checks the test count in `CLAUDE.md:200` — not changed.
+- record — the 506 against 491 count was not yet under Deviations — fixed below.
+
+## Probe results
+
+- Task 3: `jq -r '.version'` printed `0.1.2` before the edit and `0.2.0` after;
+  `grep -rn '0\.1\.2' plugins/claudestacks-sdlc .claude-plugin` printed nothing (exit 1);
+  `claude plugin validate --strict plugins/claudestacks-sdlc` printed `✔ Validation passed`.
+- Task 4 step 1, the board, rendered from the worktree root after Task 3:
+
+  ```
+  CHAIN                             STATE                         NEXT
+  2026-08-29-claudevs-plugin-cache-hygiene  intent draft (triage)         review evidence
+  2026-10-13-sdlc-roadmaps-milestones  plan 01 executing, plan 02 executing, plan 03 executing, plan 04 executing, plan 05 executing, plan 06 executing, plan 07 executing  
+  DONE/DROPPED: 6 done, 2 dropped (not listed)
+  ```
+
+  No `INVALID`, `stale`, `blocked` or `disproven` part. Plans 01–06 read `executing`, not `done`,
+  because each flips to `done` only when the author accepts its completion report.
+
+## Deviations
+
+- 2026-10-14 — `CLAUDE.md` reads `506 tests across 22 files`, the count the suite printed, not
+  the 491 the plan expected. Plan 03 added 7 tests, and the review fix rounds of plans 04 and 06
+  added 6 and 2.
+- 2026-10-14 — No commit was made after any task; each task's commit step was skipped and the
+  commit gate left with the author, per the `execute` skill. So the version bump is not a
+  separate last commit yet.
+- 2026-10-14 — Tasks 2 and 3 ran in parallel, since they write different files.
+- 2026-10-14 — Task 4 found plans 01–06 at `executing`, not `done` as it expects. Their
+  completion reports wait for the author.
+- 2026-10-14 — No `claudestacks-sdlc:task-briefer` was spawned. Each coder read its own task
+  section of this plan by line range.

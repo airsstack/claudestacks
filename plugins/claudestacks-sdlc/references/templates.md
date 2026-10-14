@@ -101,31 +101,28 @@ when the goal statement already names the authority]
 
 ---
 
-## File structure
+## Files that change
 
 ```
 <path>   — [create|modify] <one-line description>
 <path>   — [create|modify] <one-line description>
 ```
 
-[optional: one paragraph naming a verification approach repeated at every task, e.g. a
-single command invoked the same way throughout]
+## Order of work
 
 ### Task 1 — <imperative title>
 
-**Files:** [omit this line entirely for a task with no file changes of its own, e.g. a
-closing commit task]
-- Create/Modify <path>
+**Files:** [omit this line entirely for a task with no file changes of its own]
+- Create/Modify/Test <path> — <what changes in it>
 
-**Steps:**
+**Change:** [the behaviour this task adds or changes, in prose; types or functions it
+introduces by name and one-line purpose]
 
-1. [a concrete step — failing test, code, or command]
-2. [...]
-3. Verify:
-   ```
-   $ <command>
-   ```
-   Expected: [what confirms this step worked]
+**Proof:** [each test by name, and what it asserts, in prose — written first by `execute`]
+- `<test name>` — <what it asserts>
+
+**Done when:** `<command>` passes and the stack's Definition of Done is green. Commit
+`<conventional commit subject>`.
 
 ### Task N — <imperative title>
 
@@ -133,10 +130,20 @@ closing commit task]
 
 ---
 
-## Verification summary (plan-level)
+## Risks
+
+- [what the change could break, which step is most risky, options not taken, and any
+  question only running code can answer — `execute` settles those with a probe]
+
+## Proof
 
 - [the plan-wide checks that prove every task's work holds together]
 ````
+
+A plan carries no implementation or test code: no function bodies, no test bodies, no
+diff. A command the implementer runs is fine. The shape follows the `plan.md` in Anthropic's
+AI-native SDLC playbook — files that change, order of work, risks, proof — and `execute`
+writes the code.
 
 Provenance keys per `artifact-chain.md` §6 may also appear in a plan's frontmatter.
 

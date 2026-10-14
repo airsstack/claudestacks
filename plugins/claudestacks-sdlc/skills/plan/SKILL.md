@@ -1,35 +1,54 @@
 ---
 name: plan
-description: Use when a chain's spec is approved (or its intent carries spec: skipped) and implementation plans are needed — decomposes the objective into a set of bite-sized test-first plans with exact file paths and complete code, proposes the plan fan-out and dependencies in dialogue, then writes them to the chain's plans directory. Invoke once a spec is approved (or skipped) and before any code is written.
+description: Use when a chain's spec is approved (or its intent carries spec: skipped) and implementation plans are needed — decomposes the objective into plans naming the files that change, the order of the work, the risks, and the tests that prove it, without writing any code; proposes the plan fan-out and dependencies in dialogue, then writes them to the chain's plans directory. Invoke once a spec is approved (or skipped) and before any code is written.
 ---
 
 # Plan
 
-Turn an approved spec (or a spec-skipped intent) into one or more construction manuals an
-implementer can execute with zero prior knowledge of the codebase: exact file paths, complete
-code, runnable commands, expected output, and a commit at the end of each task. Not aspirational
-prose.
+Turn an approved spec (or a spec-skipped intent) into one or more implementation plans, in the
+shape of the `plan.md` from Anthropic's AI-native SDLC playbook (Stage 3, the plan mode play):
+**the files that change, the order of the work, the risks, and the tests that prove it.**
 
-A plan stands alone. Whoever picks it up may not know the codebase, may not have read the spec,
-and shares no context with you — so every task carries everything that task needs.
+A plan stands alone. Iterate until an engineer who has never seen the conversation could
+implement the change from the plan alone — whoever picks it up may not know the codebase, may
+not have read the spec, and shares no context with you.
+
+## Hard gate — a plan carries no code
+
+This stage is plan mode: read the codebase, change nothing. The playbook puts design review
+"before any code is generated, when changing course is still a matter of editing a document",
+and implementation starts only once the plan is accepted. Writing the code here means
+`execute` writes it a second time.
+
+So, in this skill:
+
+- **Write no implementation code and no test code** — not in the plan, not in a scratch file,
+  not as a prototype to check the plan works. No function bodies, no test bodies, no diff.
+  `execute`'s coder writes the tests and the implementation, test-first.
+- **Run nothing that builds or exercises new code.** Reading files, `grep`, `git log`, a
+  binary's `--help`, and fetching documentation to a local file are the whole toolset.
+- **Name, don't write.** A task names the files, the types or functions it introduces (by
+  name and one-line purpose; their shape belongs to the spec), the behaviour that changes,
+  and each test by name with what it asserts in prose.
+
+A question that only running new code could answer is a risk, not a reason to prototype:
+write it under the plan's `## Risks` and let `execute` settle it with a probe.
+
+Three principles bind the content:
+
+- **Test-first, named here, written in `execute`.** Every behavioural change has its proving
+  tests named in the task that makes it — what each asserts, and the command that runs them.
+  The coder writes them first, watches them fail, then writes the code.
+- **Honor the active stack's guidelines.** Detect the stack from repo markers (`Cargo.toml` →
+  Rust) and load the matching guideline skill (`claudestacks-guideline-rust:rust-guidelines`).
+  Every file placement, module boundary, and named interface must already conform to its
+  architecture rules, and each task's done-check must include its Definition of Done.
+- **DRY / YAGNI.** No abstraction the objective does not require.
 
 Paths, naming, frontmatter, and state transitions all come from
 `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`; artifact body shapes come from
 `${CLAUDE_PLUGIN_ROOT}/references/templates.md`. Lazy-create the chain's `plans/` directory
 before first write — never assume `/claudestacks-sdlc:setup` ran.
-
-Three principles bind the content:
-
-- **TDD.** Every behavioral change is preceded by a failing test: write the failing test →
-  confirm it fails → minimal code to pass → confirm it passes → commit. No task skips the
-  red-green cycle.
-- **Honor the active stack's guidelines.** Detect the stack from repo markers (`Cargo.toml` →
-  Rust) and load the matching guideline skill (`claudestacks-guideline-rust:rust-guidelines`).
-  Every code block you write must already conform to its architecture rules, and each task's
-  verification must include its Definition of Done. A plan that emits rule-violating code is a
-  defect even if the code works.
-- **DRY / YAGNI.** No abstraction the objective does not require. Extract shared code only where
-  two tasks would genuinely duplicate it.
 
 ## State gate
 
@@ -108,9 +127,8 @@ Ask only when the answer changes the plan about to be written; anything derivabl
 the repo, or a loaded guideline is derived instead and stated as an overridable assumption.
 
 One sharpening against that rule: raise every ambiguity in the spec itself as a question, never
-resolve one as an assumption. A plan is a construction manual an implementer follows with zero
-other context — an assumption baked in silently here becomes code nobody agreed to, discovered
-tasks later. If the spec leaves open which file owns a behavior, where a task's boundary falls,
+resolve one as an assumption. A plan is followed by an implementer with zero other context —
+an assumption baked in silently here becomes code nobody agreed to, discovered tasks later. If the spec leaves open which file owns a behavior, where a task's boundary falls,
 or which of two reasonable readings it means, ask; do not pick one and note it in passing.
 
 Every gate below — the fan-out proposal, checkpoint placement, each plan's approval — is a real
@@ -146,9 +164,10 @@ plan.
 
 ## Re-verify the spec's external claims before they become code
 
-A plan turns the spec's prose into constants, exhaustive matches, expected test values and literal
-lists — the exact forms that are painful to correct once written. **This is the last gate before
+A plan turns the spec's prose into the facts a test will assert — values, exhaustive lists, field
+names — the exact forms that are painful to correct once written. **This is the last gate before
 someone writes code, and the spec is not a trustworthy source for facts about outside systems.**
+Checking a fact means reading the artifact, never building code to see what happens.
 
 Before writing a task that encodes such a fact, check it against the artifact — not against the spec
 that supplied it. Fetch documentation as raw source into a local file and grep it (`curl -sS -L
@@ -188,11 +207,11 @@ what is there, and refuses judgment if you ask for more. If `claudestacks:explor
 not resolve — the `claudestacks` main plugin is not installed — map the files inline here
 and tell the user the agent was unavailable. Never fail hard for want of the main plugin.
 
-## Task granularity
+## Order of work — task granularity
 
-Each task is a 2–5 minute action — doable, testable, and committable in one sitting. Longer
-means too coarse; break it down. "Write the implementation and tests for X" as one step is a
-collapsed red-green cycle — expand it.
+The tasks are the plan's order of work. Each is one step of it — doable, testable, and
+committable in one sitting, ending in a commit. A task too large to prove with a handful of
+named tests is too coarse; break it down.
 
 ## Header template
 
@@ -222,52 +241,36 @@ The Goal line is the scope guard. If you cannot write it without "and", stop and
 
 ## Task template
 
-Each task names its files, then walks the red-green cycle with real code and real expected
-output at every step. Substitute your actual language and names:
+Each task names its files, the change in behaviour, and the proof. Substitute your actual
+language and names:
 
 ````markdown
 ### Task N — [Short imperative title]
 
 **Files:**
-- Create `src/math/add.py`
-- Modify `src/math/__init__.py`
+- Create `src/math/add.py` — integer addition
+- Modify `src/math/__init__.py` — export `add`
 - Test `tests/test_add.py`
 
-**Steps:**
+**Change:** add `add(a, b)`, returning the sum of two integers, exported from `src.math`.
 
-1. Write the failing test in `tests/test_add.py`:
+**Proof:** written first, seen failing, then passing —
+- `test_add_two_positive_integers` — `add(2, 3)` is `5`
+- `test_add_negative_and_positive` — `add(-2, 3)` is `1`
 
-   ```python
-   def test_add_two_positive_integers():
-       assert add(2, 3) == 5
-   ```
-
-2. Run it and confirm failure:
-
-   ```
-   $ pytest tests/test_add.py
-   FAILED tests/test_add.py::test_add_two_positive_integers — NameError: name 'add' is not defined
-   ```
-
-3. Write the minimal implementation in `src/math/add.py`:
-
-   ```python
-   def add(a: int, b: int) -> int:
-       return a + b
-   ```
-
-4. Run it and confirm green:
-
-   ```
-   $ pytest tests/test_add.py
-   1 passed in 0.01s
-   ```
-
-5. Export from the module index, then commit `feat(math): add integer addition function`.
+**Done when:** `pytest tests/test_add.py` passes and the stack's Definition of Done is green.
+Commit `feat(math): add integer addition function`.
 ````
 
-Where two tasks share code structure, write it out in full in both — a plan that says "similar
-to Task N" is no longer standalone, which is the property the whole format exists to protect.
+No code block in a task holds implementation or test code. A command line the implementer
+runs is fine; a function body is not. Where two tasks touch the same structure, say so in
+both — a plan that says only "similar to Task N" is no longer standalone.
+
+After the last task, the plan closes with the playbook's two plan-wide sections:
+
+- **`## Risks`** — what the change could break, which step is most risky, what the plan
+  chose not to do, and any question only running code can settle (for `execute` to probe).
+- **`## Proof`** — the plan-wide checks that show every task's work holds together.
 
 ## Before saving — review by an agent
 
@@ -291,12 +294,10 @@ plans to the author. Do not re-spawn the reviewer over the revised set, and do n
 it again when the author asks for changes — revise and present.
 
 Rounds beyond the first return progressively smaller findings about the plan's internal
-reasoning, while the defects that actually reach code are wrong external facts and
-compile-level details. The first no round can catch, because every criterion but the two
-grounding ones compares documents to each other — grounding against the artifact, and
-against a run, is what replaces them.
-The second the compiler catches in seconds. A plan set that would need a second round
-needs rewriting, not re-reviewing.
+reasoning, while the defects that actually reach code are wrong external facts. No round
+can catch those, because every criterion but the grounding ones compares documents to each
+other — grounding against the artifact is what replaces them. A plan set that would need a
+second round needs rewriting, not re-reviewing.
 
 One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
 requirement satisfied in plan `03` is covered even though plan `01` says nothing about
@@ -328,7 +329,8 @@ than the report that reviewed it was not.
 
 The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
 § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
-the two that ground the set's claims outside it, and the no-placeholder list. Hold yourself to that no-placeholder list while drafting
+the two that ground the set's claims outside it, no implementation code, and the
+no-placeholder list. Hold yourself to that no-placeholder list while drafting
 rather than waiting for the agent to find them — a plan that reaches the reviewer full
 of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can
 act on, apply that same file's criteria inline yourself and tell the user the review ran

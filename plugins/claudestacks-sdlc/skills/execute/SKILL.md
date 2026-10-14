@@ -116,8 +116,9 @@ saying so.
 
 ## Load the plan through the briefer, not into your context
 
-A plan is a construction manual, often tens of kilobytes of code blocks. Reading it whole
-spends the main thread's context on material only the coder will ever type.
+A plan names files, behaviour, and tests for every task; it carries no code — writing the
+code is this skill's job, the playbook's "accept the plan and let Claude implement". Reading
+the plan whole still spends the main thread's context on detail only each task's coder needs.
 
 Spawn `claudestacks-sdlc:task-briefer` in `ledger` mode:
 
@@ -217,7 +218,7 @@ For each batch, in order:
    ```
 
    You get back each task's files, verifications, and Asserted facts. You do not get the
-   code blocks, and you do not need them.
+   task's prose, and you do not need it.
 
 3. **Prove what the task assumes.** See below. Do this before the coder builds on it, not
    after.
@@ -227,6 +228,9 @@ For each batch, in order:
    - `handoff-protocol: <the path /claudestacks:context-handoff gave you>` — the protocol;
    - `need: <the task-briefer handoff path>` — it reads its task's verbatim `<detail>`
      itself, and builds from that text, not from your paraphrase;
+   - the instruction that the plan names the change and its proving tests but carries no
+     code: the coder writes the named tests first, sees them fail, then writes the
+     implementation;
    - the stack guideline to load (e.g. `claudestacks-guideline-rust:rust-guidelines`) and
      the instruction that its architecture rules bind, not only its Definition of Done;
    - the exact verification commands the plan names for that task;
@@ -270,11 +274,11 @@ source to a local file and grep it —
 tool, which truncates a long page and hands the remainder to a small model that emits
 plausible invented content instead of an error.
 
-**Where the plan's own red-green cycle already proves the claim, that IS the probe — do not
-write a second one.** A task whose step 2 says "run it and confirm this exact failure" has
-its probe built in; the coder running that step settles it. Only claims the plan never puts
-under a test of its own need one of yours. Probes are for the load-bearing and unproven, not
-for every literal in the file.
+**Where a test the task names under Proof already exercises the claim, the coder's red-green
+run of it IS the probe — do not write a second one.** Only claims the plan never puts under a
+test of its own need one of yours, and the plan's `## Risks` section lists the questions its
+author left for this step to settle. Probes are for the load-bearing and unproven, not for
+every literal in the file.
 
 ## Verification budget — do not over-verify
 

@@ -103,6 +103,13 @@ deleted is worth more than any amount of reasoning about the source, and it is t
 to catch a behaviour that differs from what the code appears to say. Delete the probes
 afterwards; keep their output in the spec as the evidence.
 
+**A probe answers one question about what already exists — it never builds what the spec
+describes.** A few lines, one run, one fact. Implementing the feature to see whether the
+design works is a prototype, and a prototype here means `execute` writes the same code
+again later: in the playbook the code is written in Build, after the plan is accepted. A
+question only the new code could answer goes into the spec as an open risk for the plan to
+carry.
+
 Record the evidence inline, next to the claim, at the precision someone else could re-run.
 A spec section whose claims carry no citations is not finished, however confident it reads.
 

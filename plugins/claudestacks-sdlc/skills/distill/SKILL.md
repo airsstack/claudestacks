@@ -40,8 +40,8 @@ needed to reconstruct it. The whole corpus is in scope, across every chain, not 
 most recent one; a category that recurred six months ago and again last week is still a
 recurrence.
 
-Do not read those plan files yourself. A plan is a full construction manual and its
-findings section is a few lines, so scanning the corpus inline pulls an enormous amount
+Do not read those plan files yourself. A plan runs to many tasks and its findings
+section is a few lines, so scanning the corpus inline pulls an enormous amount
 of text in to extract very little — and that cost grows with every chain the repository
 accumulates, while the answer stays a short table. Spawn
 `claudestacks-sdlc:chain-reader` instead:

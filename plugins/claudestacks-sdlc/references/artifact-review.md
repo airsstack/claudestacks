@@ -109,29 +109,31 @@ though plan `01` says nothing about it.
 - **Type consistency** — every type, signature, and constant used in Task N+1 was defined
   in an earlier task or already exists. A forward reference is a defect: reorder, or add
   the definition.
-- **Guideline conformance** — every code block scanned against the active stack
-  guideline's architecture rules. If no guideline matches the stack, say so rather than
-  skipping silently.
+- **Guideline conformance** — every file placement, module boundary, and named interface
+  checked against the active stack guideline's architecture rules. If no guideline matches
+  the stack, say so rather than skipping silently.
+- **No implementation code** — a task holding a function body, a test body, or a diff is a
+  🔴 finding. The plan names files, behaviour, and tests; `execute` writes the code. A
+  command line the implementer runs is not code in this sense.
 - **External claims inherited from the spec are re-checked, not assumed.** Where a task
   encodes a fact about an outside system — a constant, an exhaustive match, a documented
   field name, a count in a test assertion — verify it against the fetched artifact, not
   against the spec that supplied it. A plan that faithfully transcribes a wrong spec is
   still a plan that will produce wrong code, and this is the last gate before someone
   writes it.
-- **A claim the plan makes in its own voice traces to a run, not to the draft it came
-  from.** Expected command output, the error message or code a test asserts on, an exit
-  status, a count, a version, a statement about how code the task does not create
-  behaves: each has to come from something the author opened or ran, and each goes stale
-  silently when the thing it quotes moves on. Re-run the cheap ones and report any whose
-  output differs; where a claim names no run at all, that is a finding even if it reads
-  as obviously true.
+- **A claim the plan makes about what already exists traces to something opened, not to
+  the draft it came from.** A count, a version, a field name, a statement about how code
+  the task does not create behaves: each cites the `file:line` or the fetched artifact it
+  came from, and each goes stale silently when the thing it quotes moves on. Where a claim
+  cites nothing, that is a finding even if it reads as obviously true. A claim that only
+  running new code could settle belongs under the plan's `## Risks`, not asserted as fact.
 
   This bullet and the one above it are the only two that leave the chain. The rest compare
   the plan set to the document above it, so a premise the spec got wrong is *confirmed* by
   each of them rather than caught, and another pass of the same comparison raises
-  confidence in that premise without ever testing it. Rounds do not substitute for a run.
+  confidence in that premise without ever testing it. Rounds do not substitute for the
+  artifact.
 - **No placeholders** — `TBD`, `TODO`, `implement later`; "add appropriate error handling
-  / validation / edge cases" without naming them and showing the code; "write tests for
-  the above" without the test code; a step saying *what* without showing *how*, with no
-  code block, command, or expected output; a reference to a type, function, or constant
-  defined neither earlier in the plan nor in the codebase.
+  / validation / edge cases" without naming which; "write tests for the above" without
+  naming each test and what it asserts; a task with no done-check command; a reference to
+  a type, function, or constant introduced neither earlier in the plan nor in the codebase.

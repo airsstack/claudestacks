@@ -41,7 +41,9 @@ question at a time, never a battery.
   back to the intent. Writes: `draft → approved` at the user's design-review approval.
 - **`plan`** — an `approved` spec (or an `approved` intent carrying `spec: skipped`) becomes
   one or more `plans/NN-<topic>.md` files, each with an explicit `depends-on:` so independent
-  plans are visibly parallelizable across worktrees. Writes: `draft → approved` per plan.
+  plans are visibly parallelizable across worktrees. A plan follows the playbook's
+  `plan.md` — files that change, order of work, risks, proof — and carries no code; the
+  code is written in `execute`. Writes: `draft → approved` per plan.
 - **`execute`** — an `approved` plan, referenced as `<chain>/<NN>`, becomes a reviewed,
   verified diff. Refuses a plan that isn't `approved`; warns if a `depends-on` plan isn't
   `done` yet. Cuts the plan's tasks into batches of genuinely independent work and runs
@@ -135,13 +137,15 @@ which agent was unavailable.
 
 ## Attribution
 
-Two lineages meet here. The stage model and the `distill`/`triage` feedback loops implement
-Anthropic's [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook).
-The `intent → design → plan → execute` execution discipline — gated design dialogue, TDD
-plan format, checkpointed execution with a user commit gate — descends from
+The stage model, the artifact shapes, and the `distill`/`triage` feedback loops implement
+Anthropic's [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook),
+which is the authority where the two lineages disagree. The execution discipline — gated
+design dialogue, test-first execution, a user commit gate — descends from
 `claudestacks-sdd`, itself adapted from the
 [superpowers](https://github.com/obra/superpowers) plugin
-(`superpowers@claude-plugins-official`).
+(`superpowers@claude-plugins-official`). Its plan format, which wrote complete code into the
+plan, was dropped for the playbook's `plan.md`: no code is written before the plan is
+accepted.
 
 ## License
 

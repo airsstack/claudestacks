@@ -24,7 +24,7 @@ pub fn to_lua(path: &Path) -> Result<String> {
         path: path.display().to_string(),
         source,
     })?;
-    let value: serde_json::Value = serde_yaml_ng::from_str(&text).map_err(|e| Error::CaseLoad {
+    let value: serde_json::Value = serde_saphyr::from_str(&text).map_err(|e| Error::CaseLoad {
         path: path.display().to_string(),
         reason: e.to_string(),
     })?;

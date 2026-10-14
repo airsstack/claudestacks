@@ -26,7 +26,7 @@ pub fn load(path: &Path) -> Result<Case> {
 
     let text = std::fs::read_to_string(path).map_err(|e| fail(e.to_string()))?;
     let value: serde_json::Value =
-        serde_yaml_ng::from_str(&text).map_err(|e| fail(e.to_string()))?;
+        serde_saphyr::from_str(&text).map_err(|e| fail(e.to_string()))?;
     let raw: RawCase = serde_json::from_value(value).map_err(|e| fail(e.to_string()))?;
 
     let stem = path

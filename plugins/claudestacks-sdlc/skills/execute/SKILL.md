@@ -420,3 +420,13 @@ After a plan flips to `done` — or when you were given a bare chain name whose 
   `intent disproven`. The walk-up fires on a later run, once the text is up to date.
 - **Other plans remain `draft`, `approved`, or `executing`.** Leave the intent as is and
   say what is still open.
+
+**Then the roll-up.** When the walk-up flipped the intent to `done` and that intent
+carries a `milestone` key, run the roll-up for the milestone's roadmap as the last step.
+Its procedure is defined once, in `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`:
+it closes each `approved` milestone whose chains are all finished, with at least one
+`done`, then the roadmap once its milestones are, again with at least one `done`. It is
+idempotent, and it flips without a fresh approval question — a consequence of state
+already earned on the chains. Tell the user each thing it closed, then render the board
+again and tell the user what the milestone's and the roadmap's rows read. An intent with
+no `milestone` key is a simple chain: there is nothing to roll up.

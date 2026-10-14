@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-10-14
 depends-on: [03, 04]
 built-on: a5a235079e03
@@ -699,3 +699,129 @@ This task changes no repository file. It builds a throwaway chain root under the
 - Each of Tasks 1–5 showed its file or phrase absent before the change and present after.
 - The walkthrough's real output matches every row of Task 6's table: the milestone reads `approved, 0 of 0 done` → `park scope` before anything is parked, counts parked `draft` intents in its total, reads `milestone complete` → `roll up` once its members are finished, and a chain naming a closed milestone makes that milestone `INVALID (done with open chains)`.
 - `git diff --stat` for this plan lists the four files of the file structure and this plan file itself (its appended record sections), and nothing under `references/` or `scripts/`.
+
+## Review findings
+
+One `claudestacks:reviewer` spawn over the four skill files, 2026-10-14. Verdict: `SPEC: COMPLIANT`, blocking set none. It re-ran `cargo make plugins` (`71 file(s) compiled, 0 failed`, `493 passed, 0 failed (22 files)`, `fingerprint gate: 8 cases passed`), diffed both new skills byte-identical to the plan's Task 1 and Task 2 blocks, and re-ran the walkthrough independently (all 20 rows matched). One fix round by a fresh coder followed. The fixes are skill text, so no test shows them; each was confirmed present by `grep -n` in that round, and the gate after it read `499 passed, 0 failed (22 files)`, the count including plan 04's fix round running beside it.
+
+- correctness — `INVALID (done with open chains)` had no way out: the milestone file is correct and every operation but `roll up` refuses an `INVALID` row — `skills/milestone/SKILL.md:53-56` — fixed: the skill now says to remove the `milestone` key from each open member's intent by hand; it does not reopen a `done` milestone.
+- spec §8 shared check — the roll-up after a walk-up did not re-render the board — `skills/execute/SKILL.md:424-430` — fixed: re-render and report the milestone's and the roadmap's rows.
+- consistency — `intent` checked a missing or closed milestone but not two files sharing its number, which `milestone` refuses — `skills/intent/SKILL.md:138-142` — fixed: the key is written only when exactly one file matches.
+- spec §8 shared check — the creation-time approval in `roadmap` did not re-render the board — `skills/roadmap/SKILL.md:67-69` — fixed.
+- correctness — the roll-up paraphrase dropped "with at least one `done`" — `skills/roadmap/SKILL.md:104-105`, `skills/execute/SKILL.md:427-428` — fixed in both.
+- consistency — `milestone` did not refuse `drop` when already `dropped` or `un-drop` when not `dropped`, unlike `roadmap` — `skills/milestone/SKILL.md:65-66` — fixed.
+- clarity — "the State walk-up … and nothing else" can be read as excluding the roll-up — `skills/execute/SKILL.md:26` — not changed: plan 03's line, outside this plan.
+- style — the reflow leaves a short line — `skills/intent/SKILL.md:158-160` — not changed: the plan's exact text.
+- defined-once — `milestone` restates the parked-intent shape `references/templates.md` owns; the two agree today — `skills/milestone/SKILL.md:93-121` — not changed: the plan's text.
+- question — "nothing under `roadmaps/` is ever deleted or renamed", yet fixing a duplicate number needs a rename. Does the rule bind only the skill, or the user too? Spec §4 carries the same pair — `skills/milestone/SKILL.md:27,37-38` — open for the author.
+- unguarded — no test, lint or gate reads `SKILL.md`, so reverting any of the four edits fails nothing — all four files — accepted: the plan states skill text has no unit test.
+
+## Probe results
+
+### Walkthrough
+
+```
+$ sh sdlc-roadmap-walk.sh /Users/hiraq/Projects/airsstack/claudestacks/.claude/worktrees/sdlc-milestones-roadmap
+```
+
+The script is Task 6 step 1's, extracted verbatim. Real output, 2026-10-14. Every row matches the step 2 table:
+
+```
+######## R1 a milestone parked, worked and closed by roll-up ########
+
+-- R1.1 roadmap wrote and approved the roadmap; its first milestone is a draft
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 0 of 1 milestones done  
+MILESTONE platform/01-auth        draft, 0 of 0 done            approve or drop
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+
+-- R1.2 milestone approved it; nothing is parked yet
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 0 of 1 milestones done  
+MILESTONE platform/01-auth        approved, 0 of 0 done         park scope
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+
+-- R1.3 milestone parked two pieces of work as draft intents
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 0 of 1 milestones done  
+MILESTONE platform/01-auth        approved, 0 of 2 done         
+  2026-10-14-login                intent draft                  approve or drop
+  2026-10-14-logout               intent draft                  approve or drop
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+
+-- R1.4 intent approved one member; its chain is now worked like any other
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 0 of 1 milestones done  
+MILESTONE platform/01-auth        approved, 0 of 2 done         
+  2026-10-14-login                intent approved               design
+  2026-10-14-logout               intent draft                  approve or drop
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+
+-- R1.5 one member done by walk-up, the other dropped: the roll-up is owed
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 0 of 1 milestones done  
+MILESTONE platform/01-auth        milestone complete            roll up
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+DONE/DROPPED: 1 done, 1 dropped (not listed)
+
+-- R1.6 the roll-up closed the milestone (its first step)
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  roadmap complete              roll up
+MILESTONE platform/01-auth        done, 1 of 1 done             
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+DONE/DROPPED: 1 done, 1 dropped (not listed)
+
+-- R1.7 the same roll-up then closed the roadmap (its second step)
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  done, 1 of 1 milestones done  
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+DONE/DROPPED: 1 done, 1 dropped (not listed)
+
+######## R2 a closed milestone takes no new work ########
+
+-- R2.1 intent un-dropped a member of the closed milestone and removed its key
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  done, 1 of 1 milestones done  
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+  2026-10-14-logout               intent draft                  approve or drop
+DONE/DROPPED: 1 done, 0 dropped (not listed)
+
+-- R2.2 the state the milestone skill's refusal prevents, written by hand
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  done, 1 of 1 milestones done  
+MILESTONE platform/01-auth        INVALID (done with open chains)  fix platform/01
+  2026-10-15-late                 intent draft                  approve or drop
+UNASSIGNED
+  2026-10-13-fix-typo             intent approved               design
+  2026-10-14-logout               intent draft                  approve or drop
+DONE/DROPPED: 1 done, 0 dropped (not listed)
+```
+
+Step 3, run before the review fix round (the fix round moved some of these lines). Each grep printed exactly one line. `grep -n` on a single file prints no file name, so the file name in front of each line was added here:
+
+```
+milestone/SKILL.md:67:| park scope | writes one new chain per piece of work the user lists, each a `draft` intent carrying the `milestone` key | the milestone is `done` or `dropped` |
+milestone/SKILL.md:68:| adopt | adds the `milestone` key to an existing chain's intent | the milestone is `done` or `dropped`; the chain already has a `milestone` key; the chain's intent is not `draft` or `approved` |
+milestone/SKILL.md:153:## Closed is final
+milestone/SKILL.md:148:Run it for the milestone's roadmap as the last step of `approve`, `drop` and `release`,
+intent/SKILL.md:146:- **Un-dropping a member of a closed milestone.** When the intent being un-dropped names
+intent/SKILL.md:143:- **Dropping a member.** After dropping an intent that carries `milestone`, run the
+execute/SKILL.md:424:**Then the roll-up.** When the walk-up flipped the intent to `done` and that intent
+roadmap/SKILL.md:86:| approve | `draft → approved`, then the roll-up (below) | the roadmap is not `draft` |
+```
+
+## Deviations
+
+- 2026-10-14 — No commit was made after any task; each task's commit step was skipped and the commit gate left with the author, per the `execute` skill.
+- 2026-10-14 — Tasks 1, 2, 3 and 5 ran as one parallel batch, since they write four different files. Task 4 followed Task 3 because both edit `skills/intent/SKILL.md`.
+- 2026-10-14 — The plan was started while plan 04, which it depends on, was still `executing` (code complete, under review). The author's instruction was to execute plans 04 to 07.
+- 2026-10-14 — The review fix round added six short passages that are not in the plan's text. They are listed under Review findings.
+- 2026-10-14 — No `claudestacks-sdlc:task-briefer` was spawned. Each coder read its own task section of this plan by line range.

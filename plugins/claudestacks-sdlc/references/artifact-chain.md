@@ -154,7 +154,7 @@ A roadmap file and a milestone file carry `status` and `created` and no other ke
 | spec `draft → approved` | user approves at the design review gate | `design` |
 | spec `approved → superseded` | user requests a redesign; old file renamed per §4, new `spec.md` written | `design` |
 | plan `— → draft` | file written | `plan` |
-| plan `draft → approved` | user approves at the plan review gate | `plan` |
+| plan `draft → approved` | user accepts the plan set at the plan acceptance gate; every plan in the set flips together | `plan` |
 | plan `draft → approved` | user names the plan and asks for it to be executed, and the plan's `built-on` equals its authority's current fingerprint (§10.2) — the instruction is the approval, so the gate is satisfied rather than bypassed | `execute` |
 | plan `approved → executing` | execution starts task 1 | `execute` |
 | plan `executing → done` | every task verified and the user accepts the completion report | `execute` |

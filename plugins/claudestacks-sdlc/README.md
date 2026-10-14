@@ -45,7 +45,8 @@ question at a time, never a battery.
   one or more `plans/NN-<topic>.md` files, each with an explicit `depends-on:` so independent
   plans are visibly parallelizable across worktrees. A plan follows the playbook's
   `plan.md` — files that change, order of work, risks, proof — and carries no code; the
-  code is written in `execute`. Writes: `draft → approved` per plan.
+  code is written in `execute`. Asks the author nothing until the set is written, then asks
+  once: accept the whole set. Writes: `draft → approved` for every plan in the set together.
 - **`execute`** — a plan, referenced as `<chain>/<NN>`, becomes a reviewed, verified diff.
   Takes the instruction to run an unchanged `draft` plan as its approval, resumes an
   `executing` one, and does not silently re-run a `done` or `superseded` one; warns if a

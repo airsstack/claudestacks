@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when a chain's spec is approved (or its intent carries spec: skipped) and implementation plans are needed — decomposes the objective into plans naming the files that change, the order of the work, the risks, and the tests that prove it, without writing any code; proposes the plan fan-out and dependencies in dialogue, then writes them to the chain's plans directory. Invoke once a spec is approved (or skipped) and before any code is written.
+description: Use when a chain's spec is approved (or its intent carries spec: skipped) and implementation plans are needed — decomposes the objective into plans naming the files that change, the order of the work, the risks, and the tests that prove it, without writing any code; derives the plan fan-out and dependencies from the spec without asking, writes them to the chain's plans directory, and asks once for the whole set to be accepted. Invoke once a spec is approved (or skipped) and before any code is written.
 ---
 
 # Plan
@@ -115,31 +115,26 @@ Re-confirmation is never inferred, and one plan's yes does not cover another. Af
 clearing a condition, render the board again: an `INVALID` result replaces the whole
 row, so another condition may have been standing behind it.
 
-## Dialogue
+## No dialogue — the questions were answered upstream
 
-Guided the same way every skill in this pipeline is: one question at a time, never a battery.
-Prefer multiple-choice phrasing where a question has a natural small set of answers, and lead
-with your own recommendation rather than laying out every option flat. If the user redirects
-mid-dialogue — a different fan-out, a dependency you had not proposed — follow it without
-re-litigating the answer it replaced.
+By the time this skill runs, the intent and the spec have been discussed and approved, open
+questions included. Planning asks the author nothing more. The plan set, its dependency
+shape, the order of work and the risks are all derived from the spec, the repo and the
+loaded guideline, and the author sees them once, at the acceptance gate below.
 
-Ask only when the answer changes the plan about to be written; anything derivable from the spec,
-the repo, or a loaded guideline is derived instead and stated as an overridable assumption.
-
-One sharpening against that rule: raise every ambiguity in the spec itself as a question, never
-resolve one as an assumption. A plan is followed by an implementer with zero other context —
-an assumption baked in silently here becomes code nobody agreed to, discovered tasks later. If the spec leaves open which file owns a behavior, where a task's boundary falls,
-or which of two reasonable readings it means, ask; do not pick one and note it in passing.
-
-Every gate below — the fan-out proposal, checkpoint placement, each plan's approval — is a real
-stop: present it and wait for an explicit answer, never "proceeding unless you object."
+The one exception is a spec that cannot be planned as written: it contradicts the artifact
+(see *Re-verify*, below), or it leaves open something a plan must decide — which file owns a
+behaviour, where a boundary falls, which of two readings it means. That is a defect in the
+spec, not a planning question. Do not resolve it as an assumption, and do not ask the author
+to settle it here. Stop before writing any plan, name the gap in one line, and send it back to
+the `design` skill, which owns the spec.
 
 ## Fan-out is first-class
 
-A spec usually yields several plans, not one. Before writing anything, propose the plan set and
-its dependency shape in dialogue: "N plans: `01-<topic>` (…), `02-<topic>` (…); `02` is
-independent of `01` — agree?" Also ask where checkpoint boundaries belong within each plan (e.g.
-"pause for review after tasks 1–3"). Only once the user agrees do you start writing files.
+A spec usually yields several plans, not one. Derive the plan set and its dependency shape
+yourself and write it; do not propose it first. Mark a checkpoint inside a plan only where
+the spec asks for one — `execute` treats each as a hard stop, so a checkpoint nobody asked for
+is a question in disguise.
 
 Plans live at `plans/NN-<kebab-topic>.md` inside the chain directory — the `NN` prefix orders
 plans within the chain, and sibling plans are disambiguated by topic, not renumbering. Each
@@ -301,8 +296,8 @@ second round needs rewriting, not re-reviewing.
 
 One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
 requirement satisfied in plan `03` is covered even though plan `01` says nothing about
-it, and a reviewer shown one plan at a time cannot see that. The per-plan approval gate
-below is unaffected — each plan is still presented and approved on its own.
+it, and a reviewer shown one plan at a time cannot see that. The acceptance gate below
+takes the set the same way: once, as a whole.
 
 The agent returns a verdict summary plus that path. Route off the summary; read the
 `<detail>` only when you must act on a finding. Fix every finding in the drafts
@@ -336,21 +331,22 @@ of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing
 act on, apply that same file's criteria inline yourself and tell the user the review ran
 inline; never skip the review for want of the agent.
 
-## Approval gate
+## Acceptance gate — one question for the whole set
 
-Each plan gets its own approval: present it, ask the user to read and approve, and show the
-rows of the disposition table that belong to that plan in the same message — including the
-declined ones. An approval given without sight of them is not an approval of them.
+This is the only question this skill asks. Present the set in one message: each plan's path
+and Goal line, its `depends-on`, and the whole disposition table, declined rows included. An
+acceptance given without sight of them is not an acceptance of them. Then ask once: *accept
+the plan set?*
 
-Before you ask, compute the authority's fingerprint again and compare it with the plan's
-`built-on`. If they differ, the authority changed while this plan was a draft: say so, and
-the approval question becomes whether the plan still holds against the authority as it now
-reads.
+Before you ask, compute the authority's fingerprint again and compare it with the plans'
+`built-on`. If they differ, the authority changed while the set was a draft: say so, and the
+question becomes whether the set still holds against the authority as it now reads.
 
-Only on explicit approval, flip that plan's frontmatter `status: draft → approved` and write
-the authority's current fingerprint as `built-on`, in the same edit, as the last step of the
-interaction that reviews it — do not flip a plan the user has not yet seen. Then render the
-board again (Sync check) and tell the user what the chain's row reads.
+On an explicit yes, flip every plan in the set `status: draft → approved` and write the
+authority's current fingerprint as each plan's `built-on`, in the same edit per file, as the
+last step of this interaction. If the author asks for changes instead, revise and present the
+set again — still one question, not one per plan. Then render the board again (Sync check) and
+tell the user what the chain's row reads.
 
 ## Lifecycle
 

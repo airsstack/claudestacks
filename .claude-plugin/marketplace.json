@@ -14,7 +14,7 @@
     {
       "name": "claudestacks-sdlc",
       "source": "./plugins/claudestacks-sdlc",
-      "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops and a deterministic status board. Implements Anthropic's AI-native SDLC playbook; execution discipline descends from the superpowers plugin (superpowers@claude-plugins-official) via the retired claudestacks-sdd."
+      "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops, optional roadmaps and milestones, and a deterministic status board that reports artifacts drifting out of sync. Implements Anthropic's AI-native SDLC playbook; execution discipline descends from the superpowers plugin (superpowers@claude-plugins-official) via the retired claudestacks-sdd."
     },
     {
       "name": "claudestacks-guideline-rust",

@@ -40,6 +40,50 @@ Three ways into this skill:
   current state — approving a `dropped` intent without first un-dropping it, for instance — is refused by
   name: the file, its current state, and that un-dropping is the command that advances it.
 
+## Sync check on re-invocation
+
+When re-invoked on an existing chain, render the board before acting and read that
+chain's row:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+
+When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
+`status` skill's fallback does. Do the same again after every `status` flip this skill
+makes, and tell the user what the row reads then. A chain being created has no row yet
+and needs no check before it is written.
+
+The row's wording comes from the sync rules in
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Two of them touch this skill:
+
+- **Amending marks what was built on the intent stale.** A spec records the fingerprint
+  of the intent's body it was written against, and on the spec-skip path each plan does.
+  Before amending the body of an intent whose chain has an `approved` spec — or, with
+  `spec: skipped`, a plan that is `approved` or `executing` — tell the user the amendment
+  will make the board read `spec stale (intent changed)` (or
+  `plan NN <status>: stale (intent changed)`), and that the `design` skill (or the `plan`
+  skill) is what clears it afterwards. Then proceed on their word. Only the body counts:
+  a `status` flip or a frontmatter key never changes a fingerprint.
+- **`intent disproven by plan NN` is cleared here.** On the spec-skip path the intent is
+  the plans' authority, and this row means executing plan `NN` disproved one of its
+  claims. It ends when the intent's body is amended to correct what was disproven — this
+  skill's amend mode. Afterwards the chain's `approved` and `executing` plans read
+  `plan NN <status>: stale (intent changed)` and go to the `plan` skill.
+
+An amendment is not a `status` flip, so render the board again after making one, and
+tell the user what the row reads: an `INVALID` result replaces the whole row, so another
+condition may have been standing behind it.
+
+Any other condition on the row is not this skill's to clear. Say what the row reads and
+carry on with what the user asked.
+
+When the intent carries `milestone`, read that milestone's row as well. A line under the
+chain's row reading `⤷ milestone <roadmap>/<NN> is dropped — release this chain` means
+the chain still names a dropped milestone: say so, and name the `milestone` skill's
+`release` as what clears it. A row reading
+`INVALID (intent.md: unknown milestone <value>)` or
+`INVALID (intent.md: ambiguous milestone <value>)` means the key resolves to no single
+milestone: name the file and the value, and leave the correction to the user.
+
 ## Input-doc scan
 
 Before the dialogue, list `prds/` and `rfcs/` under `.claudestacks/sdlc/`. Both are optional and often
@@ -81,11 +125,39 @@ spec-skip path: set `spec: skipped` in frontmatter plus a one-line reason record
 this skill's to propose for a problem that plainly needs design — a multi-system change, an ambiguous
 approach, or anything the multi-scope check flagged is not offered the skip.
 
+## Milestones
+
+A chain may belong to one milestone, recorded as `milestone: <roadmap>/<NN>` in the
+intent's frontmatter — for example `milestone: platform/01`. Roadmaps and milestones are
+optional (`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`), and most chains have
+none: a chain with no `milestone` key is a simple chain.
+
+- **Never ask.** Write the key only when the user names a milestone for this chain. When
+  they name none, write no key and ask no question about milestones — not even in a
+  repository that has roadmaps. Never infer membership from a topic or a name.
+- **Check it before writing it.** When the user names one, find the milestone file
+  `.claudestacks/sdlc/roadmaps/<roadmap>/<NN>-<topic>.md` and read its `status`. Write
+  the key only when exactly one file matches and its status is `draft` or `approved`.
+  Otherwise write no key: report the path you looked for, the status you found, or the
+  two files sharing the number, and ask the user how to proceed. A `done` milestone takes
+  no new work.
+- **Dropping a member.** After dropping an intent that carries `milestone`, run the
+  roll-up for that milestone's roadmap as the last step. The procedure is defined in
+  `artifact-chain.md`; dropping a milestone's last open chain can close the milestone.
+- **Un-dropping a member of a closed milestone.** When the intent being un-dropped names
+  a milestone whose status is `done`, remove the `milestone` key in the same edit and
+  tell the user the revived chain is now a simple chain: a closed milestone takes no new
+  work.
+
+Adopting an existing chain into a milestone, releasing one, and parking a milestone's
+unstarted work are the `milestone` skill's.
+
 ## Output
 
 Write `<date>-<topic>/intent.md` (chain directory named `YYYY-MM-DD-<kebab-topic>`, the date the intent
 is created) in the frontmatter and body shape from `templates.md`: `status`, `created`, the optional
-provenance lists, optional `source`, optional `spec: skipped`, and body sections Problem, Affected
+provenance lists, optional `source`, optional `spec: skipped`, optional `milestone` (Milestones, above),
+and body sections Problem, Affected
 systems, Desired outcome, Constraints, Non-goals, in that order. A triage-sourced intent (`source:
 triage`) additionally carries an Evidence section — that shape is `triage`'s to write, not this skill's,
 but this skill reads and amends such an intent the same as any other on re-invocation.

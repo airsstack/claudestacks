@@ -19,8 +19,51 @@ Paths, naming, frontmatter, and state transitions all come from
 ## Input
 
 A chain/plan reference, e.g. `2026-08-24-webhook-reliability/01`, resolving to
-`.claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-<topic>.md`. Given a bare chain
-name with no plan number, ask which plan, offering the chain's `approved` plans as choices.
+`.claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-<topic>.md`.
+
+Given a bare chain name with no plan number, read the chain's row on the board first
+(Sync check, below). When the row reads `chain complete`, the chain's plans are finished
+and its intent was never flipped: perform the State walk-up at the end of this file, and
+nothing else — no plan is run. Otherwise ask which plan, offering the chain's `approved`
+plans as choices.
+
+## Sync check
+
+Before acting, render the board and read the chain's row:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+
+When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
+`status` skill's fallback does. Do the same again after every `status` flip this skill
+makes — on a plan or on the intent — and tell the user what the row reads then.
+
+The row's wording comes from the sync rules in
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. A plan's **authority** is the
+chain's `spec.md`, or the chain's `intent.md` when the intent carries `spec: skipped`
+and no `spec.md` exists.
+
+**Refuse to start or resume the plan** — naming the file, the condition exactly as the
+board words it, and what clears it — when the row reads any of:
+
+| The row reads | Cleared by |
+|---|---|
+| `INVALID (spec.md: missing built-on)` | the `design` skill |
+| `INVALID (plans/NN: missing built-on)` | the `plan` skill |
+| any other `INVALID (…)` | the user, in the file the row names |
+| `spec stale (intent changed)` | the `design` skill |
+| `plan NN <status>: blocked (spec not approved)`, for the plan you were given | the `design` skill |
+| `plan NN <status>: stale (spec changed)` or `plan NN <status>: stale (intent changed)`, for the plan you were given | the `plan` skill |
+
+A `blocked` or `stale` part that names a different plan does not stop this one. These
+are refusals, not warnings: stricter than the unmet-`depends-on` case in the state gate
+below, which stays the user's call.
+
+**While the row reads `spec disproven by plan NN` or `intent disproven by plan NN`**,
+refuse to start or resume every plan of the chain except one: the plan whose own
+`disproves` frontmatter key equals its authority's current fingerprint, which may finish
+the run that raised the condition. Every other plan waits — a `draft` plan you are asked
+to run included — until the `design` skill (for `spec disproven`) or the `intent` skill
+(for `intent disproven`) has brought the text up to date.
 
 ## State gate
 
@@ -28,15 +71,30 @@ Read the plan's **frontmatter only** — not its body — before anything else:
 
 - `approved` — proceed.
 - `executing` — you are presumably resuming. Continue rather than refuse.
-- `draft` — **the instruction to execute is the approval.** A user who names a plan and asks
-  for it to run has done the thing the approval gate exists to capture, so do not refuse and
-  do not send them to another skill to say it a second time. Flip
-  `draft → approved → executing` yourself and state plainly, in one line, that you did:
-  which plan, that it was `draft`, and that executing it is being recorded as its approval.
-  Then carry on. Two exceptions where you stop and ask first: the plan carries an unresolved
-  marker its own author left for the reader (a `TODO`, an open question, a `TBD`), or the
-  reference you were given was a whole chain rather than one named plan — a blanket "execute
-  this chain" is not approval of a specific draft nobody has read.
+- `draft` — **the instruction to execute is the approval**, provided nobody has changed
+  what the plan was written against. A user who names a plan and asks for it to run has
+  done the thing the approval gate exists to capture, so do not send them to another
+  skill to say it a second time. First compare the plan's `built-on` with its
+  authority's current fingerprint:
+
+      sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
+
+  When they differ, or the plan has no `built-on`, refuse and name the `plan` skill:
+  either the authority changed after the plan was drafted, or the plan never recorded
+  what it was written against, and in both cases nobody has read the plan against the
+  current text, so running it would approve something no one reviewed. Refuse the same
+  way, naming the `design` skill, when the authority is a `spec.md` that is still
+  `draft` — the plan would read `blocked (spec not approved)` the moment it went live.
+
+  Two further cases where you stop and ask first: the plan carries an unresolved marker
+  its own author left for the reader (a `TODO`, an open question, a `TBD`), or the
+  reference you were given was a whole chain rather than one named plan — a blanket
+  "execute this chain" is not approval of a specific draft nobody has read.
+
+  Only when none of those holds — the two are equal, the authority is not a `draft`
+  `spec.md`, and neither case above applies — flip `draft → approved → executing`
+  yourself and state plainly, in one line, that you did: which plan, that it was
+  `draft`, and that executing it is being recorded as its approval. Then carry on.
 - `done` or `superseded` — do not silently re-run it. The work already happened or was
   replaced, so re-executing would repeat commits or contradict the plan that replaced it.
   But do not dead-end either: follow-up work on a finished plan — fixing findings its own
@@ -58,8 +116,9 @@ saying so.
 
 ## Load the plan through the briefer, not into your context
 
-A plan is a construction manual, often tens of kilobytes of code blocks. Reading it whole
-spends the main thread's context on material only the coder will ever type.
+A plan names files, behaviour, and tests for every task; it carries no code — writing the
+code is this skill's job, the playbook's "accept the plan and let Claude implement". Reading
+the plan whole still spends the main thread's context on detail only each task's coder needs.
 
 Spawn `claudestacks-sdlc:task-briefer` in `ledger` mode:
 
@@ -159,7 +218,7 @@ For each batch, in order:
    ```
 
    You get back each task's files, verifications, and Asserted facts. You do not get the
-   code blocks, and you do not need them.
+   task's prose, and you do not need it.
 
 3. **Prove what the task assumes.** See below. Do this before the coder builds on it, not
    after.
@@ -169,6 +228,9 @@ For each batch, in order:
    - `handoff-protocol: <the path /claudestacks:context-handoff gave you>` — the protocol;
    - `need: <the task-briefer handoff path>` — it reads its task's verbatim `<detail>`
      itself, and builds from that text, not from your paraphrase;
+   - the instruction that the plan names the change and its proving tests but carries no
+     code: the coder writes the named tests first, sees them fail, then writes the
+     implementation;
    - the stack guideline to load (e.g. `claudestacks-guideline-rust:rust-guidelines`) and
      the instruction that its architecture rules bind, not only its Definition of Done;
    - the exact verification commands the plan names for that task;
@@ -212,11 +274,11 @@ source to a local file and grep it —
 tool, which truncates a long page and hands the remainder to a small model that emits
 plausible invented content instead of an error.
 
-**Where the plan's own red-green cycle already proves the claim, that IS the probe — do not
-write a second one.** A task whose step 2 says "run it and confirm this exact failure" has
-its probe built in; the coder running that step settles it. Only claims the plan never puts
-under a test of its own need one of yours. Probes are for the load-bearing and unproven, not
-for every literal in the file.
+**Where a test the task names under Proof already exercises the claim, the coder's red-green
+run of it IS the probe — do not write a second one.** Only claims the plan never puts under a
+test of its own need one of yours, and the plan's `## Risks` section lists the questions its
+author left for this step to settle. Probes are for the load-bearing and unproven, not for
+every literal in the file.
 
 ## Verification budget — do not over-verify
 
@@ -269,10 +331,29 @@ amend the plan and the spec now, or after this run?* Do not fold it into a quest
 implementation and read the answer as covering both. Approving a code change is not approving
 the record.
 
+**Record the debt before you continue.** When what the probe disproved is a claim of the
+plan's authority — the chain's `spec.md`, or its `intent.md` on the spec-skip path —
+write `disproves` into the frontmatter of the plan you are running, holding that
+authority's current fingerprint:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
+
+Write it whichever answer the author gives, and before any further task runs. The key
+holds one fingerprint: a later disproof by the same plan overwrites it, and it is never
+removed. From then on the board reads `spec disproven by plan NN` (or
+`intent disproven by plan NN`), no sibling plan can start, and the chain cannot
+complete, until the authority's text changes — at which point the marker matches
+nothing and stops having any effect. A disproven claim that belongs to the plan alone,
+not to its authority, writes no marker.
+
+Writing the key is not a `status` flip, so render the board again afterwards and tell the
+user what the row reads: an `INVALID` result replaces the whole row, so the condition
+you just recorded may not show until it is cleared.
+
 Sibling plans were written against the old text and cannot see the commit that corrected it.
 A commit body is not where the next plan's author looks. Amending a `draft` plan is the `plan`
-skill's; superseding an approved `spec.md` is the `design` skill's, and the author authorizes
-it.
+skill's; superseding an approved `spec.md` is the `design` skill's, and amending the intent
+on the spec-skip path is the `intent` skill's. The author authorizes each.
 
 ## When to stop and ask
 
@@ -324,9 +405,28 @@ Only once the user accepts the completion report, flip the plan's frontmatter
 
 ## State walk-up
 
-After a plan flips to `done`, check the rest of the chain. If every plan is now `done` or
-`superseded`, with at least one `done`, flip the chain's `intent.md`
-`status: approved → done` and tell the user the chain is complete — the second transition
-that fires without a fresh approval question, a consequence of state already earned on the
-individual plans. If other plans remain `draft`, `approved`, or `executing`, leave the intent
-as is and say what is still open.
+After a plan flips to `done` — or when you were given a bare chain name whose row reads
+`chain complete` — render the board (Sync check) and read the chain's row.
+
+- **The row reads `chain complete`.** Every plan is `done` or `superseded`, with at least
+  one `done`, and nothing is owed on the chain's text. Flip the chain's `intent.md`
+  `status: approved → done` and tell the user the chain is complete — the second
+  transition that fires without a fresh approval question, a consequence of state already
+  earned on the individual plans.
+- **Every plan is settled, but the row reads `spec stale (intent changed)`,
+  `spec disproven by plan NN` or `intent disproven by plan NN`.** The chain is not
+  complete. Leave the intent `approved`, and say which condition holds it open and which
+  skill clears it: `design` for the two `spec` conditions, `intent` for
+  `intent disproven`. The walk-up fires on a later run, once the text is up to date.
+- **Other plans remain `draft`, `approved`, or `executing`.** Leave the intent as is and
+  say what is still open.
+
+**Then the roll-up.** When the walk-up flipped the intent to `done` and that intent
+carries a `milestone` key, run the roll-up for the milestone's roadmap as the last step.
+Its procedure is defined once, in `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`:
+it closes each `approved` milestone whose chains are all finished, with at least one
+`done`, then the roadmap once its milestones are, again with at least one `done`. It is
+idempotent, and it flips without a fresh approval question — a consequence of state
+already earned on the chains. Tell the user each thing it closed, then render the board
+again and tell the user what the milestone's and the roadmap's rows read. An intent with
+no `milestone` key is a simple chain: there is nothing to roll up.

@@ -41,7 +41,7 @@ project's spec-driven, review-gated development methodology for
 | Plugin | What it provides |
 | --- | --- |
 | **`claudestacks`** | Execution engine: a TDD `coder`, a merged code+spec `reviewer`, a read-only `explorer`, an `orchestrate` driver, process guidelines, project-local snapshot memory, and `/claudestacks:discuss`, a communication protocol with topic-indexed agent output. |
-| **`claudestacks-sdlc`** | AI-native SDLC workflow: a committed `intent` → `design` → `plan` → `execute` chain under `.claudestacks/sdlc/`, with `distill`/`triage` feedback loops and a `status` board. |
+| **`claudestacks-sdlc`** | AI-native SDLC workflow: a committed `intent` → `design` → `plan` → `execute` chain under `.claudestacks/sdlc/`, with `distill`/`triage` feedback loops, optional `roadmap`s and `milestone`s, and a `status` board that reports artifacts drifting out of sync. |
 | **`claudestacks-guideline-rust`** | Rust engineering guidelines plus a strict Definition-of-Done, delivered as a single lazily-loaded skill the execution agents consult when they touch Rust. |
 | **`claudestacks-journal`** | Transparent, note-based experiential memory: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index (`capture` / `note` / `recall` / `link` / `review` / `helped`). |
 | **`claudestacks-cmux`** | Native [cmux](https://cmux.com) terminal control as four lazily-loaded skills (`cmux-control` hub, `cmux-workspace`, `cmux-browser`, `cmux-config`) over the real `cmux` CLI. Requires a cmux install on the machine. |

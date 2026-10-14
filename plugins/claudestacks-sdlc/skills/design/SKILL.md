@@ -27,6 +27,50 @@ else, read the intent and check its state:
   new round of work is a new intent, not a redesign of a finished chain.
 - `approved` — proceed.
 
+## Sync check
+
+Before acting, render the board and read this chain's row:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+
+When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
+`status` skill's fallback does. Do the same again after every `status` flip this skill
+makes, and tell the user what the row reads then.
+
+The row's wording, and what each condition means, come from the sync rules in
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Four of them are this skill's to
+clear:
+
+| The row reads | Do |
+|---|---|
+| `spec stale (intent changed)` | Offer re-confirmation, below. |
+| `INVALID (spec.md: missing built-on)` | Offer re-confirmation, below. |
+| `spec disproven by plan NN` | Tell the user that executing plan `NN` disproved a claim of this spec, and that the redesign path (step 11) is what clears it. On their word, follow step 11. The condition ends when the new `spec.md`'s text differs from the text that was disproven — a replacement with the same body leaves it standing. |
+| `plan NN <status>: blocked (spec not approved)` | Tell the user the spec is still `draft`, and take it through the user review gate (step 10). Approving it clears the condition. |
+
+Any other condition on the row is not this skill's to clear. Say what the row reads, in
+the board's own words, and carry on under the state gate above.
+
+**Re-confirmation.** An approved spec records, in its `built-on` frontmatter key, the
+fingerprint of the intent it was written against. When the intent's text has changed
+since, or the key is missing, ask the user one question: *does this spec still hold
+against the intent as it now reads?* Show them what the intent says now; do not answer
+for them.
+
+- **An explicit yes** — compute the intent's current fingerprint,
+
+      sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <chain>/intent.md
+
+  write the 12 characters it prints as `built-on` in `spec.md`'s frontmatter, and change
+  nothing else in the file. The spec stays `approved`. Then render the board again: an
+  `INVALID` result replaces the whole row, so another condition may have been standing
+  behind it.
+- **A no** — offer the redesign path (step 11), and follow it only on the user's
+  explicit word. A no is not that word; until they give it, the row stays as it reads.
+
+Re-confirmation is never inferred from silence or from an answer to another question,
+and never given on the user's behalf.
+
 ## Hard gate
 
 Do NOT invoke any implementation skill, write code, or scaffold anything until you have
@@ -58,6 +102,13 @@ Does the tool accept that flag? Run it with the flag. A temporary test that is r
 deleted is worth more than any amount of reasoning about the source, and it is the only way
 to catch a behaviour that differs from what the code appears to say. Delete the probes
 afterwards; keep their output in the spec as the evidence.
+
+**A probe answers one question about what already exists — it never builds what the spec
+describes.** A few lines, one run, one fact. Implementing the feature to see whether the
+design works is a prototype, and a prototype here means `execute` writes the same code
+again later: in the playbook the code is written in Build, after the plan is accepted. A
+question only the new code could answer goes into the spec as an open risk for the plan to
+carry.
 
 Record the evidence inline, next to the claim, at the precision someone else could re-run.
 A spec section whose claims carry no citations is not finished, however confident it reads.
@@ -154,6 +205,14 @@ is visible.
    is the durable record — write it to stand on its own without reference to this
    conversation.
 
+   The frontmatter also carries `built-on`: the fingerprint of the chain's `intent.md`
+   as it reads at this moment. Run
+
+       sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <chain>/intent.md
+
+   and write the 12 characters it prints. If it prints nothing, the intent has no
+   fingerprint: stop and name the file rather than write a spec against it.
+
 9. **Review the spec — by an agent, not by yourself.** You wrote every line of this
    spec and held the dialogue that produced it, so you are the weakest available reader
    of it. Spawn `claudestacks-sdlc:artifact-reviewer` over the draft:
@@ -213,10 +272,18 @@ is visible.
    This is a mandatory stop, not a formality. If they request
    changes — small clarifications or significant redesigns — revise the spec and present
    it again. **Do not re-spawn the reviewer**; step 9 has already run and runs once per
-   spec. Only on explicit
-   approval, flip `spec.md`'s frontmatter
-   `status: draft → approved` as the last step of this interaction. Committing the spec
-   is the user's call — do not auto-commit.
+   spec.
+
+   Before you ask, compute the intent's fingerprint again and compare it with the
+   spec's `built-on`. If they differ, the intent changed while this spec was a draft:
+   say so, and the approval question becomes whether the spec still holds against the
+   intent as it now reads.
+
+   Only on explicit approval, flip `spec.md`'s frontmatter `status: draft → approved`
+   and write the intent's current fingerprint as `built-on`, in the same edit, as the
+   last step of this interaction. Then render the board again (Sync check) and tell the
+   user what the chain's row reads. Committing the spec is the user's call — do not
+   auto-commit.
 
 11. **Redesign path.** When the user asks to redesign a chain whose `spec.md` is
     already `approved`: rename the existing file to `spec-superseded-YYYY-MM-DD.md`

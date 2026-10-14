@@ -30,6 +30,11 @@ is normative, not descriptive.
 │   └── .gitkeep
 ├── rfcs/                                  # optional technical input docs (inbox)
 │   └── .gitkeep
+├── roadmaps/                              # optional; created on first use by the roadmap skill
+│   └── platform/                          # one directory per roadmap; the engineer names it
+│       ├── roadmap.md
+│       ├── 01-auth.md                     # one file per milestone; NN orders them
+│       └── 02-billing.md
 ├── REVIEW.md                              # review policy, from template
 └── 2026-08-24-webhook-reliability/        # one chain = one intent
     ├── intent.md
@@ -41,6 +46,8 @@ is normative, not descriptive.
 
 - `prds/` and `rfcs/` are top-level inboxes, siblings of the chain directories, not
   nested inside any chain.
+- `roadmaps/` is optional and is never created by `setup`. Chains stay flat at the
+  chain root whether or not they belong to a milestone (§11).
 - `REVIEW.md` lives directly under `.claudestacks/sdlc/`, one copy per repository.
 - Within a chain directory: `intent.md` and `spec.md` are singular files; `plans/`
   holds one file per plan.
@@ -84,7 +91,7 @@ is normative, not descriptive.
 ## 6. Frontmatter schema
 
 Every chain artifact (`intent.md`, `spec.md`, each `plans/NN-<topic>.md`) opens with
-YAML frontmatter. The full schema, all seven keys:
+YAML frontmatter. The full schema, all ten keys:
 
 ```yaml
 ---
@@ -97,7 +104,10 @@ derived-from-rfc:             # optional, list-valued, provenance only
   - rfcs/retry-budget-notes.md
 source: triage                # optional; absent = human-originated
 spec: skipped                 # optional, intent only; §8
+milestone: platform/01        # optional, intent only; §11
 depends-on: [01]              # optional, plan only; empty/absent = independent
+built-on: 7df83709971b        # spec and plan; §10
+disproves: 7df83709971b       # optional, plan only; §10
 ---
 ```
 
@@ -109,10 +119,16 @@ depends-on: [01]              # optional, plan only; empty/absent = independent
 | `derived-from-rfc` | list of strings (paths under `rfcs/`) | optional; provenance only |
 | `source` | string (e.g. `triage`) | optional; absent means human-originated |
 | `spec` | string (`skipped`) | optional; intent only (§8) |
+| `milestone` | string (`<roadmap>/<NN>`) | optional; intent only (§11); absent means a simple chain |
 | `depends-on` | list of plan numbers (e.g. `[01]`) | optional; plan only; empty/absent means independent |
+| `built-on` | fingerprint (12 hex characters, §10) | required on an `approved` spec and on an `approved` or `executing` plan; written when the artifact is drafted |
+| `disproves` | fingerprint (12 hex characters, §10) | optional; plan only; written by `execute`, never removed |
 
 Provenance fields (`derived-from-prd`, `derived-from-rfc`) are omitted entirely — not
 written as an empty list — when nothing seeded the artifact.
+
+A roadmap file and a milestone file carry `status` and `created` and no other key
+(§11).
 
 ## 7. States and transitions
 
@@ -123,6 +139,8 @@ written as an empty list — when nothing seeded the artifact.
 | intent | `draft → approved → done`; `dropped` from any state |
 | spec | `draft → approved`; `approved → superseded` |
 | plan | `draft → approved → executing → done`; `superseded` from draft/approved/executing |
+| roadmap | `draft → approved → done`; `dropped` from `draft` or `approved`; `dropped → draft` |
+| milestone | `draft → approved → done`; `dropped` from `draft` or `approved`; `dropped → draft` |
 
 ### 7.2 Transitions
 
@@ -130,17 +148,27 @@ written as an empty list — when nothing seeded the artifact.
 |---|---|---|
 | intent `— → draft` | file written | `intent` |
 | intent `draft → approved` | user approves at the intent gate (in-session or on later re-invocation) | `intent` |
-| intent `approved → done` | all the chain's plans are `done` or `superseded`, with at least one `done` | `execute` (walk-up) |
+| intent `approved → done` | the chain is complete: all its plans are `done` or `superseded`, with at least one `done`, and neither C1 nor C2 holds (§10.4) | `execute` (walk-up) |
 | intent `→ dropped` | user declares the idea dead | `intent` |
 | spec `— → draft` | file written | `design` |
 | spec `draft → approved` | user approves at the design review gate | `design` |
 | spec `approved → superseded` | user requests a redesign; old file renamed per §4, new `spec.md` written | `design` |
 | plan `— → draft` | file written | `plan` |
-| plan `draft → approved` | user approves at the plan review gate | `plan` |
-| plan `draft → approved` | user names the plan and asks for it to be executed — the instruction is the approval, so the gate is satisfied rather than bypassed | `execute` |
+| plan `draft → approved` | user accepts the plan set at the plan acceptance gate; every plan in the set flips together | `plan` |
+| plan `draft → approved` | user names the plan and asks for it to be executed, and the plan's `built-on` equals its authority's current fingerprint (§10.2) — the instruction is the approval, so the gate is satisfied rather than bypassed | `execute` |
 | plan `approved → executing` | execution starts task 1 | `execute` |
 | plan `executing → done` | every task verified and the user accepts the completion report | `execute` |
 | plan `→ superseded` | re-planning replaces it | `plan` |
+| roadmap `— → draft` | file written | `roadmap` |
+| roadmap `draft → approved` | the author approves it | `roadmap` |
+| roadmap `approved → done` | roll-up (§12) | the skill running the roll-up |
+| roadmap `→ dropped` | the author's instruction | `roadmap` |
+| roadmap `dropped → draft` | the author un-drops it | `roadmap` |
+| milestone `— → draft` | file written | `roadmap` (first milestones) or `milestone` |
+| milestone `draft → approved` | the author approves it | `milestone` |
+| milestone `approved → done` | roll-up (§12) | the skill running the roll-up |
+| milestone `→ dropped` | the author's instruction | `milestone` |
+| milestone `dropped → draft` | the author un-drops it | `milestone` |
 
 ### 7.3 Flip rule
 
@@ -155,8 +183,15 @@ act — no skill in this plugin commits.
 flips the state back on the user's explicit instruction. Nothing is ever deleted, so
 git history plus the current value of the `status` field is the complete record of an
 artifact's life. The only transitions that fire without a fresh approval question are
-the mechanical pair: plan `approved → executing` and the intent's `done` roll-up —
-both are consequences of state already earned elsewhere, not new decisions.
+the mechanical ones: plan `approved → executing`, the intent's `done` walk-up, and the
+milestone's and roadmap's `done` roll-up (§12) — all are consequences of state already
+earned elsewhere, not new decisions.
+
+Two things differ for roadmaps and milestones. Un-dropping one always returns it to
+`draft`, and the author approves it again. And `done` is final: a closed milestone or
+roadmap is not reopened, amended or dropped; work that arrives after one closed becomes
+a simple chain or belongs to a new milestone. Amending a roadmap's or milestone's body
+leaves its status as it was.
 
 ## 8. Spec skip
 
@@ -170,7 +205,12 @@ that intent — `plan` reads the flag but never sets it itself.
 
 These are the rules the status board's NEXT column executes — by `scripts/status.lua`
 when `airsl` is installed, and by hand, from this file, when it is not (the fallback
-tier of `/claudestacks-sdlc:status`). Derivation is states-only, no judgment call:
+tier of `/claudestacks-sdlc:status`). The board scans the chain root one level deep:
+every directory is a chain except `prds/`, `rfcs/` and `roadmaps/`, and a plain file is
+not a row. Roadmaps, milestones and the grouped layout are in §11.
+Derivation reads states and fingerprints only, no judgment call. For a chain whose
+intent is `approved`, the sync rules of §10 are applied first; the list below decides
+NEXT only when none of them does:
 
 - intent `draft` → `approve or drop`
 - intent `approved`, no spec, no skip flag → `design`
@@ -182,18 +222,273 @@ tier of `/claudestacks-sdlc:status`). Derivation is states-only, no judgment cal
 - plan `approved` with any plan named in its `depends-on` not yet `done` →
   `wait (dependencies pending)`
 - plan `executing` → shown as executing (no further derivation; it is mid-flight)
-- all plans in the chain `done` or `superseded`, with at least one `done` → chain complete
+- the chain is complete (§10.4) → STATE `chain complete`, NEXT `execute walk-up`
+- every plan `superseded` and none `done` → `plan`
 
-Triage-sourced intents (`source: triage`) are tagged `(triage)` in the STATE column
-alongside their derived state. Chains whose intent is `dropped`, or whose every plan
-is `done`/`superseded` with at least one `done`, are listed under a collapsed
-`DONE/DROPPED` tail section (count only), unless a verbose flag in the status skill's
-dialogue asks for the detail.
+Triage-sourced intents (`source: triage`) are tagged `(triage)` in the STATE column,
+after every other part of the cell. Chains whose intent is `done` or `dropped` are
+listed under a collapsed `DONE/DROPPED` tail section (count only), unless a verbose
+flag in the status skill's dialogue asks for the detail. A complete chain whose intent
+is still `approved` is **not** collapsed: it is a row reading `chain complete` →
+`execute walk-up`, so a walk-up that was never performed stays visible.
 
 A chain whose intent, spec, or any plan names input docs via the provenance frontmatter keys
 (`derived-from-prd` / `derived-from-rfc`, §6) renders a `⤷ inputs:` annotation line
 under that chain's row, listing the named files. Input docs never get their own row
 (§5); this annotation is their only appearance on the board.
+
+## 10. Fingerprints and sync rules
+
+Related artifacts must still agree: a spec with the intent it was written from, a plan
+with the spec it was written from. The board checks that mechanically, for every chain
+whose intent is `approved`. A chain whose intent is `draft`, `dropped` or `done` is not
+checked.
+
+### 10.1 Fingerprints
+
+The **fingerprint** of an artifact is the first 12 hexadecimal characters of the
+SHA-256 of its body. The body is every line after the line that closes the frontmatter
+(the first line equal to `---` after line 1), with one trailing carriage return removed
+from each line and each line terminated by exactly one `\n`. The frontmatter is
+excluded, so a `status` flip never changes a fingerprint and any edit to the text does.
+A file whose first line is not `---`, or whose frontmatter is never closed, has no
+fingerprint.
+
+`scripts/lib/fingerprint.lua` computes it for the board. Without `airsl`, compute it
+with `sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <file>`, which prints the 12
+characters and exits 0, or prints nothing and exits 2 when the file has no fingerprint.
+
+### 10.2 The two keys
+
+An artifact's **authority** is what it was written from. A spec's authority is the
+chain's `intent.md`. A plan's authority is the chain's `spec.md`; when the intent
+carries `spec: skipped` and no `spec.md` exists (§8), it is the chain's `intent.md`.
+
+- `built-on` holds the fingerprint of the authority the artifact was written against,
+  or last re-confirmed against. It is written when the artifact is drafted. The skill
+  that owns the artifact — `design` for a spec, `plan` for a plan — compares it with
+  the authority's current fingerprint before flipping `draft → approved`, says so when
+  they differ, and writes the current fingerprint in the same edit as the flip.
+  `execute` may approve a `draft` plan by being asked to run it (§7.2) only when that
+  plan's `built-on` already equals its authority's current fingerprint; otherwise it
+  refuses and names `plan`, because nobody has read the plan against the changed text.
+  **Re-confirmation** rewrites the key on an approved artifact: the owning skill asks
+  whether the artifact still holds against its authority as that authority now reads,
+  and on an explicit yes writes the current fingerprint and changes nothing else. It is
+  never inferred, and never performed by `execute`.
+- `disproves` holds the fingerprint of the authority whose claim a plan's execution
+  showed to be wrong. `execute` writes it on the plan it is running. It holds one
+  fingerprint, a later disproof by the same plan overwrites it, and it is never
+  removed: it stops matching, and so stops having any effect, once the authority's text
+  changes.
+
+A **live plan** is `approved` or `executing`. A **settled plan** is `done` or
+`superseded`.
+
+### 10.3 Invalid results
+
+An invalid result replaces the whole STATE cell and its NEXT is `fix <chain>`. When
+several hold, the cell shows the first in this order; within a rule, the lowest plan
+number.
+
+| # | Condition | STATE |
+|---|---|---|
+| I1 | an artifact is missing, unreadable or unparseable, or carries an unknown status | `INVALID (<file>: <reason>)`; a missing `intent.md` reads `INVALID (intent.md missing)`, with no colon |
+| I2 | `spec.md` has a status other than `draft` or `approved` | `INVALID (spec.md: unknown status <status>)` |
+| I3 | `spec.md` is `approved` and has no `built-on` | `INVALID (spec.md: missing built-on)` |
+| I4 | a live plan exists, there is no `spec.md`, and the intent has no `spec: skipped` | `INVALID (plans/NN: no spec and no skip flag)` |
+| I5 | a live plan has no `built-on` | `INVALID (plans/NN: missing built-on)` |
+
+A superseded spec is renamed (§4), so `spec.md` itself is never legitimately
+`superseded`.
+
+### 10.4 Conditions, STATE and NEXT
+
+| # | Condition | STATE part | NEXT |
+|---|---|---|---|
+| C1 | `spec.md` is `approved` and its `built-on` differs from the intent's fingerprint | `spec stale (intent changed)` | `design` |
+| C2 | a plan that is not `superseded` carries `disproves` equal to the current fingerprint of its authority | `spec disproven by plan NN`; on the spec-skip path `intent disproven by plan NN` | `design`; on the spec-skip path `intent` |
+| C3 | a live plan's authority is `spec.md` and that spec is `draft` | `plan NN <status>: blocked (spec not approved)` | `approve spec` |
+| C4 | a live plan's `built-on` differs from its authority's fingerprint, and C3 does not hold for it | `plan NN <status>: stale (spec changed)`; on the spec-skip path `plan NN <status>: stale (intent changed)` | `plan` |
+
+`<status>` is the plan's own status. C3 and C4 read live plans only. C2 reads every plan
+except `superseded` ones, because a plan can finish its run with the debt still owed;
+when several plans satisfy it, the part names the lowest number.
+
+**STATE.** When no invalid result holds, the cell is built in this order,
+comma-separated, with the `(triage)` tag last:
+
+1. the C1 part, if C1 holds;
+2. the C2 part, if C2 holds;
+3. for a chain with plans, one part per plan in number order: `plan NN <status>`, or the
+   C3 or C4 form for a plan they hold for;
+4. for a chain without plans, the single state of §9 (`intent approved`,
+   `intent approved (spec skipped)`, `spec draft`, `spec approved`), except that
+   `spec approved` is omitted when C1 holds.
+
+**NEXT.** The first of C1, C2, C3, C4 that holds decides it, per the table. Only when
+none holds does the list in §9 apply. A chain with a standing C2 therefore never offers
+`execute NN`.
+
+**A chain is complete** when every plan is settled, at least one is `done`, and neither
+C1 nor C2 holds. Only a complete chain reads `chain complete` and only a complete chain
+is walked up to `done` (§7.2). While C1 or C2 stands the cell is built by the list
+above and the intent stays `approved`.
+
+## 11. Roadmaps and milestones
+
+Both are optional. A repository with no `roadmaps/` directory and no intent carrying a
+`milestone` key has no roadmap or milestone behaviour of any kind.
+
+### 11.1 Files
+
+- A roadmap is the directory `roadmaps/<roadmap>/` holding `roadmap.md`. A milestone is
+  a file `NN-<topic>.md` beside it. `<roadmap>` and `<topic>` are kebab-case. A
+  repository may hold any number of roadmaps.
+- A roadmap may not be named `plans`: `roadmaps/plans/NN-<topic>.md` would match the
+  glob `distill` reads plans through.
+- A milestone is identified by the reference `<roadmap>/<NN>`, for example
+  `platform/01`. A number is never reused within a roadmap; a new milestone takes the
+  next free `NN`, as plans do (§4).
+- Nothing in `roadmaps/` is ever deleted or renamed; a milestone that is no longer
+  wanted is `dropped`.
+- Within a roadmap directory, any entry other than `roadmap.md` and files matching
+  `NN-<topic>.md` is ignored. A plain file directly under `roadmaps/` is ignored.
+- Neither body holds a list of milestones, a list of chains, a progress figure or a
+  checklist of finished work. A roadmap's milestones are the files beside it; a
+  milestone's chains are the intents that name it.
+- A milestone's or roadmap's status does not gate chain work: a member chain moves
+  through `design`, `plan` and `execute` whatever its milestone's status.
+
+### 11.2 Membership and progress
+
+The only link is the optional intent key `milestone: <roadmap>/<NN>` (§6). A chain
+belongs to at most one milestone; a chain with no `milestone` key is a **simple
+chain**. A chain's directory never moves. No skill infers membership from a topic or a
+name: `intent` writes the key only when the author names a milestone, and `milestone`
+writes it when parking scope or adopting a chain and removes it when releasing one.
+
+Progress is counted every time the board is rendered and is never written down.
+
+- A milestone's **members** are every chain whose intent names it. Its progress is
+  `N of M done`: `M` is the members whose intent is not `dropped`, `N` the members
+  whose intent is `done`.
+- A roadmap's progress is `N of M milestones done`: `M` is its milestone files whose
+  status is not `dropped`, `N` those whose status is `done`.
+- Work planned for a milestone and not yet begun is a parked `draft` intent, so it is
+  in `M` from the moment it is parked.
+
+### 11.3 Board layout
+
+An **open chain** is one that has a row: every chain not collapsed into the
+`DONE/DROPPED` tail. That is every chain whose intent is `draft` or `approved`, and
+every chain that renders `INVALID`.
+
+With no roadmap directory under `roadmaps/`, the board keeps the flat layout of §9.
+With at least one, the same three columns are kept and the rows are grouped:
+
+```
+CHAIN                             STATE                         NEXT
+ROADMAP platform                  approved, 1 of 2 milestones done
+MILESTONE platform/01-auth        done, 4 of 4 done
+MILESTONE platform/02-billing     approved, 1 of 3 done
+  2026-10-13-invoices             plan 01 approved: stale (spec changed)  plan
+  2026-10-14-refunds              intent draft                  approve or drop
+UNASSIGNED
+  2026-10-15-fix-typo             intent approved               design
+DONE/DROPPED: 6 done, 2 dropped (not listed)
+```
+
+- A roadmap row's first column is `ROADMAP <roadmap>`; a milestone row's is
+  `MILESTONE <roadmap>/<file name without .md>`.
+- Roadmaps print in directory-listing order, each followed by its milestones in number
+  order, each milestone followed by its open member chains in directory-listing order,
+  indented two spaces.
+- Under a `draft` or `approved` roadmap, and under one whose `roadmap.md` is invalid,
+  every milestone prints. Under a `done` or `dropped` roadmap, a milestone prints only
+  when it is not `done` or `dropped` itself, or has an open member chain.
+- Members that are not open are counted in their milestone's progress and in the tail,
+  and not listed.
+- `UNASSIGNED` heads every open chain that is not listed under a milestone: every
+  simple chain and every chain whose `milestone` value does not resolve. The line is
+  omitted when there is none.
+- Under a row, its `⤷ inputs:` line comes first, then any `⤷ milestone …` line; a
+  milestone's `⤷ roadmap …` line follows its row. Each is indented two spaces past its
+  row.
+- A root holding a roadmap and no chain renders the board, not the starter hint.
+
+### 11.4 Milestone rows
+
+| Milestone status | Condition | STATE | NEXT |
+|---|---|---|---|
+| `draft` | — | `draft, N of M done` | `approve or drop` |
+| `approved` | `M` is 0 | `approved, 0 of 0 done` | `park scope` |
+| `approved` | every member `done` or `dropped`, at least one `done` | `milestone complete` | `roll up` |
+| `approved` | otherwise | `approved, N of M done` | empty |
+| `done` | every member `done` or `dropped` | `done, N of M done` | empty |
+| `done` | any member neither `done` nor `dropped` | `INVALID (done with open chains)` | `fix <roadmap>/<NN>` |
+| `dropped` | — | `dropped` | empty |
+| file unparseable, or any other status | — | `INVALID (<file>: <reason>)` | `fix <roadmap>/<NN>` |
+| two files in one roadmap share a number | each of them | `INVALID (<file>: duplicate number NN)` | `fix <roadmap>/<NN>` |
+
+### 11.5 Roadmap rows
+
+| Roadmap status | Condition | STATE | NEXT |
+|---|---|---|---|
+| `draft` | — | `draft, N of M milestones done` | `approve or drop` |
+| `approved` | `M` is 0 (no milestone file, or all `dropped`) | `approved, 0 of 0 milestones done` | `add milestone` |
+| `approved` | every milestone `done` or `dropped`, at least one `done` | `roadmap complete` | `roll up` |
+| `approved` | otherwise | `approved, N of M milestones done` | empty |
+| `done` | every milestone `done` or `dropped` | `done, N of M milestones done` | empty |
+| `done` | any milestone neither `done` nor `dropped` | `INVALID (done with open milestones)` | `fix <roadmap>` |
+| `dropped` | — | `dropped` | empty |
+| `roadmap.md` missing or unparseable, or any other status | — | `INVALID (roadmap.md: <reason>)` | `fix <roadmap>` |
+| the directory is named `plans` | — | `INVALID (reserved name)` | `fix plans` |
+
+A milestone that is invalid has no status: it counts in `M` and never in `N`, so it
+keeps its roadmap open.
+
+### 11.6 Membership problems
+
+These apply to every chain whose intent is `draft` or `approved`, in either layout.
+
+| Condition | Reported as |
+|---|---|
+| the `milestone` value is not of the form `<roadmap>/<NN>`, or no milestone file has that roadmap and number | the chain renders `INVALID (intent.md: unknown milestone <value>)` → `fix <chain>` |
+| the value matches two milestone files (duplicate number) | the chain renders `INVALID (intent.md: ambiguous milestone <value>)` → `fix <chain>` |
+| the chain names a `dropped` milestone | under the chain's row: `⤷ milestone <roadmap>/<NN> is dropped — release this chain` |
+| a `draft` or `approved` milestone sits under a `dropped` roadmap | under the milestone's row: `⤷ roadmap <roadmap> is dropped — drop this milestone` |
+
+The two invalid results rank after I1 and before I2 (§10.3). In a repository with no
+roadmap directory, a chain carrying a `milestone` key therefore renders the first row
+of this table in the flat layout.
+
+## 12. Roll-up
+
+The roll-up closes milestones, and then their roadmap, when their work is finished. It
+takes a roadmap name, and it is idempotent: running it when nothing is ready changes
+nothing.
+
+1. For each milestone of the roadmap whose status is `approved`, in number order: if
+   every member's intent is `done` or `dropped`, with at least one `done`, flip the
+   milestone `approved → done` and tell the author it closed.
+2. If the roadmap's status is `approved`, and every milestone's status is `done` or
+   `dropped`, with at least one `done`, flip the roadmap `approved → done` and tell the
+   author it closed.
+
+It runs as the last step of any interaction that could have made either condition
+true, for the roadmap concerned:
+
+| Event | Skill |
+|---|---|
+| a member's intent flips to `done` (chain walk-up) | `execute` |
+| a member's intent is dropped | `intent` |
+| a chain is released; a milestone is approved or dropped | `milestone` |
+| a roadmap is approved | `roadmap` |
+| the author asks for it, or the board's NEXT reads `roll up` | `milestone`, operation `roll up`, given a roadmap name or a milestone reference |
+
+A roll-up that was missed is visible: the board reads `milestone complete` or
+`roadmap complete` with NEXT `roll up` (§11.4, §11.5).
 
 ---
 

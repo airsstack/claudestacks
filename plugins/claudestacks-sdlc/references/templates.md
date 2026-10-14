@@ -1,9 +1,9 @@
-# Artifact Templates — body shapes for intent, spec, and plan
+# Artifact Templates — body shapes for intent, spec, plan, roadmap, and milestone
 
 The body-shape authority for the `claudestacks-sdlc` skills. When `intent`, `design`,
-or `plan` writes a new artifact, it reproduces the shape shown here: frontmatter plus
-the body sections below it. Bracketed text is guidance for the writing skill, not
-content to leave in the file.
+`plan`, `roadmap`, or `milestone` writes a new artifact, it reproduces the shape shown
+here: frontmatter plus the body sections below it. Bracketed text is guidance for the
+writing skill, not content to leave in the file.
 
 ## `intent.md`
 
@@ -17,6 +17,7 @@ derived-from-rfc:                # optional — see artifact-chain §6
   - rfcs/<file>.md
 source: triage                   # optional — see artifact-chain §6
 spec: skipped                    # optional — see artifact-chain §6
+milestone: <roadmap>/<NN>        # optional — see artifact-chain §11
 ---
 
 # Intent: <title>
@@ -53,6 +54,7 @@ commands — at full precision.
 ---
 status: draft
 created: <YYYY-MM-DD>
+built-on: <fingerprint>          # of intent.md — see artifact-chain §10
 ---
 
 # Spec: <title>
@@ -83,6 +85,7 @@ Provenance keys per `artifact-chain.md` §6 may also appear in a spec's frontmat
 status: draft
 created: <YYYY-MM-DD>
 depends-on: [01]                 # optional — see artifact-chain §6
+built-on: <fingerprint>          # of the plan's authority — see artifact-chain §10
 ---
 
 # <name> Implementation Plan
@@ -99,31 +102,28 @@ when the goal statement already names the authority]
 
 ---
 
-## File structure
+## Files that change
 
 ```
 <path>   — [create|modify] <one-line description>
 <path>   — [create|modify] <one-line description>
 ```
 
-[optional: one paragraph naming a verification approach repeated at every task, e.g. a
-single command invoked the same way throughout]
+## Order of work
 
 ### Task 1 — <imperative title>
 
-**Files:** [omit this line entirely for a task with no file changes of its own, e.g. a
-closing commit task]
-- Create/Modify <path>
+**Files:** [omit this line entirely for a task with no file changes of its own]
+- Create/Modify/Test <path> — <what changes in it>
 
-**Steps:**
+**Change:** [the behaviour this task adds or changes, in prose; types or functions it
+introduces by name and one-line purpose]
 
-1. [a concrete step — failing test, code, or command]
-2. [...]
-3. Verify:
-   ```
-   $ <command>
-   ```
-   Expected: [what confirms this step worked]
+**Proof:** [each test by name, and what it asserts, in prose — written first by `execute`]
+- `<test name>` — <what it asserts>
+
+**Done when:** `<command>` passes and the stack's Definition of Done is green. Commit
+`<conventional commit subject>`.
 
 ### Task N — <imperative title>
 
@@ -131,10 +131,20 @@ closing commit task]
 
 ---
 
-## Verification summary (plan-level)
+## Risks
+
+- [what the change could break, which step is most risky, options not taken, and any
+  question only running code can answer — `execute` settles those with a probe]
+
+## Proof
 
 - [the plan-wide checks that prove every task's work holds together]
 ````
+
+A plan carries no implementation or test code: no function bodies, no test bodies, no
+diff. A command the implementer runs is fine. The shape follows the `plan.md` in Anthropic's
+AI-native SDLC playbook — files that change, order of work, risks, proof — and `execute`
+writes the code.
 
 Provenance keys per `artifact-chain.md` §6 may also appear in a plan's frontmatter.
 
@@ -144,6 +154,61 @@ throwaway test run to prove a claim the task asserted but did not create: the cl
 command, its real output, and whether it came out against the plan), and `## Deviations`
 (departures from the plan) — before flipping it `done`. None is authored by the `plan`
 skill; all three are appended by `execute`.
+
+## `roadmaps/<roadmap>/roadmap.md`
+
+````markdown
+---
+status: draft
+created: <YYYY-MM-DD>
+---
+
+# Roadmap: <title>
+
+## Vision
+
+[where this body of work is going and why]
+
+## Non-goals
+
+[what this roadmap deliberately leaves out]
+````
+
+## `roadmaps/<roadmap>/NN-<topic>.md`
+
+````markdown
+---
+status: draft
+created: <YYYY-MM-DD>
+---
+
+# Milestone: <title>
+
+## Goal
+
+[the state of the world when this milestone is reached]
+
+## Non-goals
+
+[what this milestone deliberately leaves out]
+````
+
+Both carry `status` and `created` and no other frontmatter key. Neither body lists
+milestones, chains, progress or finished work: `artifact-chain.md` §11 says where
+those come from.
+
+## A parked intent
+
+Work planned for a milestone and not yet begun is parked by the `milestone` skill as an
+ordinary `intent.md` with `status: draft` and the `milestone` key. `Problem` holds what
+the author said about that piece of work. `Affected systems`, `Desired outcome`,
+`Constraints` and `Non-goals` each hold exactly this sentence:
+
+```
+Not explored yet — parked by milestone <roadmap>/<NN>.
+```
+
+The author completes it later through the `intent` skill's amend mode.
 
 ---
 

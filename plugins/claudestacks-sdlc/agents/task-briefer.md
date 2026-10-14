@@ -6,7 +6,7 @@ description: >
   task's complete verbatim content to a handoff file and returns only its
   summary. Also lists, without judging, every fact the task asserts about the
   codebase or an outside system. HARD-REFUSES judgment, implementation, and
-  running the plan's commands. Use so a 60 KB plan never enters the main
+  running the plan's commands. Use so a whole plan never enters the main
   thread's context.
 tools: [Read, Grep, Glob, Bash, Write]
 model: sonnet
@@ -58,10 +58,10 @@ needs it in hand.
 ## Mode `brief`
 
 Write the handoff file. Its `<detail>` is task `N` reproduced **verbatim**: the heading, the
-Files list, every numbered step, every code block, every command, every expected-output
-block, byte for byte as the plan has it. Do not renumber, do not reflow, do not "clean up",
-do not fill in an ellipsis, do not translate an expected output into prose. A coder will
-build from this text and nothing else, so a paraphrase here becomes wrong code downstream.
+Files list, the Change, every Proof line, the Done-when command, byte for byte as the plan
+has it, followed by the plan's `## Risks` section verbatim. Do not renumber, do not reflow,
+do not "clean up", do not fill in an ellipsis. A coder will build from this text and
+nothing else, so a paraphrase here becomes wrong code downstream.
 
 If the task's text references another task ("as in Task 3", "the same shape as above"),
 reproduce that referenced material too, inline, marked `— pulled from Task 3 —`. The brief

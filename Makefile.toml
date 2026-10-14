@@ -160,6 +160,61 @@ airsl test --policy confined \
   --allow-write "${TMPDIR:-/tmp}" \
   --allow-exec git \
   plugins
+set +x
+
+# The fingerprint gate. `scripts/fingerprint.sh` is the one piece of the
+# claudestacks-sdlc board with no Lua test: it exists for machines without
+# airsl. It must print exactly what `lib/fingerprint.lua` computes, and
+# fingerprint_test.lua asserts these same literals on the Lua side. Run
+# here so the Ubuntu job proves the pipeline on Linux.
+FP_SH=plugins/claudestacks-sdlc/scripts/fingerprint.sh
+FP_DIR=$(mktemp -d)
+trap 'rm -rf "$FP_DIR"' EXIT
+FM='---\nstatus: approved\ncreated: 2026-10-13\n---\n'
+BODY='# Spec: sample\n\nA line with --- inside it.\n---\nlast line'
+printf '%b' "${FM}${BODY}\n" > "$FP_DIR/lf-final-newline.md"
+printf '%b' "${FM}${BODY}" > "$FP_DIR/lf-no-final-newline.md"
+printf '%b' "${FM}${BODY}\n" | awk '{ printf "%s\r\n", $0 }' > "$FP_DIR/crlf.md"
+printf '%b' "${FM}${BODY}\n" | sed '2s/approved/done/' > "$FP_DIR/status-flipped.md"
+printf '%b' "${FM}${BODY} changed\n" > "$FP_DIR/body-edited.md"
+printf '%b' "${FM}" > "$FP_DIR/empty-body.md"
+printf '%s\n' '# just a heading' > "$FP_DIR/no-frontmatter.md"
+printf '%s\n' '---' 'status: draft' > "$FP_DIR/unterminated.md"
+fail=0
+FP_PATH=$PATH
+check() {
+  got=$(PATH="$FP_PATH" /bin/sh "$FP_SH" "$FP_DIR/$1") && code=0 || code=$?
+  if [ "$got" != "$2" ] || [ "$code" != "$3" ]; then
+    echo "fingerprint gate: $1: want '$2' exit $3, got '$got' exit $code" >&2
+    fail=1
+  fi
+}
+cases() {
+  check lf-final-newline.md    db42cc1eff57 0
+  check lf-no-final-newline.md db42cc1eff57 0
+  check crlf.md                db42cc1eff57 0
+  check status-flipped.md      db42cc1eff57 0
+  check body-edited.md         02746658f17b 0
+  check empty-body.md          e3b0c44298fc 0
+  check no-frontmatter.md      ""           2
+  check unterminated.md        ""           2
+}
+cases
+[ "$fail" = 0 ] || exit 1
+echo "fingerprint gate: 8 cases passed"
+# fingerprint.sh prefers shasum, so where both tools exist the sha256sum
+# branch never runs above. Run the cases again with a PATH holding only what
+# the script needs and no shasum.
+if command -v shasum >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1; then
+  mkdir "$FP_DIR/bin"
+  for tool in awk cut sha256sum; do
+    ln -s "$(command -v "$tool")" "$FP_DIR/bin/$tool"
+  done
+  FP_PATH="$FP_DIR/bin"
+  cases
+  [ "$fail" = 0 ] || exit 1
+  echo "fingerprint gate: 8 cases passed with sha256sum"
+fi
 '''
 
 [tasks.claudevs-check]

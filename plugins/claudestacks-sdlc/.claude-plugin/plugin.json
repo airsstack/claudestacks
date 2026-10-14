@@ -1,7 +1,7 @@
 {
   "name": "claudestacks-sdlc",
-  "version": "0.1.2",
-  "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops and a deterministic status board. Implements Anthropic's AI-native SDLC playbook.",
+  "version": "0.2.0",
+  "description": "AI-native SDLC workflow: a committed intent → spec → plan → execute chain with distill and triage feedback loops, optional roadmaps and milestones, and a deterministic status board that reports artifacts drifting out of sync. Implements Anthropic's AI-native SDLC playbook.",
   "author": {
     "name": "rstlix0x0",
     "email": "rstlix.dev@gmail.com"

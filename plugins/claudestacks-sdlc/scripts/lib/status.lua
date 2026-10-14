@@ -5,6 +5,8 @@
 -- Code side of the rules whose prose mirror is `references/artifact-chain.md`
 -- (spec §5.1 NEXT derivation, §2.3 frontmatter); the two MUST agree.
 
+local fingerprint = require("lib.fingerprint")
+
 local fs = airsstack.fs
 local path = airsstack.path
 
@@ -54,7 +56,8 @@ function M.parse_frontmatter(text)
 end
 
 -- Reads one artifact's frontmatter; nil and a reason when unreadable,
--- unparseable, or missing the status field.
+-- unparseable, or missing the status field. The file's text is the second
+-- result, so a caller that needs the body's fingerprint does not read twice.
 function M.read_artifact(file)
   local ok, text = pcall(fs.read, file)
   if not ok then
@@ -67,12 +70,13 @@ function M.read_artifact(file)
   if not fields.status then
     return nil, "missing status"
   end
-  return fields
+  return fields, text
 end
 
--- Reads one chain directory into { name, intent, spec, plans, invalid }.
--- The first unparseable artifact marks the whole chain invalid: no state is
--- ever guessed.
+-- Reads one chain directory into { name, intent, spec, plans, invalid,
+-- intent_fp, spec_fp }. The first unparseable artifact marks the whole chain
+-- invalid: no state is ever guessed. The two fingerprints are computed only
+-- for an `approved` intent, the only chains the sync rules read.
 function M.read_chain(dir, name)
   local chain = { name = name, plans = {} }
 
@@ -81,22 +85,31 @@ function M.read_chain(dir, name)
     chain.invalid = "intent.md missing"
     return chain
   end
-  local intent, reason = M.read_artifact(intent_file)
+  -- read_artifact's second result is the file's text on success and the
+  -- reason on failure.
+  local intent, intent_detail = M.read_artifact(intent_file)
   if not intent then
-    chain.invalid = "intent.md: " .. reason
+    chain.invalid = "intent.md: " .. intent_detail
     return chain
   end
   chain.intent = intent
+  local checked = intent.status == "approved"
+  if checked then
+    chain.intent_fp = fingerprint.of_text(intent_detail)
+  end
 
   -- Only spec.md governs; spec-superseded-*.md files are history (§2.1).
   local spec_file = path.join(dir, "spec.md")
   if fs.exists(spec_file) then
-    local spec, sreason = M.read_artifact(spec_file)
+    local spec, spec_detail = M.read_artifact(spec_file)
     if not spec then
-      chain.invalid = "spec.md: " .. sreason
+      chain.invalid = "spec.md: " .. spec_detail
       return chain
     end
     chain.spec = spec
+    if checked then
+      chain.spec_fp = fingerprint.of_text(spec_detail)
+    end
   end
 
   local plans_dir = path.join(dir, "plans")
@@ -185,8 +198,87 @@ local function deps_met(chain, plan)
   return true
 end
 
--- STATE and NEXT for one chain, per the NEXT-derivation rules in
--- `references/artifact-chain.md` (spec §5.1). States only, no judgment.
+-- A live plan still has work in it; a settled one (`done`, `superseded`)
+-- does not. Rules I4, I5, C3 and C4 read only live plans; a `draft` plan is
+-- not checked by them.
+local function live(plan)
+  return plan.status == "approved" or plan.status == "executing"
+end
+
+-- A frontmatter fingerprint value, or nil when the key is absent or empty
+-- (an empty `key:` parses as an empty list).
+local function fp_value(value)
+  if type(value) == "string" then
+    return value
+  end
+  return nil
+end
+
+-- The sync findings for a chain whose intent is `approved`, per the sync
+-- rules in `references/artifact-chain.md` §10. Returns a table holding
+-- either `invalid` (the reason, rules I2-I5 in order) or the conditions:
+-- `c1` (spec stale), `c2` (the lowest plan number whose `disproves` still
+-- matches), `plans` (plan -> "blocked" for C3 or "stale" for C4), `blocked`
+-- and `stale` (whether any plan holds C3 / C4), and `word` — "spec" or
+-- "intent", the artifact this chain's plans are written against, or nil when
+-- there is no spec.md and no skip flag.
+function M.sync(chain)
+  local spec, intent = chain.spec, chain.intent
+  local out = { plans = {} }
+
+  if spec and spec.status ~= "draft" and spec.status ~= "approved" then
+    out.invalid = "spec.md: unknown status " .. tostring(spec.status)
+    return out
+  end
+  if spec and spec.status == "approved" and not fp_value(spec["built-on"]) then
+    out.invalid = "spec.md: missing built-on"
+    return out
+  end
+
+  local word, authority_fp
+  if spec then
+    word, authority_fp = "spec", chain.spec_fp
+  elseif intent.spec == "skipped" then
+    word, authority_fp = "intent", chain.intent_fp
+  end
+  out.word = word
+
+  for _, plan in ipairs(chain.plans) do
+    if live(plan) and not word then
+      out.invalid = "plans/" .. plan.num .. ": no spec and no skip flag"
+      return out
+    end
+  end
+  for _, plan in ipairs(chain.plans) do
+    if live(plan) and not fp_value(plan["built-on"]) then
+      out.invalid = "plans/" .. plan.num .. ": missing built-on"
+      return out
+    end
+  end
+
+  out.c1 = spec ~= nil and spec.status == "approved"
+    and fp_value(spec["built-on"]) ~= chain.intent_fp
+  for _, plan in ipairs(chain.plans) do
+    if not out.c2 and plan.status ~= "superseded"
+      and authority_fp and fp_value(plan.disproves) == authority_fp then
+      out.c2 = plan.num
+    end
+    if live(plan) then
+      if word == "spec" and spec.status == "draft" then
+        out.plans[plan] = "blocked"
+        out.blocked = true
+      elseif fp_value(plan["built-on"]) ~= authority_fp then
+        out.plans[plan] = "stale"
+        out.stale = true
+      end
+    end
+  end
+  return out
+end
+
+-- STATE and NEXT for one chain, per the NEXT-derivation and sync rules in
+-- `references/artifact-chain.md` §9 and §10. States and fingerprints only,
+-- no judgment.
 function M.derive(chain)
   if chain.invalid then
     return "INVALID (" .. chain.invalid .. ")", "fix " .. chain.name
@@ -207,8 +299,35 @@ function M.derive(chain)
       "fix " .. chain.name
   end
 
+  -- An unknown plan status is refused before the sync rules read the plans.
+  for _, plan in ipairs(chain.plans) do
+    if not PLAN_STATUSES[plan.status] then
+      return "INVALID (plans/" .. plan.num .. ": unknown status " .. tostring(plan.status) .. ")",
+        "fix " .. chain.name
+    end
+  end
+
+  local sync = M.sync(chain)
+  if sync.invalid then
+    return "INVALID (" .. sync.invalid .. ")", "fix " .. chain.name
+  end
+
+  -- The sync parts lead the cell, and the first standing condition decides
+  -- NEXT ahead of the states-only derivation below.
+  local parts = {}
+  if sync.c1 then
+    parts[#parts + 1] = "spec stale (intent changed)"
+  end
+  if sync.c2 then
+    parts[#parts + 1] = sync.word .. " disproven by plan " .. sync.c2
+  end
+  local sync_next = (sync.c1 and "design")
+    or (sync.c2 and (sync.word == "intent" and "intent" or "design"))
+    or (sync.blocked and "approve spec")
+    or (sync.stale and "plan")
+    or nil
+
   if #chain.plans > 0 then
-    local parts = {}
     -- every_settled: every plan is done or superseded (no draft/approved/
     -- executing left). done_count: how many are actually done. Per spec
     -- §2.4:116 / reference §7.2, the walk-up needs BOTH — a chain that is
@@ -216,11 +335,13 @@ function M.derive(chain)
     local every_settled, done_count = true, 0
     local next_exec, next_draft, blocked, any_executing = nil, nil, false, false
     for _, plan in ipairs(chain.plans) do
-      if not PLAN_STATUSES[plan.status] then
-        return "INVALID (plans/" .. plan.num .. ": unknown status " .. tostring(plan.status) .. ")",
-          "fix " .. chain.name
+      local part = "plan " .. plan.num .. " " .. plan.status
+      if sync.plans[plan] == "blocked" then
+        part = part .. ": blocked (spec not approved)"
+      elseif sync.plans[plan] == "stale" then
+        part = part .. ": stale (" .. sync.word .. " changed)"
       end
-      parts[#parts + 1] = "plan " .. plan.num .. " " .. plan.status
+      parts[#parts + 1] = part
       if plan.status == "done" then
         done_count = done_count + 1
       elseif plan.status ~= "superseded" then
@@ -240,28 +361,31 @@ function M.derive(chain)
         next_draft = plan.num
       end
     end
-    if every_settled and done_count > 0 then
-      -- Reference §9:188 collapses this into the DONE/DROPPED tail (count
-      -- only); M.render does that collapse by matching this exact state.
+    if every_settled and done_count > 0 and not sync.c1 and not sync.c2 then
+      -- The chain's work is finished and only the walk-up is owed. A
+      -- standing C1 or C2 keeps the chain open: the debt outlives the plans.
       return "chain complete" .. tag, "execute walk-up"
     end
-    local nxt = next_exec and ("execute " .. next_exec)
+    local nxt = sync_next
+      or next_exec and ("execute " .. next_exec)
       or (next_draft and ("approve plan " .. next_draft))
       or (blocked and "wait (dependencies pending)")
       -- plan `executing` -> "no further derivation; it is mid-flight"
-      -- (reference §9:183): nothing to fabricate, NEXT stays empty.
+      -- (reference §9): nothing to fabricate, NEXT stays empty.
       or (any_executing and "")
       -- Reached only when every plan is settled (`done` or `superseded`)
-      -- but none is actually `done` — the all-superseded case.
-      -- Unrecognised statuses are refused above, so this cannot be a typo
-      -- falling through. Reference §9:187-188 names this case and requires
-      -- the ≥1-`done` guard above before it collapses. Minimal defensible
-      -- action: the chain needs a replacement plan, same as an approved
-      -- spec with none yet.
+      -- but none is actually `done` — the all-superseded case, which
+      -- reference §9 sends to `plan`. Unrecognised statuses are refused
+      -- above, so this cannot be a typo falling through. The chain needs a
+      -- replacement plan, same as an approved spec with none yet.
       or "plan"
     return table.concat(parts, ", ") .. tag, nxt
   end
 
+  if sync.c1 then
+    -- `spec approved` is left out: the stale part already says it.
+    return table.concat(parts, ", ") .. tag, sync_next
+  end
   if intent.spec == "skipped" then
     return "intent approved (spec skipped)" .. tag, "plan"
   end
@@ -271,11 +395,8 @@ function M.derive(chain)
   if chain.spec.status == "draft" then
     return "spec draft" .. tag, "approve spec"
   end
-  if chain.spec.status == "approved" then
-    return "spec approved" .. tag, "plan"
-  end
-  return "INVALID (spec.md: unknown status " .. tostring(chain.spec.status) .. ")",
-    "fix " .. chain.name
+  -- M.sync refused every status but `draft` and `approved`.
+  return "spec approved" .. tag, "plan"
 end
 
 -- The union of the intent's provenance lists, in prd-then-rfc order.
@@ -312,10 +433,10 @@ function M.render(rootdir)
   local done_count, dropped_count = 0, 0
   for _, chain in ipairs(chains) do
     local state, nxt = M.derive(chain)
-    -- "chain complete" (with an optional trailing "(triage)" tag) is the
-    -- every-plan-done-or-superseded-with->=1-done case; reference §9:188
-    -- collapses it into the tail same as a dropped/done intent.
-    if state == "done" or state:match("^chain complete") then
+    -- Only a `done` or `dropped` intent collapses into the tail. A chain
+    -- whose plans are complete but whose intent was never flipped is a row,
+    -- so a missed walk-up is visible.
+    if state == "done" then
       done_count = done_count + 1
     elseif state == "dropped" then
       dropped_count = dropped_count + 1

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-10-14
 depends-on: [02]
 built-on: a5a235079e03
@@ -1768,3 +1768,100 @@ edit and present after it.
 - A repository with no `roadmaps/` directory renders exactly as it did after plan 02.
 - `references/artifact-chain.md` holds §11 and §12, and every board string in §11 appears in
   the Lua.
+
+## Review findings
+
+One `claudestacks:reviewer` spawn over the whole diff, 2026-10-14. Verdict:
+`SPEC: COMPLIANT-WITH-AMENDMENTS`, blocking set none. The reviewer re-ran `cargo make plugins`
+(`71 file(s) compiled, 0 failed`, `493 passed, 0 failed (22 files)`,
+`fingerprint gate: 8 cases passed`). It diffed Tasks 1–4 against the plan's code with an
+empty result, and rendered this repository's chain root with HEAD's `lib/status.lua` and with
+the new one; the two outputs were byte-identical. One fix round by a fresh coder followed,
+and each mutation in it was run through `cargo make plugins-test` and then restored. The gate
+after the round read `71 file(s) compiled, 0 failed`, `499 passed, 0 failed (22 files)`,
+`fingerprint gate: 8 cases passed`.
+
+- reversion guard — reverting `(type(value) == "string" and value or "")` to `value` failed
+  nothing; an empty `milestone:` key would then crash the board — `scripts/lib/status.lua:293`
+  — fixed: test `an_empty_milestone_key_is_an_unknown_milestone_and_the_board_still_renders`.
+  Reverted: `498 passed, 1 failed`, with `status.lua:293: attempt to concatenate a table value (local 'value')`.
+- reversion guard — deleting `milestone.status = nil` failed nothing; two `done` files sharing
+  a number would complete their roadmap — `scripts/lib/roadmap.lua:77` — fixed: test
+  `two_done_milestones_sharing_a_number_do_not_complete_their_roadmap`. Reverted:
+  `498 passed, 1 failed`, `want approved, 0 of 2 milestones done / , got roadmap complete / roll up`.
+- reversion guard — the decision "an unparseable duplicate shows its unparseable reason" had no
+  test — `scripts/lib/roadmap.lua:75` — fixed: test
+  `an_unparseable_duplicate_shows_its_unparseable_reason`. Reverted: `498 passed, 1 failed`,
+  `want INVALID (01-auth.md: missing status) / fix platform/01, got INVALID (01-auth.md: duplicate number 01) / fix platform/01`.
+- reversion guard — the `⤷ roadmap … drop this milestone` note's status clause was unguarded;
+  reverted, it would tell the author to drop a `done` milestone — `scripts/lib/status.lua`
+  (`M.board`) — fixed: test `a_done_milestone_under_a_dropped_roadmap_is_not_told_to_drop`.
+  Reverted: `498 passed, 1 failed`.
+- reversion guard — the `⤷ milestone … is dropped` note's status clause was unguarded —
+  `scripts/lib/status.lua` (`M.board`) — fixed: test
+  `a_chain_invalid_by_status_is_not_told_to_release_a_dropped_milestone`. Reverted:
+  `498 passed, 1 failed`.
+- correctness — a directory named like `02-x.md` was read as a milestone; spec §4 ignores
+  anything but files — `scripts/lib/roadmap.lua:51-52` — fixed: `fs.is_file` check, test
+  `a_directory_named_like_a_milestone_file_is_ignored`, red before the fix:
+  `498 passed, 1 failed`, `want no milestone, got 1`.
+- comment-matches-code — the header said "when the root holds a `roadmaps/` directory", but an
+  empty `roadmaps/` renders flat — `scripts/lib/status.lua:3-4` — fixed.
+- comment-matches-code — the derive comment cited §9 and §10 only — `scripts/lib/status.lua:297-298`
+  — fixed: it also cites the membership rules of §11.
+- rendering — an empty `milestone:` key renders `INVALID (intent.md: unknown milestone )` with a
+  dangling space — `scripts/lib/status.lua:293` — not changed: the spec does not say whether an
+  empty key is absent or unknown.
+- rendering — labels longer than the 34-column CHAIN cell push STATE out of line, which the
+  `MILESTONE <roadmap>/` prefix makes more common — `M.row_lines` — not changed: the behaviour
+  predates this plan.
+- parser — `milestone: "platform/01"` keeps its quotes and reads as an unknown milestone —
+  `scripts/lib/roadmap.lua:109`, `parse_frontmatter` — not changed: the frontmatter parser's
+  existing YAML subset.
+- spec amendment — "open chain" is widened to every chain with a row, `INVALID` included; spec
+  §7.1 still says `draft` or `approved`, and plan 06 counts the widened term — open for the
+  author: amend the spec now or after the plan set.
+- spec amendment — this plan ran beside plan 03, against spec §12's order — recorded in the plan,
+  agreed at approval; spec text unchanged.
+- spec drift — under a closed roadmap, a milestone prints when it is not `done` or `dropped`
+  (so an `INVALID` one prints too); spec §7.1 says "when it is draft or approved" — not changed;
+  test `a_closed_roadmap_prints_only_milestones_that_are_still_open` asserts the wider reading.
+
+## Probe results
+
+- Task 5 step 11, the board strings of `references/artifact-chain.md` §11 against the Lua, run
+  after Task 4: all 14 strings present in `lib/roadmap.lua` or `lib/status.lua`.
+- Guard break, Task 3 step 7: `if #unassigned > 0 then` → `if true then` gave
+  `483 passed, 6 failed`, the guard `unassigned_is_omitted_when_every_open_chain_is_a_member`
+  among them; restored.
+- Guard break, Task 4: dropping `or intent.status == "done"` gave `486 passed, 7 failed`,
+  `a_closed_chain_with_a_broken_milestone_key_is_not_checked` failing with
+  `INVALID (intent.md: unknown status done)`; restored.
+- Task 6, the board for this repository, rendered from the worktree root after Task 4:
+
+  ```
+  CHAIN                             STATE                         NEXT
+  2026-08-29-claudevs-plugin-cache-hygiene  intent draft (triage)         review evidence
+  2026-10-13-sdlc-roadmaps-milestones  plan 01 executing, plan 02 executing, plan 03 executing, plan 04 executing, plan 05 approved, plan 06 approved, plan 07 approved  wait (dependencies pending)
+  DONE/DROPPED: 6 done, 2 dropped (not listed)
+  ```
+
+  Flat layout, no `ROADMAP`, `MILESTONE` or `UNASSIGNED` line. The reviewer's render of the same
+  root under HEAD's `lib/status.lua` was byte-identical to it.
+
+## Deviations
+
+- 2026-10-14 — Test counts run 7 higher than the plan states throughout, because plan 03 added
+  7 tests after this plan was written: the baseline was `448 passed`, not 441, and the end
+  state `493 passed, 0 failed (22 files)`, not 486. After the review fix round it is `499`.
+- 2026-10-14 — No commit was made after any task; each task's commit step was skipped and the
+  commit gate left with the author, per the `execute` skill.
+- 2026-10-14 — Task 5 ran in parallel with Task 1, since the two write different files. So its
+  step 11 cross-check could not pass when Task 5 finished, and was run again after Task 4
+  instead.
+- 2026-10-14 — Task 3 added one clause to the `lib/status.lua` header comment that is not in the
+  plan's text; the review fix round reworded it.
+- 2026-10-14 — The review fix round added six tests and the `fs.is_file` check, which are not
+  in the plan. They are listed under Review findings.
+- 2026-10-14 — No `claudestacks-sdlc:task-briefer` was spawned. Each coder read its own task
+  section of this plan by line range.

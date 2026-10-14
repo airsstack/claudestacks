@@ -1,9 +1,9 @@
-# Artifact Templates — body shapes for intent, spec, and plan
+# Artifact Templates — body shapes for intent, spec, plan, roadmap, and milestone
 
 The body-shape authority for the `claudestacks-sdlc` skills. When `intent`, `design`,
-or `plan` writes a new artifact, it reproduces the shape shown here: frontmatter plus
-the body sections below it. Bracketed text is guidance for the writing skill, not
-content to leave in the file.
+`plan`, `roadmap`, or `milestone` writes a new artifact, it reproduces the shape shown
+here: frontmatter plus the body sections below it. Bracketed text is guidance for the
+writing skill, not content to leave in the file.
 
 ## `intent.md`
 
@@ -17,6 +17,7 @@ derived-from-rfc:                # optional — see artifact-chain §6
   - rfcs/<file>.md
 source: triage                   # optional — see artifact-chain §6
 spec: skipped                    # optional — see artifact-chain §6
+milestone: <roadmap>/<NN>        # optional — see artifact-chain §11
 ---
 
 # Intent: <title>
@@ -153,6 +154,61 @@ throwaway test run to prove a claim the task asserted but did not create: the cl
 command, its real output, and whether it came out against the plan), and `## Deviations`
 (departures from the plan) — before flipping it `done`. None is authored by the `plan`
 skill; all three are appended by `execute`.
+
+## `roadmaps/<roadmap>/roadmap.md`
+
+````markdown
+---
+status: draft
+created: <YYYY-MM-DD>
+---
+
+# Roadmap: <title>
+
+## Vision
+
+[where this body of work is going and why]
+
+## Non-goals
+
+[what this roadmap deliberately leaves out]
+````
+
+## `roadmaps/<roadmap>/NN-<topic>.md`
+
+````markdown
+---
+status: draft
+created: <YYYY-MM-DD>
+---
+
+# Milestone: <title>
+
+## Goal
+
+[the state of the world when this milestone is reached]
+
+## Non-goals
+
+[what this milestone deliberately leaves out]
+````
+
+Both carry `status` and `created` and no other frontmatter key. Neither body lists
+milestones, chains, progress or finished work: `artifact-chain.md` §11 says where
+those come from.
+
+## A parked intent
+
+Work planned for a milestone and not yet begun is parked by the `milestone` skill as an
+ordinary `intent.md` with `status: draft` and the `milestone` key. `Problem` holds what
+the author said about that piece of work. `Affected systems`, `Desired outcome`,
+`Constraints` and `Non-goals` each hold exactly this sentence:
+
+```
+Not explored yet — parked by milestone <roadmap>/<NN>.
+```
+
+The author completes it later through the `intent` skill's amend mode.
 
 ---
 

@@ -1,11 +1,14 @@
 -- The claudestacks-sdlc status board: scans the committed chain root,
 -- parses artifact frontmatter, derives each chain's STATE and NEXT, and
--- renders the board.
+-- renders the board, grouped under roadmaps and milestones when `roadmaps/`
+-- holds at least one roadmap directory, and lists the rows that need
+-- attention as the session-start text.
 --
 -- Code side of the rules whose prose mirror is `references/artifact-chain.md`
 -- (spec §5.1 NEXT derivation, §2.3 frontmatter); the two MUST agree.
 
 local fingerprint = require("lib.fingerprint")
+local roadmap = require("lib.roadmap")
 
 local fs = airsstack.fs
 local path = airsstack.path
@@ -16,7 +19,7 @@ local M = {}
 M.ROOT = ".claudestacks/sdlc"
 
 -- Top-level entries that are not chains.
-local SKIP = { prds = true, rfcs = true }
+local SKIP = { prds = true, rfcs = true, [roadmap.DIR] = true }
 
 -- Parses the YAML subset the skills write: `key: value` scalars (inline
 -- `# comments` stripped) and block lists (`key:` followed by `- item`
@@ -276,13 +279,30 @@ function M.sync(chain)
   return out
 end
 
+-- The membership problem of an open chain's intent, or nil: its `milestone`
+-- value resolves to no milestone, or to two (reference §11). A chain with
+-- no `milestone` key is a simple chain and has no problem.
+local function membership_problem(intent, roadmaps)
+  local value = intent.milestone
+  if value == nil then
+    return nil
+  end
+  local milestone, why = roadmap.resolve(roadmaps, value)
+  if milestone then
+    return nil
+  end
+  return "intent.md: " .. why .. " milestone " .. (type(value) == "string" and value or "")
+end
+
 -- STATE and NEXT for one chain, per the NEXT-derivation and sync rules in
--- `references/artifact-chain.md` §9 and §10. States and fingerprints only,
--- no judgment.
-function M.derive(chain)
+-- `references/artifact-chain.md` §9 and §10, and the membership rules of §11.
+-- States and fingerprints only, no judgment. `roadmaps` is lib/roadmap's
+-- scan; absent means none exist.
+function M.derive(chain, roadmaps)
   if chain.invalid then
     return "INVALID (" .. chain.invalid .. ")", "fix " .. chain.name
   end
+  roadmaps = roadmaps or {}
 
   local intent = chain.intent
   local tag = intent.source == "triage" and " (triage)" or ""
@@ -291,6 +311,10 @@ function M.derive(chain)
     return intent.status, ""
   end
   if intent.status == "draft" then
+    local problem = membership_problem(intent, roadmaps)
+    if problem then
+      return "INVALID (" .. problem .. ")", "fix " .. chain.name
+    end
     return "intent draft" .. tag,
       intent.source == "triage" and "review evidence" or "approve or drop"
   end
@@ -305,6 +329,12 @@ function M.derive(chain)
       return "INVALID (plans/" .. plan.num .. ": unknown status " .. tostring(plan.status) .. ")",
         "fix " .. chain.name
     end
+  end
+
+  -- A broken membership ranks after the results above and before I2-I5.
+  local problem = membership_problem(intent, roadmaps)
+  if problem then
+    return "INVALID (" .. problem .. ")", "fix " .. chain.name
   end
 
   local sync = M.sync(chain)
@@ -423,36 +453,212 @@ local function pad(text, width)
   return text .. string.rep(" ", width - #text)
 end
 
--- The full board for one chain root.
-function M.render(rootdir)
+-- The board for one chain root, as data: { rows, done, dropped, open,
+-- empty }. `done` and `dropped` are the tail counts, `open` the number of
+-- chain rows, and `empty` is true when the root holds neither a chain nor a
+-- roadmap. Each row is { kind, label, state, next, indent, notes }: `kind`
+-- is "chain", "milestone", "roadmap" or "heading" (a heading has a label
+-- only), and `notes` are its `⤷` annotation lines in print order.
+--
+-- With no roadmap directory the rows are the open chains, flat. With one,
+-- they are grouped: each roadmap, its milestones, each milestone's open
+-- member chains indented, then `UNASSIGNED` over every other open chain.
+function M.board(rootdir)
   local chains = M.scan(rootdir)
-  if #chains == 0 then
-    return "No chains under " .. rootdir .. ". Start one with the intent skill."
-  end
-  local lines = { pad("CHAIN", 34) .. pad("STATE", 30) .. "NEXT" }
-  local done_count, dropped_count = 0, 0
+  local roadmaps = roadmap.scan(rootdir, M.read_artifact)
+  local board = {
+    rows = {}, done = 0, dropped = 0, open = 0,
+    empty = #chains == 0 and #roadmaps == 0,
+  }
+
+  local unassigned, by_milestone = {}, {}
   for _, chain in ipairs(chains) do
-    local state, nxt = M.derive(chain)
+    local state, nxt = M.derive(chain, roadmaps)
+    local intent = chain.intent
+    local milestone = intent and intent.milestone ~= nil
+      and roadmap.resolve(roadmaps, intent.milestone) or nil
     -- Only a `done` or `dropped` intent collapses into the tail. A chain
     -- whose plans are complete but whose intent was never flipped is a row,
     -- so a missed walk-up is visible.
+    local open = state ~= "done" and state ~= "dropped"
     if state == "done" then
-      done_count = done_count + 1
+      board.done = board.done + 1
     elseif state == "dropped" then
-      dropped_count = dropped_count + 1
-    else
-      lines[#lines + 1] = pad(chain.name, 34) .. pad(state, 30) .. nxt
+      board.dropped = board.dropped + 1
+    end
+    if milestone then
+      milestone.members[#milestone.members + 1] = { status = intent.status, open = open }
+    end
+    if open then
+      board.open = board.open + 1
+      local row = { kind = "chain", label = chain.name, state = state, next = nxt, indent = 0, notes = {} }
       local ins = M.inputs(chain)
       if #ins > 0 then
-        lines[#lines + 1] = "  ⤷ inputs: " .. table.concat(ins, " · ")
+        row.notes[#row.notes + 1] = "⤷ inputs: " .. table.concat(ins, " · ")
+      end
+      if milestone and milestone.status == "dropped"
+        and (intent.status == "draft" or intent.status == "approved") then
+        row.notes[#row.notes + 1] = "⤷ milestone " .. milestone.ref
+          .. " is dropped — release this chain"
+      end
+      if milestone then
+        by_milestone[milestone] = by_milestone[milestone] or {}
+        table.insert(by_milestone[milestone], row)
+      else
+        unassigned[#unassigned + 1] = row
       end
     end
   end
-  if done_count + dropped_count > 0 then
+
+  if #roadmaps == 0 then
+    board.rows = unassigned
+    return board
+  end
+
+  local rows = board.rows
+  for _, item in ipairs(roadmaps) do
+    local state, nxt = roadmap.roadmap_row(item)
+    rows[#rows + 1] = {
+      kind = "roadmap", label = "ROADMAP " .. item.name,
+      state = state, next = nxt, indent = 0, notes = {},
+    }
+    for _, milestone in ipairs(item.milestones) do
+      if roadmap.prints(milestone) then
+        local mstate, mnext = roadmap.milestone_row(milestone)
+        local row = {
+          kind = "milestone", label = "MILESTONE " .. item.name .. "/" .. milestone.stem,
+          state = mstate, next = mnext, indent = 0, notes = {},
+        }
+        if item.status == "dropped"
+          and (milestone.status == "draft" or milestone.status == "approved") then
+          row.notes[1] = "⤷ roadmap " .. item.name .. " is dropped — drop this milestone"
+        end
+        rows[#rows + 1] = row
+        for _, member in ipairs(by_milestone[milestone] or {}) do
+          member.indent = 2
+          rows[#rows + 1] = member
+        end
+      end
+    end
+  end
+  if #unassigned > 0 then
+    rows[#rows + 1] = { kind = "heading", label = "UNASSIGNED", indent = 0, notes = {} }
+    for _, row in ipairs(unassigned) do
+      row.indent = 2
+      rows[#rows + 1] = row
+    end
+  end
+  return board
+end
+
+-- The printed lines of one board row: the row itself, then its notes, each
+-- note indented two spaces past the row.
+function M.row_lines(row)
+  local indent = string.rep(" ", row.indent)
+  if row.kind == "heading" then
+    return { indent .. row.label }
+  end
+  local lines = { indent .. pad(row.label, 34 - row.indent) .. pad(row.state, 30) .. row.next }
+  for _, note in ipairs(row.notes) do
+    lines[#lines + 1] = indent .. "  " .. note
+  end
+  return lines
+end
+
+-- The full board for one chain root.
+function M.render(rootdir)
+  local board = M.board(rootdir)
+  if board.empty then
+    return "No chains under " .. rootdir .. ". Start one with the intent skill."
+  end
+  local lines = { pad("CHAIN", 34) .. pad("STATE", 30) .. "NEXT" }
+  for _, row in ipairs(board.rows) do
+    for _, line in ipairs(M.row_lines(row)) do
+      lines[#lines + 1] = line
+    end
+  end
+  if board.done + board.dropped > 0 then
     lines[#lines + 1] = string.format(
-      "DONE/DROPPED: %d done, %d dropped (not listed)", done_count, dropped_count)
+      "DONE/DROPPED: %d done, %d dropped (not listed)", board.done, board.dropped)
   end
   return table.concat(lines, "\n")
+end
+
+-- Words in a STATE cell that mean the row needs someone's attention.
+local ATTENTION_WORDS = { "INVALID", "stale", "blocked", "disproven", "complete" }
+
+-- The session-start text is held under this many bytes: Claude Code caps a
+-- hook's stdout at 10,000 characters, and a byte count never undercounts.
+M.ATTENTION_LIMIT = 9000
+
+-- Bytes kept free for the line that says how many rows were left out.
+local ATTENTION_RESERVE = 64
+
+-- True for a `⤷ milestone …` or `⤷ roadmap …` note; a `⤷ inputs:` note is
+-- provenance, not a problem.
+local function is_problem_note(note)
+  return note:find("⤷ milestone ", 1, true) == 1 or note:find("⤷ roadmap ", 1, true) == 1
+end
+
+-- Whether a board row needs attention: its STATE holds one of the attention
+-- words, it names a plan as `executing`, or it carries a problem note.
+function M.needs_attention(row)
+  if row.kind == "heading" then
+    return false
+  end
+  for _, word in ipairs(ATTENTION_WORDS) do
+    if row.state:find(word, 1, true) then
+      return true
+    end
+  end
+  if row.state:find("plan %d%d executing") then
+    return true
+  end
+  for _, note in ipairs(row.notes) do
+    if is_problem_note(note) then
+      return true
+    end
+  end
+  return false
+end
+
+-- The session-start text for one chain root: a first line counting the open
+-- chains and the rows needing attention, then those rows exactly as the
+-- board prints them, each followed by its problem notes. The text is held
+-- under M.ATTENTION_LIMIT bytes; when rows are left out, a last line says how
+-- many. Empty when the chain root does not exist.
+function M.attention(rootdir)
+  if not (fs.exists(rootdir) and fs.is_dir(rootdir)) then
+    return ""
+  end
+  local board = M.board(rootdir)
+
+  local blocks = {}
+  for _, row in ipairs(board.rows) do
+    if M.needs_attention(row) then
+      local lines = { M.row_lines(row)[1] }
+      for _, note in ipairs(row.notes) do
+        if is_problem_note(note) then
+          lines[#lines + 1] = string.rep(" ", row.indent) .. "  " .. note
+        end
+      end
+      blocks[#blocks + 1] = table.concat(lines, "\n")
+    end
+  end
+
+  local out = { string.format(
+    "claudestacks-sdlc: %d open, %d need attention — full board: /claudestacks-sdlc:status",
+    board.open, #blocks) }
+  local size = #out[1]
+  for i, block in ipairs(blocks) do
+    if size + 1 + #block > M.ATTENTION_LIMIT - ATTENTION_RESERVE then
+      out[#out + 1] = string.format("  (%d more rows not shown)", #blocks - i + 1)
+      break
+    end
+    out[#out + 1] = block
+    size = size + 1 + #block
+  end
+  return table.concat(out, "\n")
 end
 
 return M

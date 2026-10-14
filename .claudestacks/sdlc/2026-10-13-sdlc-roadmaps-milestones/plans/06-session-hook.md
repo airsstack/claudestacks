@@ -1,5 +1,5 @@
 ---
-status: approved
+status: executing
 created: 2026-10-14
 depends-on: [04]
 built-on: a5a235079e03
@@ -714,3 +714,123 @@ plan's approval gate:
   holding stale, complete and annotated rows; both times are under one second.
 - Not verified by this plan: the hook firing inside a live session, and its text reaching
   subagents.
+
+## Review findings
+
+One `claudestacks:reviewer` spawn over the plan's five files, 2026-10-14. Verdict:
+`SPEC: COMPLIANT-WITH-AMENDMENTS`, blocking set none, no bugs found. The reviewer re-ran
+`cargo make plugins` (`72 file(s) compiled, 0 failed`, `504 passed, 0 failed (22 files)`,
+`fingerprint gate: 8 cases passed`) and `claude plugin validate --strict` (passed on 2.1.299;
+a copy of `hooks.json` without the top-level `hooks` key fails it). One fix round by a fresh
+coder followed. It touched `status_test.lua` only: each mutation of `lib/status.lua` went red
+and was restored, and the shasum before and after matched. The gate after it read
+`72 file(s) compiled, 0 failed`, `506 passed, 0 failed (22 files)`,
+`fingerprint gate: 8 cases passed`.
+
+- reversion guard — removing the `kind == "heading"` early return in `M.needs_attention`
+  failed nothing. Any root with a roadmap and an unassigned chain would then crash, and
+  `--fail-open` would hide the crash — `scripts/lib/status.lua` — fixed: test
+  `attention_lists_a_roadmap_row_and_skips_the_unassigned_heading`. Reverted:
+  `505 passed, 1 failed`, `status.lua:607: attempt to index a nil value (field 'state')`.
+- reversion guard — no test pinned a ROADMAP row qualifying (spec §9) — same test. With
+  `needs_attention` returning false for `kind == "roadmap"`: `505 passed, 1 failed`, the
+  ROADMAP line missing from the output.
+- reversion guard — setting `ATTENTION_RESERVE` to 0 failed nothing — fixed: test
+  `attention_keeps_room_for_the_line_that_says_what_it_left_out`. Reverted:
+  `505 passed, 1 failed`, `want at most 9000 bytes, got 9026`. The fixture is tuned to the
+  row width and must be retuned if that changes.
+- naming — `attention_lists_roadmap_rows_and_problem_notes_but_not_inputs` asserts no ROADMAP
+  row — fixed: renamed `attention_lists_milestone_rows_and_problem_notes_but_not_inputs`. Task 1
+  of this plan still quotes the old name.
+- correctness — the hook reads the chain root from the payload's `cwd`, which `hooks.md:613`
+  says follows Claude's `cd`. A session started or compacted in a subdirectory gets nothing:
+  a payload `cwd` of `<repo>/crates/clauders` printed nothing, exit 0. Whether a
+  `SessionStart` `compact` payload carries a post-`cd` `cwd` is not verified — not changed:
+  spec §9 dictates the `cwd`; walking up to the nearest `.claudestacks/sdlc` is a spec change,
+  open for the author.
+- modularity — `M.attention` re-implements `M.row_lines`' note indent, so "exactly as the board
+  prints them" rests on two copies — not changed: the plan's code.
+- surface — `M.needs_attention` is exported but called only inside the module — not changed:
+  the plan's code.
+- noise — a row with an empty NEXT carries two trailing spaces into the session text, as on
+  the board — not changed: spec-faithful.
+- spec amendment — the first line counts every chain row, `INVALID` included; spec §7.1/§9
+  still define open as `draft` or `approved` — open for the author (same question as plan 04).
+- citation rot — `hooks.md` is now 270,367 bytes: the 10,000-character cap moved
+  `:996 → :1017` and the `SessionStart` sources `:1190-1194 → :1211-1215`. `:207`, `:612-613`
+  and `:810` are unchanged, and `plugins-reference.md` is byte-identical. Every fact in the table
+  still holds — not changed.
+- question — spec §9 "done/dropped cost one frontmatter read" against plan 02 reading every
+  artifact — open for the author, as before.
+
+## Probe results
+
+- Task 3 step 5: launcher runs, all exit 0, with payloads fed from a file instead of a pipe.
+  - Payload `cwd` = the worktree root printed
+    `claudestacks-sdlc: 2 open, 1 need attention — full board: /claudestacks-sdlc:status`
+    and this chain's row, character for character the board's.
+  - No payload (`</dev/null`) printed the same two lines.
+  - Payload `cwd` = `/tmp` printed nothing.
+  - With `airsl` out of reach (`env -i PATH=/usr/bin:/bin`) it printed nothing.
+- Task 4 step 4: the declared command `sh "${CLAUDE_PLUGIN_ROOT}/scripts/attention.sh"` ran
+  with the variable expanded by hand to the plugin path, since the worktree guard refuses
+  it unexpanded. Same two lines, exit 0. Expansion by `sh -c` itself was not exercised.
+- Task 5 step 1, this repository, with the payload read from a file:
+
+  ```
+  $ time sh plugins/claudestacks-sdlc/scripts/attention.sh < p06-payload.json
+  claudestacks-sdlc: 2 open, 1 need attention — full board: /claudestacks-sdlc:status
+  2026-10-13-sdlc-roadmaps-milestones  plan 01 executing, plan 02 executing, plan 03 executing, plan 04 executing, plan 05 executing, plan 06 executing, plan 07 approved  wait (dependencies pending)
+  sh  <   0.02s user 0.01s system 67% cpu 0.045 total
+  ```
+
+- Task 5 step 2, the throwaway root. The script is the plan's, extracted verbatim, and its
+  output matches the expected text exactly:
+
+  ```
+  $ sh sdlc-hook-walk.sh /Users/hiraq/Projects/airsstack/claudestacks/.claude/worktrees/sdlc-milestones-roadmap
+  -- the board
+  CHAIN                             STATE                         NEXT
+  ROADMAP platform                  approved, 0 of 0 milestones done  add milestone
+  MILESTONE platform/01-auth        dropped                       
+    2026-10-17-parked               intent draft                  approve or drop
+      ⤷ milestone platform/01 is dropped — release this chain
+  UNASSIGNED
+    2026-10-15-stale                plan 01 approved: stale (spec changed)  plan
+    2026-10-16-missed               chain complete                execute walk-up
+    2026-10-18-idea                 intent draft                  approve or drop
+  DONE/DROPPED: 1 done, 0 dropped (not listed)
+
+  -- the hook
+  claudestacks-sdlc: 4 open, 3 need attention — full board: /claudestacks-sdlc:status
+    2026-10-17-parked               intent draft                  approve or drop
+      ⤷ milestone platform/01 is dropped — release this chain
+    2026-10-15-stale                plan 01 approved: stale (spec changed)  plan
+    2026-10-16-missed               chain complete                execute walk-up
+
+  -- its wall time
+
+  real	0m0.012s
+  user	0m0.004s
+  sys	0m0.006s
+  ```
+
+- Not observed: the hook firing inside a live Claude Code session. That needs the plugin
+  reinstalled from this tree and a new session.
+
+## Deviations
+
+- 2026-10-14 — Test counts run 13 higher than the plan states: plan 03 added 7 tests and plan
+  04's review fix round 6. The end state is `504 passed`, not 491, and `506` after this plan's
+  review fix round.
+- 2026-10-14 — No commit was made after any task; each task's commit step was skipped and the
+  commit gate left with the author, per the `execute` skill.
+- 2026-10-14 — Tasks 1 and 4 ran in parallel, then Tasks 2 and 3, since each pair writes
+  different files. Task 4's run step waited for Task 3's launcher.
+- 2026-10-14 — Task 1 added one clause to the `lib/status.lua` header comment that is not in
+  the plan's text.
+- 2026-10-14 — Hook payloads were read from a file instead of piped through `printf`, and the
+  `airsl`-missing run used `env -i PATH=/usr/bin:/bin` instead of `HOME=/nonexistent`. The
+  worktree guard refuses both of the plan's forms.
+- 2026-10-14 — No `claudestacks-sdlc:task-briefer` was spawned. Each coder read its own task
+  section of this plan by line range.

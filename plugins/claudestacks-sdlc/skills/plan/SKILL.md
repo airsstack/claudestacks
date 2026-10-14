@@ -49,6 +49,53 @@ Anything else is refused, naming the file, its current state, and the command th
 
 This skill never sets `spec: skipped` itself — it only reads the flag.
 
+## Sync check
+
+Before acting, render the board and read this chain's row:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+
+When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
+`status` skill's fallback does. Do the same again after every `status` flip this skill
+makes, and tell the user what the row reads then.
+
+The row's wording comes from the sync rules in
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. A plan's **authority** is the
+chain's `spec.md`, or the chain's `intent.md` when the intent carries `spec: skipped`
+and no `spec.md` exists.
+
+Refuse — naming the file, the condition exactly as the board words it, and what clears
+it — when the row reads any of:
+
+| The row reads | Cleared by |
+|---|---|
+| `spec stale (intent changed)` | the `design` skill |
+| `spec disproven by plan NN` | the `design` skill |
+| `intent disproven by plan NN` | the `intent` skill |
+| `plan NN <status>: blocked (spec not approved)` | the `design` skill |
+| `INVALID (spec.md: missing built-on)` | the `design` skill |
+| any other `INVALID (…)`, except `INVALID (plans/NN: missing built-on)` | the user, in the file the row names |
+
+Two conditions are this skill's own to clear. When the row reads
+`plan NN <status>: stale (spec changed)`, `plan NN <status>: stale (intent changed)`, or
+`INVALID (plans/NN: missing built-on)`, take each such plan in number order and offer
+the user two ways out:
+
+- **Re-confirm it.** Ask one question: *does plan `NN` still hold against its authority
+  as that authority now reads?* On an explicit yes, compute the authority's current
+  fingerprint,
+
+      sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
+
+  write the 12 characters it prints as `built-on` in that plan's frontmatter, and
+  change nothing else in the file. The plan keeps its status.
+- **Supersede it.** Flip it `superseded` and write its replacement under the next free
+  `NN` (Lifecycle, below).
+
+Re-confirmation is never inferred, and one plan's yes does not cover another. After
+clearing a condition, render the board again: an `INVALID` result replaces the whole
+row, so another condition may have been standing behind it.
+
 ## Dialogue
 
 Guided the same way every skill in this pipeline is: one question at a time, never a battery.
@@ -78,9 +125,17 @@ independent of `01` — agree?" Also ask where checkpoint boundaries belong with
 
 Plans live at `plans/NN-<kebab-topic>.md` inside the chain directory — the `NN` prefix orders
 plans within the chain, and sibling plans are disambiguated by topic, not renumbering. Each
-plan's frontmatter carries `status`, `created`, and `depends-on` (a list of plan numbers this
-plan needs `done` first; absent or empty means independent — visibly parallelizable across
-worktrees).
+plan's frontmatter carries `status`, `created`, `built-on`, and `depends-on` (a list of plan
+numbers this plan needs `done` first; absent or empty means independent — visibly
+parallelizable across worktrees).
+
+`built-on` is the fingerprint of the plan's authority (Sync check, above)
+as it reads when the plan is written. Run
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
+
+and write the 12 characters it prints into every plan of the set. If it prints nothing, the
+authority has no fingerprint: stop and name the file rather than write a plan against it.
 
 ## Scope check — one objective per plan
 
@@ -149,6 +204,7 @@ Frontmatter and header follow the body shape in
 status: draft
 created: <YYYY-MM-DD>
 depends-on: [01]                 # optional
+built-on: <fingerprint>          # the authority's fingerprint when written
 ---
 
 # [Feature Name] Implementation Plan
@@ -282,9 +338,17 @@ inline; never skip the review for want of the agent.
 
 Each plan gets its own approval: present it, ask the user to read and approve, and show the
 rows of the disposition table that belong to that plan in the same message — including the
-declined ones. An approval given without sight of them is not an approval of them. Only on
-explicit approval, flip that plan's frontmatter `status: draft → approved` as the last step of
-the interaction that reviews it — do not flip a plan the user has not yet seen.
+declined ones. An approval given without sight of them is not an approval of them.
+
+Before you ask, compute the authority's fingerprint again and compare it with the plan's
+`built-on`. If they differ, the authority changed while this plan was a draft: say so, and
+the approval question becomes whether the plan still holds against the authority as it now
+reads.
+
+Only on explicit approval, flip that plan's frontmatter `status: draft → approved` and write
+the authority's current fingerprint as `built-on`, in the same edit, as the last step of the
+interaction that reviews it — do not flip a plan the user has not yet seen. Then render the
+board again (Sync check) and tell the user what the chain's row reads.
 
 ## Lifecycle
 

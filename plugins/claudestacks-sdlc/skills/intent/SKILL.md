@@ -40,6 +40,42 @@ Three ways into this skill:
   current state — approving a `dropped` intent without first un-dropping it, for instance — is refused by
   name: the file, its current state, and that un-dropping is the command that advances it.
 
+## Sync check on re-invocation
+
+When re-invoked on an existing chain, render the board before acting and read that
+chain's row:
+
+    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+
+When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
+`status` skill's fallback does. Do the same again after every `status` flip this skill
+makes, and tell the user what the row reads then. A chain being created has no row yet
+and needs no check before it is written.
+
+The row's wording comes from the sync rules in
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Two of them touch this skill:
+
+- **Amending marks what was built on the intent stale.** A spec records the fingerprint
+  of the intent's body it was written against, and on the spec-skip path each plan does.
+  Before amending the body of an intent whose chain has an `approved` spec — or, with
+  `spec: skipped`, a plan that is `approved` or `executing` — tell the user the amendment
+  will make the board read `spec stale (intent changed)` (or
+  `plan NN <status>: stale (intent changed)`), and that the `design` skill (or the `plan`
+  skill) is what clears it afterwards. Then proceed on their word. Only the body counts:
+  a `status` flip or a frontmatter key never changes a fingerprint.
+- **`intent disproven by plan NN` is cleared here.** On the spec-skip path the intent is
+  the plans' authority, and this row means executing plan `NN` disproved one of its
+  claims. It ends when the intent's body is amended to correct what was disproven — this
+  skill's amend mode. Afterwards the chain's `approved` and `executing` plans read
+  `plan NN <status>: stale (intent changed)` and go to the `plan` skill.
+
+An amendment is not a `status` flip, so render the board again after making one, and
+tell the user what the row reads: an `INVALID` result replaces the whole row, so another
+condition may have been standing behind it.
+
+Any other condition on the row is not this skill's to clear. Say what the row reads and
+carry on with what the user asked.
+
 ## Input-doc scan
 
 Before the dialogue, list `prds/` and `rfcs/` under `.claudestacks/sdlc/`. Both are optional and often

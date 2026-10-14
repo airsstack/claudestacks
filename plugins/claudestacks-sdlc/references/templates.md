@@ -53,6 +53,7 @@ commands — at full precision.
 ---
 status: draft
 created: <YYYY-MM-DD>
+built-on: <fingerprint>          # of intent.md — see artifact-chain §10
 ---
 
 # Spec: <title>
@@ -83,6 +84,7 @@ Provenance keys per `artifact-chain.md` §6 may also appear in a spec's frontmat
 status: draft
 created: <YYYY-MM-DD>
 depends-on: [01]                 # optional — see artifact-chain §6
+built-on: <fingerprint>          # of the plan's authority — see artifact-chain §10
 ---
 
 # <name> Implementation Plan

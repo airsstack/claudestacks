@@ -104,12 +104,14 @@ If it fails, STOP and show the error. Do not tag.
 
 The tag is annotated, named `<crate>-v<version>`, on the commit just published, and pushed by name —
 never `git push --tags`, which would also push unrelated local tags. The message is `<crate> V`, a
-blank line, then the body of the CHANGELOG entry for `V`.
+blank line, then the body of the CHANGELOG entry for `V`. `--cleanup=verbatim` is required: git's
+default cleanup strips every line starting with `#` as a comment, which deletes the entry's
+`### Added` and similar headings from the tag message.
 
 Show the author the tag name and message and ask for an explicit yes, then:
 
 ```bash
-git tag -a "$0-vV" -F <message-file>
+git tag -a "$0-vV" --cleanup=verbatim -F <message-file>
 git push origin "$0-vV"
 ```
 

@@ -49,7 +49,7 @@ feature degrades gracefully, wrong behaviour does not.
 | Prompt caching (per-block, TTL tiers, usage counters) | ✅ parity (minus top-level auto-place) |
 | JSON-schema structured output | ✅ parity (minus typed-parse helper) |
 | System prompt (string + segments + per-segment cache) | ✅ parity |
-| **Streaming accumulation** | ✅ parity on all six modelled delta kinds, including `input_json_delta` buffering for both `ToolUse` and `ServerToolUse` blocks (accumulator.rs:222-225, 305-309) — with five deliberate divergences, see [`../divergences.md`](../divergences.md) |
+| **Streaming accumulation** | ✅ parity on all six modelled delta kinds, including `input_json_delta` buffering for both `ToolUse` and `ServerToolUse` blocks (accumulator.rs:222-225, 303-307) — with five deliberate divergences, see [`../divergences.md`](../divergences.md) |
 | **Forward compatibility (every server-decoded enum)** | ✅ parity — payload-retaining unknown arm on all ten |
 | **`thinking` / `output_config.effort`** | ✅ parity — both request params present |
 | **Response diagnostics (`container`, `stop_details`, typed `pause_turn`, usage sub-objects)** | ✅ parity (§8, §8.1, §8.3) |
@@ -83,9 +83,9 @@ to *this* pillar is the Files API, which is listed as a gap above.
 
 | Capability | Python | TS | airsclaude | Status |
 |---|---|---|---|---|
-| `POST /v1/messages` | ✅ | ✅ | `messages::MessagesResource::create` (resource.rs:82) | ✅ |
-| Streaming create (SSE) | ✅ | ✅ | `MessagesResource::stream` (resource.rs:172) | ✅ transport / ✅ accumulation (`MessageAccumulator`) — index policy follows Go, see §4.3 |
-| `POST /v1/messages/count_tokens` | ✅ | ✅ | `count_tokens` (resource.rs:287) | ✅ |
+| `POST /v1/messages` | ✅ | ✅ | `messages::MessagesResource::create` (resource.rs:166) | ✅ |
+| Streaming create (SSE) | ✅ | ✅ | `MessagesResource::stream` (resource.rs:258) | ✅ transport / ✅ accumulation (`MessageAccumulator`) — index policy follows Go, see §4.3 |
+| `POST /v1/messages/count_tokens` | ✅ | ✅ | `count_tokens` (resource.rs:375) | ✅ |
 | Message Batches — create/get/list/results/cancel/delete | ✅ | ✅ | `batches::BatchesResource` (all six) | ✅ |
 | `GET /v1/models`, `GET /v1/models/{id}` | ✅ | ✅ | `models::ModelsResource::{list,get}` | ✅ endpoints and payload — see §9 |
 | Files API (`/v1/files`) | ✅ (beta) | ✅ (beta) | ❌ | ❌ |
@@ -104,35 +104,35 @@ The official GA (non-beta) parameter set, verified identical in both SDKs
 
 | Param | Python | TS | airsclaude | Status |
 |---|---|---|---|---|
-| `model` | ✅ | ✅ | `model: ModelId` (request.rs:147) | ✅ |
-| `max_tokens` | ✅ | ✅ | `max_tokens: MaxTokens` (request.rs:149) | ✅ — `0` accepted; see §2.3 |
-| `messages` | ✅ | ✅ | `messages: Vec<InputMessage>` (request.rs:151) | 🟡 — no `system` role; see §3 |
-| `system` | ✅ | ✅ | `system: Option<SystemPrompt>` (request.rs:154) | ✅ |
-| `stop_sequences` | ✅ | ✅ | (request.rs:166) | ✅ |
-| `metadata` | ✅ | ✅ | `Metadata { user_id }` (request.rs:169) | ✅ |
-| `stream` | ✅ | ✅ | hidden, resource-managed (request.rs:183) | ✅ |
-| `tools` / `tool_choice` | ✅ | ✅ | (request.rs:172-175) | ✅ for custom tools — see §6 |
-| `output_config.format` | ✅ | ✅ | `OutputConfig` (request.rs:178, structured_outputs.rs:43) | ✅ |
-| `output_config.effort` | ✅ `low\|medium\|high\|xhigh\|max` | ✅ same | `EffortLevel` (structured_outputs.rs:52) | ✅ |
-| `thinking` | ✅ 3 variants | ✅ 3 variants | `ThinkingConfig` (request.rs:181) | ✅ |
-| `temperature` | ✅ *(`@deprecated` in TS)* | ✅ *(`@deprecated`)* | `Temperature`, `#[deprecated]` (request.rs:157, 343) | ✅ — see §2.2 |
-| `top_p` | ✅ *(`@deprecated`)* | ✅ *(`@deprecated`)* | `TopP`, `#[deprecated]` (request.rs:160, 361) | ✅ — see §2.2 |
-| `top_k` | ✅ *(`@deprecated`)* | ✅ *(`@deprecated`)* | `TopK`, `#[deprecated]` (request.rs:163, 377) | ✅ — see §2.2 |
+| `model` | ✅ | ✅ | `model: ModelId` (request.rs:205) | ✅ |
+| `max_tokens` | ✅ | ✅ | `max_tokens: MaxTokens` (request.rs:207) | ✅ — `0` accepted; see §2.3 |
+| `messages` | ✅ | ✅ | `messages: Vec<InputMessage>` (request.rs:209) | 🟡 — no `system` role; see §3 |
+| `system` | ✅ | ✅ | `system: Option<SystemPrompt>` (request.rs:212) | ✅ |
+| `stop_sequences` | ✅ | ✅ | (request.rs:224) | ✅ |
+| `metadata` | ✅ | ✅ | `Metadata { user_id }` (request.rs:175) | ✅ |
+| `stream` | ✅ | ✅ | hidden, resource-managed (request.rs:257) | ✅ |
+| `tools` / `tool_choice` | ✅ | ✅ | (request.rs:230-233) | ✅ for custom tools — see §6 |
+| `output_config.format` | ✅ | ✅ | `OutputConfig` (request.rs:236, structured_outputs.rs:46) | ✅ |
+| `output_config.effort` | ✅ `low\|medium\|high\|xhigh\|max` | ✅ same | `EffortLevel` (types/effort.rs:30) | ✅ |
+| `thinking` | ✅ 3 variants | ✅ 3 variants | `ThinkingConfig` (request.rs:239) | ✅ |
+| `temperature` | ✅ *(`@deprecated` in TS)* | ✅ *(`@deprecated`)* | `Temperature`, `#[deprecated]` (request.rs:215, 432) | ✅ — see §2.2 |
+| `top_p` | ✅ *(`@deprecated`)* | ✅ *(`@deprecated`)* | `TopP`, `#[deprecated]` (request.rs:218, 450) | ✅ — see §2.2 |
+| `top_k` | ✅ *(`@deprecated`)* | ✅ *(`@deprecated`)* | `TopK`, `#[deprecated]` (request.rs:221, 466) | ✅ — see §2.2 |
 | **`cache_control`** (top-level auto-place) | ✅ | ✅ | `MessageRequest.cache_control: Option<CacheControl>` (request.rs:252), `.cache_control()` builder setter (request.rs:586) | ✅ — see §2.4 |
 | **`service_tier`** (`auto` \| `standard_only`) | ✅ | ✅ | `RequestServiceTier` (request.rs:73-78, 242, 565) | ✅ — see §2.4 |
 | **`inference_geo`** | ✅ | ✅ | `InferenceGeo` newtype (request.rs:86-100, 245, 572) | ✅ — see §2.4 |
 | **`container`** | ✅ | ✅ | `ContainerId` newtype (request.rs:105-119, 248, 579) | ✅ — see §2.4 |
 | `user_profile_id` (sent as `anthropic-user-profile-id` header) | ✅ | ✅ | ❌ | ❌ |
-| `betas` / `anthropic-beta` header | ✅ | ✅ | multi, comma-joined (resource.rs:114-122) | ✅ |
+| `betas` / `anthropic-beta` header | ✅ | ✅ | multi, comma-joined (resource.rs:200-208) | ✅ |
 
 Beta-gated params, absent from airsclaude, listed for completeness: `mcp_servers`, `context_management`,
 `fallbacks`, `fallback_credit_token`, `speed`, `diagnostics`, `output_config.task_budget`.
 
 ### 2.1 ✅ `thinking` and `effort`
 
-`MessageRequest` carries a `thinking: Option<ThinkingConfig>` field (request.rs:181), set through the
-builder's `.thinking(ThinkingConfig)` method (request.rs:469). `output_config.effort` is set through
-`.effort(EffortLevel)` (request.rs:462) or through `.output_config(OutputConfig)` (request.rs:452),
+`MessageRequest` carries a `thinking: Option<ThinkingConfig>` field (request.rs:239), set through the
+builder's `.thinking(ThinkingConfig)` method (request.rs:558). `output_config.effort` is set through
+`.effort(EffortLevel)` (request.rs:551) or through `.output_config(OutputConfig)` (request.rs:541),
 sharing the `EffortLevel` type with the Agent SDK pillar. Adaptive thinking can now be configured or
 disabled, and `effort` can be set, on every current-generation model. `count_tokens` forwards both
 parameters as well.
@@ -151,8 +151,8 @@ reference state this. A caller who wants thinking redacted must set `omitted` ex
 
 ### 2.2 ✅ Sampling params now carry the rejection semantics
 
-`temperature` / `top_p` / `top_k` are first-class builder methods (request.rs:349, 366, 380) that now
-carry `#[deprecated(note = …)]` (request.rs:343, 361, 377) stating the exact failure mode: post-Opus-4.6
+`temperature` / `top_p` / `top_k` are first-class builder methods (request.rs:438, 455, 469) that now
+carry `#[deprecated(note = …)]` (request.rs:432, 450, 466) stating the exact failure mode: post-Opus-4.6
 models accept only `temperature == 1.0`, only `top_p >= 0.99`, and reject any `top_k` with a 400. This
 matches the TypeScript SDK's own `@deprecated` annotation (`messages.ts:3055` block), which documents
 the same failure mode.
@@ -201,9 +201,9 @@ identical membership:
 | # | Official member | airsclaude | Status |
 |---|---|---|---|
 | 1 | `text` | `TextBlock` (content/text.rs:18) | ✅ — carries `citations: Option<Vec<TextCitation>>` (content/text.rs:28, content/citation.rs:25) |
-| 2 | `thinking` | `ThinkingBlock` (content/text.rs:71) | ✅ |
+| 2 | `thinking` | `ThinkingBlock` (content/text.rs:75) | ✅ |
 | 3 | `redacted_thinking` | `RedactedThinkingBlock` (content/server_tool.rs:62) | ✅ |
-| 4 | `tool_use` | `ToolUseBlock` (tools.rs:108) | ✅ |
+| 4 | `tool_use` | `ToolUseBlock` (tools.rs:118) | ✅ |
 | 5 | `server_tool_use` | `ServerToolUseBlock` (content/server_tool.rs:69) | ✅ — `name` closed to the seven official server-tool names (`ServerToolName`, content/server_tool.rs:43); an unrecognized `name` falls to `ContentBlock::Unknown` rather than failing the block |
 | 6 | `web_search_tool_result` | `WebSearchToolResultBlock` (content/server_tool.rs:90) | ✅ |
 | 7 | `web_fetch_tool_result` | `WebFetchToolResultBlock` (content/server_tool.rs:102) | ✅ |
@@ -234,7 +234,7 @@ All 12 response members above, **plus** five input-only members:
 | `image` | `ImageBlock` (`content/image.rs:59`), via `ContentBlockParam::Image` (`content/param.rs:37`) | ✅ — `base64`/`url` sources typed; Files API `file` source (beta) intentionally omitted |
 | `document` | `DocumentBlock` (`content/document.rs:81`), via `ContentBlockParam::Document` (`content/param.rs:39`) | ✅ — `base64`/`text`/`url` sources typed; `content` (embedded-content) source retained as raw `serde_json::Value` |
 | `search_result` | ❌ | ❌ |
-| `tool_result` | `ToolResultBlock` (tools.rs:141) | ✅ |
+| `tool_result` | `ToolResultBlock` (tools.rs:154) | ✅ |
 | `mid_conversation_system` | ❌ | ❌ |
 
 `image` source types (verified against `/docs/en/build-with-claude/vision`):
@@ -253,7 +253,7 @@ tokens; standard tier 1568/1568. Automatic, no beta header.
 airsclaude now uses **two** unions, matching the official SDKs' two-direction shape (§3.1, §3.2), joined
 by a fallible carry-forward conversion — not one enum shared by both directions.
 
-`ContentBlock` (`messages/content/block.rs:27-68`) is the response union: `Text`, `Thinking`,
+`ContentBlock` (`messages/content/block.rs:27-71`) is the response union: `Text`, `Thinking`,
 `ToolUse`, the nine response-only variants from §3.1 (`content/server_tool.rs`),
 and a payload-retaining `Unknown` fallback (§5.1). It has no `ToolResult` variant — the API never
 returns that block kind, so a `tool_result` on the response path decodes into `Unknown`.
@@ -261,7 +261,7 @@ returns that block kind, so a `tool_result` on the response path decodes into `U
 `ContentBlockParam` (`messages/content/param.rs:27-36`) is the request union: `Text`, `Thinking`,
 `ToolUse`, `ToolResult`. It is closed — `#[non_exhaustive]` reserves room for downstream crates only,
 there is no `Unknown` arm — because a caller only ever constructs block kinds this crate names.
-`MessageContent::Blocks` (request.rs:130-135) and `ToolResultContent::Blocks` (tools.rs:185-190) both
+`MessageContent::Blocks` (request.rs:130-135) and `ToolResultContent::Blocks` (tools.rs:197-202) both
 carry `Vec<ContentBlockParam>` now, so sending a response-only block is a compile error rather than the
 runtime "unserializable request block" failure a single shared enum allows.
 
@@ -303,27 +303,27 @@ operator instructions mid-session. The builder gained `.add_system_text(impl Int
 
 | Official | airsclaude | Status |
 |---|---|---|
-| `message_start` | `StreamEvent::MessageStart` (streaming.rs:87) | ✅ |
-| `content_block_start` | (streaming.rs:92) | ✅ |
-| `content_block_delta` | (streaming.rs:99) | ✅ |
-| `content_block_stop` | (streaming.rs:106) | ✅ |
-| `message_delta` | (streaming.rs:112) | ✅ |
-| `message_stop` | (streaming.rs:119) | ✅ |
+| `message_start` | `StreamEvent::MessageStart` (streaming.rs:89) | ✅ |
+| `content_block_start` | (streaming.rs:94) | ✅ |
+| `content_block_delta` | (streaming.rs:101) | ✅ |
+| `content_block_stop` | (streaming.rs:108) | ✅ |
+| `message_delta` | (streaming.rs:114) | ✅ |
+| `message_stop` | (streaming.rs:121) | ✅ |
 
 `ping` and `error` are **not** union members officially — both SDKs handle them in the transport layer
 (`_streaming.py:151` / `streaming.ts:51-142`: `ping` → skip, `error` → throw an `APIError`). airsclaude
-models them as `StreamEvent::Ping` / `StreamEvent::Error` (streaming.rs:121, 123-126) and maps `Error` to
-`Error::Api` in `collect()` (streaming.rs:260-271). Equivalent behavior, different placement. ✅
+models them as `StreamEvent::Ping` / `StreamEvent::Error` (streaming.rs:123, 125-128) and maps `Error` to
+`Error::Api` in `collect()` (streaming.rs:290-301). Equivalent behavior, different placement. ✅
 
 `RawContentBlockDelta`, 5 members (`types/raw_content_block_delta.py`, `messages.ts:1338`):
 
 | Official | airsclaude | Status |
 |---|---|---|
-| `text_delta` | `ContentDelta::TextDelta` (streaming.rs:151) | ✅ |
-| `input_json_delta` | `InputJsonDelta` (streaming.rs:167) | ✅ modelled |
-| `thinking_delta` | `ThinkingDelta` (streaming.rs:156) | ✅ modelled |
-| `signature_delta` | `SignatureDelta` (streaming.rs:161) | ✅ modelled |
-| **`citations_delta`** | `ContentDelta::CitationsDelta` (streaming.rs:174) | ✅ merged onto `TextBlock.citations` (accumulator.rs:259) |
+| `text_delta` | `ContentDelta::TextDelta` (streaming.rs:153) | ✅ |
+| `input_json_delta` | `InputJsonDelta` (streaming.rs:169) | ✅ modelled |
+| `thinking_delta` | `ThinkingDelta` (streaming.rs:158) | ✅ modelled |
+| `signature_delta` | `SignatureDelta` (streaming.rs:163) | ✅ modelled |
+| **`citations_delta`** | `ContentDelta::CitationsDelta` (streaming.rs:174) | ✅ merged onto `TextBlock.citations` (accumulator.rs:257) |
 
 > There is no `redacted_thinking_delta` in either SDK, despite the name appearing in some
 > third-party summaries. The five above are the whole union.
@@ -331,7 +331,7 @@ models them as `StreamEvent::Ping` / `StreamEvent::Error` (streaming.rs:121, 123
 ### 4.2 ✅ Accumulation
 
 Assembly lives in `MessageAccumulator` (`messages/accumulator.rs`); `collect()` is a thin wrapper
-over it (streaming.rs:249-277). All five delta kinds airsclaude models are handled, and the observable
+over it (streaming.rs:279-307). All five delta kinds airsclaude models are handled, and the observable
 end state matches the official SDKs — graded against SDK source, not prose, per the rule table at the
 end of this section.
 
@@ -375,7 +375,7 @@ that neither parses where airsclaude does:
 | Python | **Eagerly, on every delta** — `from_json(json_buf, partial_mode=True)` re-parses the whole buffer per fragment (`_messages.py:479-480`). `content_block_stop` does **not** re-parse (`:499-502`), so the final `input` is simply the last partial parse. |
 | TypeScript | **Lazily and memoized** — `withLazyInput` installs a getter that parses on first read of `.input` (`internal/message-stream-utils.ts:21-27`). In practice that fires at `content_block_stop`, because line `MessageStream.ts:661` reads the property to freeze it. |
 | Go | **Never** — `cb.Input` is left as raw `json.RawMessage` for the caller to unmarshal (`messageutil.go:67-74`). |
-| airsclaude | **Once, strictly, at `content_block_stop`** (`accumulator.rs:257-278`). |
+| airsclaude | **Once, strictly, at `content_block_stop`** (`accumulator.rs:288-309`). |
 
 No SDK parses "once at `content_block_stop`". For a block that receives its stop event the end state
 is identical across all four, which is what parity is graded on; the divergence is confined to
@@ -401,16 +401,16 @@ tool JSON" is acceptable parity for the non-beta surface.
 
 | Rule | Python / TypeScript | airsclaude | |
 |---|---|---|---|
-| `text_delta` | concat | concat (accumulator.rs:216-220) | ✅ |
-| `thinking_delta` | concat | concat (accumulator.rs:221-225) | ✅ |
-| `signature_delta` | **replace** (`_messages.py:494`, `MessageStream.ts:646`); Go concats | replace (accumulator.rs:226-233) | ✅ follows the two pinned SDKs |
-| `input_json_delta` | buffer + tolerant parse | buffer + strict parse at stop (accumulator.rs:193-207, 257-278) | ✅ same end state |
-| delta index out of range | Python **raises `IndexError`** (`_messages.py:465`); TS silent no-op (`.at()` → `undefined`) | silent no-op (accumulator.rs:212-214) | 🔶 follows TS, diverges from Python |
-| delta kind ≠ block kind | silent drop | silent drop (accumulator.rs:215-235) | ✅ |
-| empty tool buffer | Python leaves the start-event `input`; TS substitutes `{}` | leaves the start-event `input` (accumulator.rs:262-264) | ✅ follows Python; identical in practice, the API opens the block with `"input": {}` |
-| malformed tool JSON | both raise (non-beta) | `Error::Serde` (accumulator.rs:265-269) | ✅ |
-| `citations_delta` | accumulate onto `TextBlock.citations` | append (accumulator.rs:259) | ✅ |
-| gating of `input_json_delta` | `tool_use` **or** `server_tool_use` | `ContentBlock::ToolUse` **or** `ContentBlock::ServerToolUse` (accumulator.rs:222-225, 305-309) | ✅ |
+| `text_delta` | concat | concat (accumulator.rs:239-243) | ✅ |
+| `thinking_delta` | concat | concat (accumulator.rs:244-248) | ✅ |
+| `signature_delta` | **replace** (`_messages.py:494`, `MessageStream.ts:646`); Go concats | replace (accumulator.rs:249-256) | ✅ follows the two pinned SDKs |
+| `input_json_delta` | buffer + tolerant parse | buffer + strict parse at stop (accumulator.rs:218-230, 288-309) | ✅ same end state |
+| delta index out of range | Python **raises `IndexError`** (`_messages.py:465`); TS silent no-op (`.at()` → `undefined`) | silent no-op (accumulator.rs:235-237) | 🔶 follows TS, diverges from Python |
+| delta kind ≠ block kind | silent drop | silent drop (accumulator.rs:238-266) | ✅ |
+| empty tool buffer | Python leaves the start-event `input`; TS substitutes `{}` | leaves the start-event `input` (accumulator.rs:293-295) | ✅ follows Python; identical in practice, the API opens the block with `"input": {}` |
+| malformed tool JSON | both raise (non-beta) | `Error::Serde` (accumulator.rs:296-300) | ✅ |
+| `citations_delta` | accumulate onto `TextBlock.citations` | append (accumulator.rs:257) | ✅ |
+| gating of `input_json_delta` | `tool_use` **or** `server_tool_use` | `ContentBlock::ToolUse` **or** `ContentBlock::ServerToolUse` (accumulator.rs:222-225, 303-307) | ✅ |
 | truncated buffer, no `content_block_stop` | Python's last eager parse salvages **complete** key/value pairs (`{"a": 1,` → `{"a": 1}`); TS same on `.input` read, though `finalMessage()` throws first | never parsed, `input` stays at the start-event value | 🔶 reachable only on an already-broken stream |
 
 ### 4.3 🔶 Index handling on `content_block_start`
@@ -442,12 +442,12 @@ behavior on a malformed stream: an `Error::Stream` where the official SDKs retur
 Recorded in [`../divergences.md`](../divergences.md).
 
 Delta and stop events are a separate question, and there airsclaude follows TypeScript: an out-of-range
-index is a silent no-op (`accumulator.rs:212-214`), where Python raises `IndexError` and Go returns an
+index is a silent no-op (`accumulator.rs:235-237`), where Python raises `IndexError` and Go returns an
 error. Also 🔶, by the same standard.
 
 ### 4.4 ✅ `message_delta` usage merge
 
-`UsageDelta` (streaming.rs:207-226) carries `input_tokens`, `cache_creation_input_tokens`,
+`UsageDelta` (streaming.rs:212-230) carries `input_tokens`, `cache_creation_input_tokens`,
 `cache_read_input_tokens`, `output_tokens`, `output_tokens_details`, and `server_tool_use`.
 `MessageAccumulator` (`accumulator.rs:137-172`) overwrites the snapshot's `input_tokens`,
 `cache_creation_input_tokens`, `cache_read_input_tokens`, and `server_tool_use` when the delta
@@ -463,7 +463,7 @@ fold it, matching what the SDK source actually does.
 
 `container`, `usage.service_tier` and `usage.inference_geo` are likewise decoded but not folded:
 neither pinned SDK copies them into its snapshot either, so `MessageMetaDelta.container`
-(streaming.rs:196-199) and `Usage.{service_tier,inference_geo}` stay decoded-but-unfolded by design,
+(streaming.rs:203-204) and `Usage.{service_tier,inference_geo}` stay decoded-but-unfolded by design,
 not by omission.
 
 One divergence, small but real: airsclaude writes
@@ -490,7 +490,7 @@ TypeScript:
 | Python | **Returns the partial snapshot, no raise.** There is no completeness check on the path at all: `get_final_message()` → `until_done()` → `consume_sync_iterator` (`_utils/_streams.py:5-7`, literally `for _ in iterator: ...`), and `__final_message_snapshot` is rewritten on every event (`_messages.py:130`), so the `assert` at `:94` passes. A truncated response is indistinguishable from a complete one except by inspecting `stop_reason is None`. |
 | Go | Same — `Accumulate` has no end-of-stream hook (`messageutil.go:11-19`); the caller keeps whatever accumulated. |
 | TypeScript | **Throws** `AnthropicError('stream ended without producing a Message with role=assistant')` (`MessageStream.ts:329-333`), because `receivedMessages` is only populated by `message_stop`. |
-| airsclaude | `Ok(partial)` — follows Python/Go. `Error::Stream` is returned only when the stream ends before `message_start` (`accumulator.rs:286-289`). |
+| airsclaude | `Ok(partial)` — follows Python/Go. `Error::Stream` is returned only when the stream ends before `message_start` (`accumulator.rs:317-320`). |
 
 **Duplicate `message_start`.** All three official SDKs behave differently, so no porting answer exists:
 
@@ -514,8 +514,8 @@ All ten server-decoded enums carry a payload-retaining unknown arm plus `#[non_e
 
 | Scenario | Python | TypeScript | airsclaude |
 |---|---|---|---|
-| Unknown `type` on a content block | Coerced into the **first union variant** (`TextBlock`), unknown keys retained on `__pydantic_extra__`; `.type` preserved verbatim (`_models.py:578 construct_type`, fallback loop `:638-642`) | **No validation at all** — `defaultParseResponse` (`internal/parse.ts:18`) returns raw parsed JSON; the object arrives intact and simply fails to narrow (`messages.ts:847`) | ✅ `ContentBlock::Unknown(Value)` + `#[serde(untagged, skip_serializing)]` (content/block.rs:69) — payload retained, echo-back refused |
-| Unknown `type` on a content-block delta | Coerced to `TextDelta`; accumulator no-ops on it | Passed through untouched; accumulator `default: checkNever(...)` no-ops (`MessageStream.ts:651`) | ✅ `ContentDelta::Unknown(Value)` (streaming.rs:185), accumulator no-ops (accumulator.rs:267) |
+| Unknown `type` on a content block | Coerced into the **first union variant** (`TextBlock`), unknown keys retained on `__pydantic_extra__`; `.type` preserved verbatim (`_models.py:578 construct_type`, fallback loop `:638-642`) | **No validation at all** — `defaultParseResponse` (`internal/parse.ts:18`) returns raw parsed JSON; the object arrives intact and simply fails to narrow (`messages.ts:847`) | ✅ `ContentBlock::Unknown(Value)` + `#[serde(untagged, skip_serializing)]` (content/block.rs:70) — payload retained, echo-back refused |
+| Unknown `type` on a content-block delta | Coerced to `TextDelta`; accumulator no-ops on it | Passed through untouched; accumulator `default: checkNever(...)` no-ops (`MessageStream.ts:651`) | ✅ `ContentDelta::Unknown(Value)` (streaming.rs:185), accumulator no-ops (accumulator.rs:265) |
 | Unknown SSE `event:` name | **Silently skipped** — allowlist chain in `_streaming.py:86`, no branch matches, nothing yielded | **Silently skipped** — same allowlist shape in `core/streaming.ts:51-142` | ✅ `StreamEvent::Unknown(Value)` (streaming.rs:135), yielded not dropped — airsclaude dispatches on `data.type`, not the `event:` name |
 | Unknown field on a known object | Retained (`model_config = ConfigDict(extra="allow")`, `_models.py:107`) | Retained (no stripping) | Ignored — serde default ✅ |
 
@@ -532,7 +532,7 @@ assert m.new_thing == "bar"
 
 Note what that means: Python retains the payload but mistypes the container. airsclaude retains it under
 a variant that is honest about not knowing the type, pinned by
-`parse_unknown_type_yields_unknown_event_with_payload` (streaming.rs:498).
+`parse_unknown_type_yields_unknown_event_with_payload` (streaming.rs:528).
 
 The stakes are not hypothetical. `server_tool_use`, `redacted_thinking`, `web_search_tool_result`,
 `container_upload`, `fallback` and `connector_text` are all emitted on GA paths today, and a client
@@ -548,12 +548,12 @@ but not the only one:
 
 | Enum | Site | Exposure |
 |---|---|---|
-| **`StopReason`** | response.rs:64-87 | ✅ `pause_turn` is a typed `StopReason::PauseTurn` variant (§8.1); an untagged `Unknown(String)` arm retains the raw value for anything else, so an unrecognised stop reason never fails the enclosing `Message`. |
-| `ErrorType` | error.rs:70 | Already tolerant — a presence-only `#[serde(other)]` unit arm meant it never hard-failed. Its gap was payload retention, not decode failure. |
+| **`StopReason`** | response.rs:73-91 | ✅ `pause_turn` is a typed `StopReason::PauseTurn` variant (§8.1); an untagged `Unknown(String)` arm retains the raw value for anything else, so an unrecognised stop reason never fails the enclosing `Message`. |
+| `ErrorType` | error.rs:71 | Already tolerant — a presence-only `#[serde(other)]` unit arm meant it never hard-failed. Its gap was payload retention, not decode failure. |
 | `BatchStatus` | batches/types.rs:140-152 | Plausible. Batch lifecycle states have grown before. |
-| `MessageKind` | response.rs:53 | Latent — single-valued, stable. |
-| `BatchKind` / `DeletedBatchKind` | batches/types.rs:127 / :230-237 | Latent — single-valued. |
-| `ModelInfoKind` | models/types.rs:31 | Latent — single-valued. |
+| `MessageKind` | response.rs:60 | Latent — single-valued, stable. |
+| `BatchKind` / `DeletedBatchKind` | batches/types.rs:128 / :230-237 | Latent — single-valued. |
+| `ModelInfoKind` | models/types.rs:33 | Latent — single-valued. |
 
 `StopReason` is the one that would otherwise fail on GA paths, since `pause_turn` is returned whenever
 a server-tool loop hits its iteration limit. The rest are latent — the distinction is timing, not kind.
@@ -597,11 +597,11 @@ is harmless.
 
 | Aspect | Python | TS | airsclaude | Status |
 |---|---|---|---|---|
-| Custom tool (`name`/`description`/`input_schema`) | ✅ | ✅ | `Tool` (tools.rs:45) | ✅ |
-| `strict: true` | ✅ | ✅ | `Tool.strict` (tools.rs:62) | ✅ |
-| `tool_choice`: auto / any / tool / none | ✅ | ✅ | `ToolChoice`, all four (tools.rs:74-88) | ✅ |
-| `tool_result` content (text / blocks / `is_error`) | ✅ | ✅ | `ToolResultBlock` / `ToolResultContent` (tools.rs:141-190) | ✅ |
-| `cache_control` on tool definitions | ✅ | ✅ | `Tool.cache_control` (tools.rs:57) | ✅ |
+| Custom tool (`name`/`description`/`input_schema`) | ✅ | ✅ | `Tool` (tools.rs:47) | ✅ |
+| `strict: true` | ✅ | ✅ | `Tool.strict` (tools.rs:63) | ✅ |
+| `tool_choice`: auto / any / tool / none | ✅ | ✅ | `ToolChoice`, all four (tools.rs:84-95) | ✅ |
+| `tool_result` content (text / blocks / `is_error`) | ✅ | ✅ | `ToolResultBlock` / `ToolResultContent` (tools.rs:154-202) | ✅ |
+| `cache_control` on tool definitions | ✅ | ✅ | `Tool.cache_control` (tools.rs:58) | ✅ |
 | `eager_input_streaming` (fine-grained tool streaming, GA) | ✅ | ✅ | `Tool.eager_input_streaming` (tools.rs:70) | ✅ |
 | `ToolUseBlock.caller` (`direct` / `code_execution_20250825` / `code_execution_20260120`) | ✅ | ✅ | `ToolUseBlock.caller` (tools.rs:127), reuses `ToolCaller` (content/server_tool.rs:16) | ✅ |
 | **Server-side tools** — web_search, web_fetch, code_execution, tool_search | ✅ | ✅ | ❌ | ❌ |
@@ -625,9 +625,9 @@ The official `ToolUnion` is 19 members (`messages.ts:2277`), versioned by date s
 |---|---|---|---|---|
 | `cache_control: ephemeral` on content blocks | ✅ | ✅ | `CacheControl::ephemeral` (types/caching.rs:73-85) | ✅ |
 | 5-minute / 1-hour TTL tiers | ✅ `'5m' \| '1h'` | ✅ same | `CacheTtl::{FiveMinutes,OneHour}` (types/caching.rs:33-40) | ✅ |
-| Carriers: system segment / text / tool / tool_use / tool_result | ✅ | ✅ | system.rs:149, content/text.rs:25, tools.rs:57/118/152 | ✅ |
-| Cache-aware usage counters | ✅ | ✅ | `Usage.cache_creation/read` (response.rs:122-125) | ✅ |
-| `cache_creation` per-tier breakdown | ✅ | ✅ | `CacheCreation` (response.rs:94-100) | ✅ |
+| Carriers: system segment / text / tool / tool_use / tool_result | ✅ | ✅ | system.rs:149, content/text.rs:25, tools.rs:58/130/164 | ✅ |
+| Cache-aware usage counters | ✅ | ✅ | `Usage.cache_creation/read` (response.rs:224-230) | ✅ |
+| `cache_creation` per-tier breakdown | ✅ | ✅ | `CacheCreation` (response.rs:158) | ✅ |
 | Top-level `cache_control` (auto-place on last cacheable block) | ✅ | ✅ | `MessageRequest.cache_control` (request.rs:249-252), `.cache_control()` builder setter (request.rs:586) | ✅ |
 
 Explicit per-block caching is at genuine parity, including both TTL tiers and the tier-split accounting.
@@ -660,7 +660,7 @@ airsclaude now types all six, including `pause_turn` — the value the API retur
 loop hits its 10-iteration limit, i.e. on every long server-tool turn.
 
 **All six are typed, and `Unknown(String)` is retained for future values.**
-`PauseTurn` is a first-class variant (response.rs:86), pinned by a test at response.rs:384, so a caller
+`PauseTurn` is a first-class variant (response.rs:86), pinned by a test at response.rs:372, so a caller
 matches it directly and can act on a paused server-tool turn through the type system. `Unknown(String)`
 covers whatever value a future release adds. See §5.1.
 
@@ -788,7 +788,7 @@ results** — so refusal detection in batches must key on `stop_reason`.
 
 | Aspect | Official | airsclaude | Status |
 |---|---|---|---|
-| Open model-id type | TS `Model = <15 known ids> \| (string & {})` (`messages.ts:1258`); Python `ModelParam` accepts `str` | `ModelId::custom` + 7 headline ctors (types/model_id.rs:70-110) | ✅ same escape hatch |
+| Open model-id type | TS `Model = <15 known ids> \| (string & {})` (`messages.ts:1258`); Python `ModelParam` accepts `str` | `ModelId::custom` + 7 headline ctors (types/model_id.rs:53-110) | ✅ same escape hatch |
 | Headline model constructors | 15 ids incl. `claude-fable-5`, `claude-opus-4-8`, `claude-sonnet-5` | `claude_opus_4_7`, `claude_sonnet_4_6`, `claude_sonnet_4_5`, `claude_haiku_4_5`, `claude_opus_4_8`, `claude_sonnet_5`, `claude_fable_5` (model_id.rs:70-110) | ✅ current headline set |
 | `system` as string or block array | ✅ | `SystemPrompt::{Text,Segments}` (types/system.rs:57-64) | ✅ |
 | Per-segment system `cache_control` | ✅ | `SystemSegment.cache_control` (types/system.rs:149) | ✅ |
@@ -847,7 +847,7 @@ and fails at serialization. airsclaude splits the unions and joins them with a f
 
 **A request without `model` or `max_tokens` does not compile.** `MessageRequest::builder()` is
 type-state; so is `Client::builder()`, whose `build()` does not exist until `api_key` is set
-(`src/builder.rs:183`). There is no `MissingApiKey` error variant to handle because the state is
+(`src/builder.rs:197`). There is no `MissingApiKey` error variant to handle because the state is
 unreachable.
 
 **Values are parsed once, at construction.** `ApiKey`, `BaseUrl`, `ModelId`, `Temperature`, `TopP`,

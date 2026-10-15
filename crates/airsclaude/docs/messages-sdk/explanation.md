@@ -29,7 +29,7 @@ error rather than to be elegant.
 `ClientBuilder<Missing, T>` has no `build` method. It is not that `build` returns
 `Err(MissingApiKey)` — the method does not exist on that type. Calling `.api_key(k)` consumes the
 builder and returns `ClientBuilder<Present, T>`, and only that type has `build`
-(`src/builder.rs:183`).
+(`src/builder.rs:197`).
 
 The same rule governs `MessageRequest::builder()`: `model` and `max_tokens` are required, and the
 request cannot be built until both are set.
@@ -138,16 +138,16 @@ Each delta kind has its own rule, and they are not the same rule:
 
 | Delta | What the accumulator does | Where |
 |---|---|---|
-| `text_delta` | concatenate onto `TextBlock.text` | `accumulator.rs:243` |
-| `thinking_delta` | concatenate onto `ThinkingBlock.thinking` | `accumulator.rs:248` |
-| `signature_delta` | **replace** the signature, not concatenate | `accumulator.rs:256` |
-| `citations_delta` | append onto `TextBlock.citations` | `accumulator.rs:262` |
-| `input_json_delta` | buffer the raw fragment beside the snapshot | `accumulator.rs:228` |
+| `text_delta` | concatenate onto `TextBlock.text` | `accumulator.rs:239` |
+| `thinking_delta` | concatenate onto `ThinkingBlock.thinking` | `accumulator.rs:244` |
+| `signature_delta` | **replace** the signature, not concatenate | `accumulator.rs:249` |
+| `citations_delta` | append onto `TextBlock.citations` | `accumulator.rs:257` |
+| `input_json_delta` | buffer the raw fragment beside the snapshot | `accumulator.rs:227` |
 
 Tool arguments are the interesting case. They stream as raw JSON fragments that are only valid once
 concatenated — `{"cit`, `y": "Par`, `is"}` — so parsing each one as it arrives is not possible. They
 accumulate in a side buffer and are parsed in a single pass at `content_block_stop`
-(`src/messages/accumulator.rs:290-311`), then written onto the addressed `ToolUse` or `ServerToolUse`
+(`src/messages/accumulator.rs:288-309`), then written onto the addressed `ToolUse` or `ServerToolUse`
 block. An empty buffer is left alone, so the `input` value the block opened with survives.
 
 The signature rule matters more than it looks. An extended-thinking block's signature must round-trip

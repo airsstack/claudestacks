@@ -36,7 +36,7 @@ returned a misaligned message.
 
 ### An out-of-range delta or stop index is a silent no-op
 
-A delta addressing a block that does not exist is ignored (`src/messages/accumulator.rs:236-238`).
+A delta addressing a block that does not exist is ignored (`src/messages/accumulator.rs:235-237`).
 TypeScript does the same — `.at()` returns `undefined` and nothing happens. Python raises
 `IndexError`. Go returns an error.
 
@@ -50,7 +50,7 @@ prevent. Note this is the *opposite* choice from the row above — deliberately.
 
 A stream that ends without `message_stop` yields `Ok(partial)` with `stop_reason: None`. Only a
 stream that ends before `message_start` is an error
-(`src/messages/accumulator.rs:319-322` — `"stream ended before message_start event"`). This follows
+(`src/messages/accumulator.rs:317-320` — `"stream ended before message_start event"`). This follows
 Python and Go, both of which have no completeness check at all. TypeScript throws
 `AnthropicError('stream ended without producing a Message with role=assistant')`.
 
@@ -73,7 +73,7 @@ a plausible-looking `Message` that is silently wrong.
 ### `message_delta` writes stop fields only when present
 
 `stop_reason` and `stop_sequence` are written only when the delta actually carries them
-(`src/messages/accumulator.rs:222-229`). Python, TypeScript and Go all assign unconditionally,
+(`src/messages/accumulator.rs:139-144`). Python, TypeScript and Go all assign unconditionally,
 including overwriting an already-resolved value with `null`.
 
 The guard stops a stray later `message_delta` from clobbering a resolved `stop_reason`. It rests on
@@ -89,7 +89,7 @@ The official SDKs use one loose union for both directions — a 12-member `Conte
 and a 17-member `ContentBlockParam` superset for requests, with nothing stopping you passing the
 wrong one. airsclaude splits them (`src/messages/content/block.rs`, `src/messages/content/param.rs`)
 and joins them with a fallible `TryFrom<ContentBlock> for ContentBlockParam`
-(`src/messages/content/param.rs:81`).
+(`src/messages/content/param.rs:80`).
 
 Echoing a response block back into the next request is the common multi-turn pattern, so the
 conversion has to exist — but a `server_tool_use` or `container_upload` block cannot be sent, and the
@@ -160,7 +160,7 @@ Branches are resolved for you and discarded.
 
 airsclaude returns the full flat transcript instead — every user, assistant and (on request) system
 entry, deduped by uuid, in file order, each carrying its own `parent_uuid`
-(`src/agent/sessions/archive.rs:120-127`, `src/agent/sessions/message.rs:19-31`). Branch
+(`src/agent/sessions/archive.rs:130`, `src/agent/sessions/message.rs:19-31`). Branch
 reconstruction is left to the caller.
 
 The reasoning is that the official reconstruction is lossy and its selection rules are not

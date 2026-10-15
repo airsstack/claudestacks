@@ -83,7 +83,7 @@ Python 45.
 | `env` | `env: Vec<(String, String)>` | spawn config |
 | `continue` / `resume` / `forkSession` / `resumeSessionAt` | `session: SessionControl` | `--continue`, `--resume <id>`, `--fork-session`, `--resume-session-at=<uuid>` (`argv.rs:320-341`) |
 | `sessionId` | `session_id` | `--session-id` on new sessions only (`argv.rs:309-315`) |
-| `title` | `title` | `initialize` payload (`handshake.rs:28-35`) |
+| `title` | `title` | `initialize` payload (`handshake.rs:30-37`) |
 | `persistSession` | `session_persistence` | `--no-session-persistence` (`argv.rs:318`) |
 | `settings` | `settings: Option<SettingsSource>` | `--settings <path\|json>` (`argv.rs:192`) |
 | `settingSources` | `setting_sources: Vec<SettingSource>` | `--setting-sources=<csv>` (`argv.rs:227`) |
@@ -218,7 +218,7 @@ the updates and the binary writes them to its settings scopes.
 `mcpServers`, `initialPrompt`, `background`, `effort`. Serialized `camelCase` into the `--agents` JSON
 payload, with unset optionals skipped.
 
-One caveat carried in the source itself (`subagents/definition.rs:57-61`): the `mcpServers` element
+One caveat carried in the source itself (`subagents/definition.rs:56-60`): the `mcpServers` element
 shape is **unconfirmed**. The official `AgentMcpServerSpec` is undocumented, so each server serializes
 as an assumed `{"name": …, "config": …}`; the official element likely inlines transport fields
 instead. Re-verify against a live `--agents` round-trip before treating that one field as at parity.

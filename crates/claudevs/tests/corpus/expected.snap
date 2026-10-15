@@ -1,7 +1,7 @@
 acostanzo/quickstop  plugins/claudit  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
-AgriciDaniel/claude-seo  .  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
+AgriciDaniel/claude-seo  .  validate=Failed wiring=Passed test=Skipped test--installed=Skipped
 anthropics/claude-code  plugins/agent-sdk-dev  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
-anthropics/claude-code  plugins/claude-opus-4-5-migration  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
+anthropics/claude-code  plugins/claude-opus-4-5-migration  validate=Failed wiring=Passed test=Skipped test--installed=Skipped
 anthropics/claude-code  plugins/code-review  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 anthropics/claude-code  plugins/commit-commands  validate=Passed wiring=Passed test=Skipped test--installed=Skipped
 anthropics/claude-code  plugins/explanatory-output-style  validate=Passed wiring=Passed test=Skipped test--installed=Skipped

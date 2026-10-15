@@ -15,6 +15,17 @@ on what you are building:
 A third pillar, Managed Agents (`/v1/agents`, `/v1/sessions`), is **not started** — there is no code
 for it.
 
+## Install
+
+```toml
+[dependencies]
+airsclaude   = "0.1"
+tokio        = { version = "1", features = ["macros", "rt-multi-thread"] }
+futures-util = "0.3" # StreamExt, for consuming the Agent SDK's message stream
+```
+
+`tokio` drives both quick starts below; `futures-util` is needed only by the Agent SDK one.
+
 ## Quick start — Messages API
 
 ```rust,no_run
@@ -77,17 +88,17 @@ whatever credentials that binary already holds.
 ## Documentation
 
 The docs follow [Diátaxis](https://diataxis.fr/): four modes, kept separate. Start at
-[`docs/README.md`](docs/README.md), or go straight to what you need:
+[`docs/README.md`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/README.md), or go straight to what you need:
 
 | | Messages API | Agent SDK |
 |---|---|---|
-| Learn it | [tutorial](docs/messages-sdk/tutorial.md) | [tutorial](docs/agent-sdk/tutorial.md) |
-| Do one thing | [how-to](docs/messages-sdk/how-to.md) | [how-to](docs/agent-sdk/how-to.md) |
-| Understand it | [explanation](docs/messages-sdk/explanation.md) | [explanation](docs/agent-sdk/explanation.md) |
-| Check parity | [feature parity](docs/messages-sdk/feature-parity.md) | [feature parity](docs/agent-sdk/feature-parity.md) |
+| Learn it | [tutorial](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/tutorial.md) | [tutorial](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/tutorial.md) |
+| Do one thing | [how-to](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/how-to.md) | [how-to](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/how-to.md) |
+| Understand it | [explanation](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/explanation.md) | [explanation](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/explanation.md) |
+| Check parity | [feature parity](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/feature-parity.md) | [feature parity](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/feature-parity.md) |
 
-Cross-cutting: [architecture](docs/architecture.md) for the pillar map and the Agent SDK's internal
-layering; [divergences](docs/divergences.md) for every place this crate deliberately differs from the
+Cross-cutting: [architecture](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/architecture.md) for the pillar map and the Agent SDK's internal
+layering; [divergences](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/divergences.md) for every place this crate deliberately differs from the
 official SDKs.
 
 The API reference is the rustdoc — `cargo doc -p airsclaude --no-deps --open`.
@@ -120,11 +131,11 @@ ANTHROPIC_API_KEY=sk-ant-... cargo run -p airsclaude --example 01_hello
 cargo run -p airsclaude --example agent_01_query
 ```
 
-- [`examples/messages/`](examples/messages/README.md) — 11 programs, simplest first.
-- [`examples/agent/`](examples/agent/README.md) — 14 programs, simplest first.
+- [`examples/messages/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/messages/README.md) — 11 programs, simplest first.
+- [`examples/agent/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/agent/README.md) — 14 programs, simplest first.
 
 Both how-to guides index these by the goal you arrive with.
 
 ## License
 
-Apache-2.0. See the workspace root `LICENSE` file.
+Apache-2.0. See the `LICENSE` file.

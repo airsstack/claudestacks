@@ -11,14 +11,14 @@ history it carried.
 
 A Cargo workspace under `crates/` — `resolver = "3"`, Edition 2024 — with three members:
 
-- **`clauders`** — the Claude SDK. Its driving objective is **100% feature parity and behavioral
+- **`airsclaude`** — the Claude SDK. Its driving objective is **100% feature parity and behavioral
   compatibility with Anthropic's official SDKs** across three surfaces: the **Messages API** (the
   stateless `POST /v1/messages` client), the **Agent SDK** (drives the `claude` Code CLI as a
   subprocess over line-delimited JSON), and **Managed Agents** (server-hosted stateful agents). A
   Rust caller gets what a Python or TypeScript caller gets, with idiomatic Rust ergonomics. The
   Messages API and the Agent SDK are implemented; Managed Agents is not started. The pillar map and
-  internal structure are in [`crates/clauders/docs/architecture.md`](crates/clauders/docs/architecture.md);
-  the docs index is [`crates/clauders/docs/README.md`](crates/clauders/docs/README.md).
+  internal structure are in [`crates/airsclaude/docs/architecture.md`](crates/airsclaude/docs/architecture.md);
+  the docs index is [`crates/airsclaude/docs/README.md`](crates/airsclaude/docs/README.md).
 - **`claudevs`** — the engine behind the Claude Code plugin lifecycle CLI: the canonical case model,
   a deterministic test harness that spawns a plugin's hooks and scripts the way the Claude Code
   runtime would, native-suite delegation, static wiring checks, and install-layout simulation. It
@@ -26,8 +26,8 @@ A Cargo workspace under `crates/` — `resolver = "3"`, Edition 2024 — with th
   `claude plugin eval`, which is not deterministic.
 - **`claudevs-cli`** — the `claudevs` binary.
 
-`clauders` carries its HTTP transport in-tree as the `clauders::transport` module
-(`crates/clauders/src/transport/`) rather than depending on the `airs-transport` crate. So does
+`airsclaude` carries its HTTP transport in-tree as the `airsclaude::transport` module
+(`crates/airsclaude/src/transport/`) rather than depending on the `airs-transport` crate. So does
 [`airsstack/openrouter-rs`](https://github.com/airsstack/openrouter-rs), which vendored the same
 crate when it moved to its own repository. Vendoring lets the two copies diverge freely instead of
 coupling two repositories over one dependency.

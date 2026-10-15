@@ -115,14 +115,14 @@ is for when the author asks "what is left".
 tooling that tests Claude Code plugins, and the AI methodology that drives both. Cargo workspace,
 `resolver = "3"`, Edition 2024, three members.
 
-- `crates/clauders` — Claude SDK. The driving objective is **100% feature parity and behavioral
+- `crates/airsclaude` — Claude SDK. The driving objective is **100% feature parity and behavioral
   compatibility with Anthropic's official SDKs** across three pillars: the Messages API, the Agent
   SDK (drives the `claude` Code CLI as a subprocess), and Managed Agents (server-hosted stateful
   agents). A Rust caller gets what a Python or TypeScript caller gets, with idiomatic Rust
   ergonomics. The Messages API and Agent SDK are implemented; Managed Agents is not started. Pillar
   map and internal structure:
-  [`crates/clauders/docs/architecture.md`](crates/clauders/docs/architecture.md); docs index:
-  [`crates/clauders/docs/README.md`](crates/clauders/docs/README.md).
+  [`crates/airsclaude/docs/architecture.md`](crates/airsclaude/docs/architecture.md); docs index:
+  [`crates/airsclaude/docs/README.md`](crates/airsclaude/docs/README.md).
 - `crates/claudevs` — engine for the Claude Code plugin lifecycle CLI: case model, test harness,
   native-suite delegation. Fills the deterministic-testing gap between `claude plugin validate
   --strict` and `claude plugin eval`. Depends on `airsl` and reaches the Lua bindings through it
@@ -130,7 +130,7 @@ tooling that tests Claude Code plugins, and the AI methodology that drives both.
   copies of the interpreter.
 - `crates/claudevs-cli` — the `claudevs` binary.
 
-`clauders::transport` is a module of the SDK crate (`crates/clauders/src/transport/`), not a
+`airsclaude::transport` is a module of the SDK crate (`crates/airsclaude/src/transport/`), not a
 dependency. It was vendored from the `airs-transport` crate when the SDK moved to this repository.
 `openrouter-rs` vendored the same crate the same way when it moved to
 [`airsstack/openrouter-rs`](https://github.com/airsstack/openrouter-rs), and `rstlix0x0/airsstack` —
@@ -167,7 +167,7 @@ Re-introducing any of the above is named and scoped by the author at that point,
 Standard Rust commands apply (`cargo build`, `cargo clippy`, `cargo fmt`). **The workspace is
 featureless** — no crate declares any Cargo `[features]`, every module compiles unconditionally, and
 the `mockall` test double lives in a consumer-owned `cfg(test)` module
-(`crates/clauders/src/test_support.rs`) rather than behind a feature. So `--all-features` is a no-op
+(`crates/airsclaude/src/test_support.rs`) rather than behind a feature. So `--all-features` is a no-op
 that equals the default build.
 
 The pass/fail gate (Definition of Done) lives in the `claudestacks-guideline-rust` plugin. Invoke
@@ -267,7 +267,7 @@ Both are index-first and token-cheap. Reach for them instead of re-deriving.
 ## Conventions owned by the repo
 
 - **Commits** follow Conventional Commits v1.0.0 with workspace-aware scopes: a crate name
-  (`clauders`, `claudevs`, `claudevs-cli`), `workspace` (root Cargo files / top-level config), or
+  (`airsclaude`, `claudevs`, `claudevs-cli`), `workspace` (root Cargo files / top-level config), or
   `repo` (`.claude/`, `.github/`, `plugins/`, docs). Full convention ships in the `claudestacks`
   plugin.
 - **No session or chat links in commit messages, PR bodies, or any other committed artifact.** No

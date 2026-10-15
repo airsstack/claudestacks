@@ -1,0 +1,28 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "disableWorkflows": true,
+  "enabledPlugins": {
+    "claudestacks@claudestacks": true,
+    "claudestacks-sdlc@claudestacks": true,
+    "claudestacks-guideline-rust@claudestacks": true,
+    "claudestacks-journal@claudestacks": true,
+    "claudestacks-cmux@claudestacks": true
+  },
+  "extraKnownMarketplaces": {
+    "claudestacks": {
+      "source": {
+        "source": "directory",
+        "path": "../.."
+      }
+    }
+  },
+  "feedbackSurveyRate": 0,
+  "companyAnnouncements": [
+    "airsclaude — Rust SDK targeting parity with Anthropic's official SDKs.",
+    "Messages API and Agent SDK are implemented; Managed Agents is not started."
+  ],
+  "editorMode": "vim"
+}

@@ -1,0 +1,416 @@
+//! Tool definitions and tool-use content blocks for the Messages API.
+//!
+//! Exists as its own module so tool-calling types are scoped separately
+//! from the base messages surface.
+//!
+//! Responsibilities:
+//! - Define [`Tool`], the callable function description sent in a request.
+//! - Define [`ToolChoice`], controlling how the model selects a tool.
+//! - Define [`ToolUseBlock`] and [`ToolResultBlock`], the content-block
+//!   shapes for tool invocations and their results.
+//! - Define [`ToolResultContent`], the body of a tool result (text or blocks).
+//!
+//! Not responsible for:
+//! - Registering tool blocks inside [`crate::messages::ContentBlock`] —
+//!   that lives in `content.rs`.
+//! - HTTP transport or request sending.
+
+use crate::messages::content::ContentBlockParam;
+use crate::types::{ToolName, ToolUseId};
+
+/// A callable function the model may invoke during a generation turn.
+///
+/// Construct directly and pass via [`crate::messages::MessageRequestBuilder::tools`].
+///
+/// # Examples
+///
+/// ```
+/// use airsclaude::messages::tools::Tool;
+/// use airsclaude::types::ToolName;
+///
+/// let tool = Tool {
+///     name: ToolName::new("get_weather").unwrap(),
+///     description: "Retrieve current weather for a city.".into(),
+///     input_schema: serde_json::json!({
+///         "type": "object",
+///         "properties": { "city": { "type": "string" } },
+///         "required": ["city"]
+///     }),
+///     cache_control: None,
+///     strict: None,
+///     eager_input_streaming: None,
+/// };
+/// let j = serde_json::to_value(&tool).unwrap();
+/// assert_eq!(j["name"], "get_weather");
+/// ```
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Tool {
+    /// The name the model uses to invoke this function.
+    pub name: ToolName,
+    /// Human-readable description of what the function does.
+    pub description: String,
+    /// JSON Schema describing the function's input parameters.
+    pub input_schema: serde_json::Value,
+    /// Optional cache breakpoint for this tool definition.
+    ///
+    /// When set, this tool marks a prompt-caching boundary in the tool list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<crate::types::CacheControl>,
+    /// Constrain the model's tool input to this tool's `input_schema`.
+    ///
+    /// Wire-format boolean; serialized only when set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
+    /// Enable GA fine-grained (eager) streaming of this tool's input.
+    ///
+    /// Wire-format boolean; serialized only when set. Modeled as
+    /// `Option<bool>` — a deliberate, sibling-matching exception to the
+    /// no-semantic-bool rule, mirroring `strict` above.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eager_input_streaming: Option<bool>,
+}
+
+/// Controls which tool, if any, the model must call.
+///
+/// # Examples
+///
+/// ```
+/// use airsclaude::messages::tools::ToolChoice;
+/// let j = serde_json::to_string(&ToolChoice::Auto).unwrap();
+/// assert_eq!(j, r#"{"type":"auto"}"#);
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolChoice {
+    /// Model may call any tool or none at all.
+    Auto,
+    /// Model must call at least one tool.
+    Any,
+    /// Model must call the named tool.
+    Tool {
+        /// Name of the tool the model is required to call.
+        name: ToolName,
+    },
+    /// Model must not call any tool.
+    None,
+}
+
+/// Content block produced when the model invokes a tool.
+///
+/// Appears inside [`crate::messages::ContentBlock::ToolUse`] in a response.
+///
+/// # Examples
+///
+/// ```
+/// use airsclaude::messages::tools::ToolUseBlock;
+/// use airsclaude::types::{ToolName, ToolUseId};
+///
+/// let block = ToolUseBlock {
+///     id:    ToolUseId::new("toolu_01").unwrap(),
+///     name:  ToolName::new("get_weather").unwrap(),
+///     input: serde_json::json!({"city": "Paris"}),
+///     caller: None,
+///     cache_control: None,
+/// };
+/// assert_eq!(block.name.as_str(), "get_weather");
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ToolUseBlock {
+    /// Server-assigned identifier correlating this invocation with its result.
+    pub id: ToolUseId,
+    /// Name of the tool being called.
+    pub name: ToolName,
+    /// Arguments supplied by the model, matching the tool's `input_schema`.
+    pub input: serde_json::Value,
+    /// How this invocation was originated (direct or server-tool).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub caller: Option<crate::messages::content::ToolCaller>,
+    /// Optional cache breakpoint for this tool-use block.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cache_control: Option<crate::types::CacheControl>,
+}
+
+/// Content block carrying the result of a tool invocation.
+///
+/// Appears inside [`crate::messages::ContentBlockParam::ToolResult`] in a
+/// follow-up user turn.
+///
+/// Use [`ToolResultBlock::text`] for a plain-text result and
+/// [`ToolResultBlock::err`] to signal a tool-execution failure.
+///
+/// # Examples
+///
+/// ```
+/// use airsclaude::messages::tools::ToolResultBlock;
+/// use airsclaude::types::ToolUseId;
+///
+/// let result = ToolResultBlock::text(
+///     ToolUseId::new("toolu_01").unwrap(),
+///     r#"{"temperature": 24}"#,
+/// );
+/// assert!(result.is_error.is_none());
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ToolResultBlock {
+    /// The [`ToolUseBlock::id`] this result is responding to.
+    pub tool_use_id: ToolUseId,
+    /// Body of the result.
+    pub content: ToolResultContent,
+    /// Set to `true` when the tool execution failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_error: Option<bool>,
+    /// Optional cache breakpoint for this tool-result block.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cache_control: Option<crate::types::CacheControl>,
+}
+
+impl ToolResultBlock {
+    /// Construct a successful plain-text tool result.
+    #[must_use]
+    pub fn text(tool_use_id: ToolUseId, body: impl Into<String>) -> Self {
+        Self {
+            tool_use_id,
+            content: ToolResultContent::Text(body.into()),
+            is_error: None,
+            cache_control: None,
+        }
+    }
+
+    /// Construct a tool-error result carrying a plain-text error message.
+    #[must_use]
+    pub fn err(tool_use_id: ToolUseId, body: impl Into<String>) -> Self {
+        Self {
+            tool_use_id,
+            content: ToolResultContent::Text(body.into()),
+            is_error: Some(true),
+            cache_control: None,
+        }
+    }
+}
+
+/// Body of a [`ToolResultBlock`]: either a plain string or typed content blocks.
+///
+/// The untagged representation matches the Anthropic API wire format: a JSON
+/// string maps to `Text`; a JSON array maps to `Blocks`.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ToolResultContent {
+    /// Plain-text result.
+    Text(String),
+    /// Structured content blocks.
+    Blocks(Vec<ContentBlockParam>),
+}
+
+#[cfg(test)]
+mod tests {
+    #![expect(
+        clippy::unwrap_used,
+        reason = "tests unwrap known-valid fixtures; a panic is the intended failure signal"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn tool_serializes_with_schema() {
+        let t = Tool {
+            name: ToolName::new("get_weather").unwrap(),
+            description: "Look up weather".into(),
+            input_schema: serde_json::json!({"type":"object","properties":{"city":{"type":"string"}}}),
+            cache_control: None,
+            strict: None,
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert_eq!(j["name"], "get_weather");
+        assert_eq!(j["input_schema"]["type"], "object");
+    }
+
+    #[test]
+    fn tool_choice_tagged_correctly() {
+        assert_eq!(
+            serde_json::to_string(&ToolChoice::Auto).unwrap(),
+            r#"{"type":"auto"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ToolChoice::Tool {
+                name: ToolName::new("x").unwrap()
+            })
+            .unwrap(),
+            r#"{"type":"tool","name":"x"}"#
+        );
+    }
+
+    #[test]
+    fn tool_result_block_text_has_no_error_flag() {
+        let id = ToolUseId::new("toolu_01").unwrap();
+        let r = ToolResultBlock::text(id, "ok");
+        assert!(r.is_error.is_none());
+        assert_eq!(r.content, ToolResultContent::Text("ok".into()));
+    }
+
+    #[test]
+    fn tool_result_block_err_sets_is_error_true() {
+        let id = ToolUseId::new("toolu_02").unwrap();
+        let r = ToolResultBlock::err(id, "boom");
+        assert_eq!(r.is_error, Some(true));
+    }
+
+    #[test]
+    fn tool_use_block_round_trips_via_serde() {
+        let block = ToolUseBlock {
+            id: ToolUseId::new("toolu_01").unwrap(),
+            name: ToolName::new("get_weather").unwrap(),
+            input: serde_json::json!({"city": "Paris"}),
+            caller: None,
+            cache_control: None,
+        };
+        let j = serde_json::to_string(&block).unwrap();
+        let back: ToolUseBlock = serde_json::from_str(&j).unwrap();
+        assert_eq!(back.id, block.id);
+        assert_eq!(back.name, block.name);
+        assert_eq!(back.input["city"], "Paris");
+    }
+
+    #[test]
+    fn tool_with_cache_serializes_field() {
+        use crate::types::{CacheControl, ToolName};
+        let t = Tool {
+            name: ToolName::new("search").unwrap(),
+            description: "Search".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: Some(CacheControl::ephemeral()),
+            strict: None,
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert_eq!(j["cache_control"]["type"], "ephemeral");
+    }
+
+    #[test]
+    fn tool_without_cache_omits_field() {
+        use crate::types::ToolName;
+        let t = Tool {
+            name: ToolName::new("search").unwrap(),
+            description: "Search".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: None,
+            strict: None,
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert!(j.get("cache_control").is_none());
+    }
+
+    #[test]
+    fn tool_strict_true_serializes_field() {
+        let t = Tool {
+            name: ToolName::new("strict_tool").unwrap(),
+            description: "A strictly-typed tool.".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: None,
+            strict: Some(true),
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert_eq!(
+            j["strict"], true,
+            "strict: Some(true) must serialize as true"
+        );
+    }
+
+    #[test]
+    fn tool_strict_none_omits_field() {
+        let t = Tool {
+            name: ToolName::new("lax_tool").unwrap(),
+            description: "A non-strict tool.".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: None,
+            strict: None,
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert!(
+            j.get("strict").is_none(),
+            "strict: None must omit the field from the wire payload"
+        );
+    }
+
+    #[test]
+    fn tool_eager_input_streaming_true_serializes_field() {
+        let t = Tool {
+            name: ToolName::new("t").unwrap(),
+            description: "d".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: None,
+            strict: None,
+            eager_input_streaming: Some(true),
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert_eq!(j["eager_input_streaming"], true);
+    }
+
+    #[test]
+    fn tool_eager_input_streaming_none_omits_field() {
+        let t = Tool {
+            name: ToolName::new("t").unwrap(),
+            description: "d".into(),
+            input_schema: serde_json::json!({"type":"object"}),
+            cache_control: None,
+            strict: None,
+            eager_input_streaming: None,
+        };
+        let j = serde_json::to_value(&t).unwrap();
+        assert!(j.get("eager_input_streaming").is_none());
+    }
+
+    #[test]
+    fn tool_use_block_decodes_caller() {
+        use crate::messages::content::ToolCaller;
+        let json = r#"{"id":"toolu_1","name":"get_weather","input":{},
+            "caller":{"type":"direct"}}"#;
+        let b: ToolUseBlock = serde_json::from_str(json).unwrap();
+        assert_eq!(b.caller, Some(ToolCaller::Direct));
+    }
+
+    #[test]
+    fn tool_use_block_without_caller_omits_field() {
+        let b = ToolUseBlock {
+            id: ToolUseId::new("toolu_1").unwrap(),
+            name: ToolName::new("get_weather").unwrap(),
+            input: serde_json::json!({}),
+            cache_control: None,
+            caller: None,
+        };
+        let j = serde_json::to_value(&b).unwrap();
+        assert!(j.get("caller").is_none());
+    }
+
+    #[test]
+    fn tool_use_block_with_cache_round_trips() {
+        use crate::types::CacheControl;
+        let block = ToolUseBlock {
+            id: ToolUseId::new("toolu_01").unwrap(),
+            name: ToolName::new("get_weather").unwrap(),
+            input: serde_json::json!({"city": "Paris"}),
+            caller: None,
+            cache_control: Some(CacheControl::ephemeral()),
+        };
+        let j = serde_json::to_string(&block).unwrap();
+        let back: ToolUseBlock = serde_json::from_str(&j).unwrap();
+        assert_eq!(back.cache_control, Some(CacheControl::ephemeral()));
+    }
+
+    #[test]
+    fn tool_result_block_text_ctor_initializes_cache_control_none() {
+        let id = ToolUseId::new("toolu_01").unwrap();
+        let r = ToolResultBlock::text(id, "ok");
+        assert!(r.cache_control.is_none());
+    }
+
+    #[test]
+    fn tool_result_block_err_ctor_initializes_cache_control_none() {
+        let id = ToolUseId::new("toolu_02").unwrap();
+        let r = ToolResultBlock::err(id, "boom");
+        assert!(r.cache_control.is_none());
+    }
+}

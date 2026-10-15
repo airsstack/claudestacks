@@ -30,7 +30,7 @@ Example:
 ---
 title: Tokio cancellation safety
 type: insight
-project: clauders
+project: airsclaude
 domains: [async-rust, concurrency]
 tags: [tokio, cancellation, shutdown]
 created: 2026-06-23 14:42

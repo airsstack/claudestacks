@@ -28,7 +28,7 @@ feature-depth = 1
 # and belong here with a note saying why the exposure does not apply, never as
 # a blanket severity threshold.
 ignore = [
-    { id = "RUSTSEC-2024-0436", reason = "`paste` is unmaintained rather than vulnerable, and the advisory itself says no safe upgrade exists. It arrives only through `ratatui`, a dev-dependency used by the clauders agent-console example, so it is absent from every published artifact and from anything a caller links. Revisit when ratatui drops it." },
+    { id = "RUSTSEC-2024-0436", reason = "`paste` is unmaintained rather than vulnerable, and the advisory itself says no safe upgrade exists. It arrives only through `ratatui`, a dev-dependency used by the airsclaude agent-console example, so it is absent from every published artifact and from anything a caller links. Revisit when ratatui drops it." },
 ]
 
 # ---------------------------------------------------------------------------
@@ -59,8 +59,8 @@ confidence-threshold = 0.8
 exceptions = []
 
 [licenses.private]
-# Every workspace member is `publish = false`, so their own license text is not
-# a distribution question. They are Apache-2.0 regardless.
+# Workspace members are published to crates.io, so their own Apache-2.0
+# license is checked against the allow list like any dependency's.
 ignore = false
 
 # ---------------------------------------------------------------------------

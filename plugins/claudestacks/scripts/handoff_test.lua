@@ -254,7 +254,7 @@ return {
 
   an_explicit_root_places_the_session_tree = function()
     local root = fs.tempdir()
-    local subdir = path.join(root, "crates", "clauders")
+    local subdir = path.join(root, "crates", "airsclaude")
     fs.mkdir(subdir)
 
     local directory = handoff.init(subdir, "20260101-120000", 10, NOW, 120, root)

@@ -485,7 +485,7 @@ args = [
 
 [tasks.dod-crate]
 category = "Development"
-description = "The gate scoped to one crate: cargo make dod-crate clauders"
+description = "The gate scoped to one crate: cargo make dod-crate airsclaude"
 # While developing a single-crate change, `-p <crate>` replaces `--workspace`.
 # Cross-crate changes and pre-release runs use the unscoped `dod`.
 script_runner = "@shell"

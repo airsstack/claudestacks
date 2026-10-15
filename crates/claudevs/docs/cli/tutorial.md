@@ -5,13 +5,19 @@ run against the installed layout.
 
 ## Install claudevs
 
-From a checkout of this repository:
+From crates.io:
+
+```console
+$ cargo install --locked claudevs-cli
+```
+
+Or from a checkout of this repository:
 
 ```console
 $ cargo install --locked --path crates/claudevs-cli
 ```
 
-Recorded: `Installed package `claudevs-cli v0.1.0 (…)` (executable `claudevs`)`.
+Recorded from the checkout: `Installed package `claudevs-cli v0.1.0 (…)` (executable `claudevs`)`.
 
 Hooks run through `sh`, and cases need `git` on `PATH`: hook commands in `hooks.json` spawn as
 `sh -c <command>`, and every case runs against a materialized project that is git-initialised so

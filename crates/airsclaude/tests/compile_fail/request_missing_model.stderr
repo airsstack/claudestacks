@@ -1,0 +1,13 @@
+error[E0599]: no method named `build` found for struct `MessageRequestBuilder<airsclaude::messages::request::Missing, airsclaude::messages::request::Present>` in the current scope
+ --> tests/compile_fail/request_missing_model.rs:4:10
+  |
+2 |       let _req = airsclaude::messages::MessageRequest::builder()
+  |  ________________-
+3 | |         .max_tokens(airsclaude::types::MaxTokens::new(1))
+4 | |         .build();
+  | |         -^^^^^ method not found in `MessageRequestBuilder<airsclaude::messages::request::Missing, airsclaude::messages::request::Present>`
+  | |_________|
+  |
+  |
+  = note: the method was found for
+          - `MessageRequestBuilder<airsclaude::messages::request::Present, airsclaude::messages::request::Present>`

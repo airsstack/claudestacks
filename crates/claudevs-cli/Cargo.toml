@@ -10,6 +10,10 @@ repository.workspace   = true
 authors.workspace      = true
 publish.workspace      = true
 
+readme     = "README.md"
+keywords   = ["claude-code", "claude", "plugin", "testing", "cli"]
+categories = ["command-line-utilities", "development-tools::testing"]
+
 [[bin]]
 name = "claudevs"
 path = "src/main.rs"

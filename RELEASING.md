@@ -50,7 +50,7 @@ today, so if the release slips, fix the date in a PR first.
    │     yes → cargo publish -p claudevs
    │
    └─ ✋ "push tag claudevs-vx.y.z?"
-         yes → git tag -a claudevs-vx.y.z
+         yes → git tag -a claudevs-vx.y.z --cleanup=verbatim
                git push origin claudevs-vx.y.z
 ```
 

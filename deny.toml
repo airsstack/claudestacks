@@ -59,8 +59,8 @@ confidence-threshold = 0.8
 exceptions = []
 
 [licenses.private]
-# Every workspace member is `publish = false`, so their own license text is not
-# a distribution question. They are Apache-2.0 regardless.
+# Workspace members are published to crates.io, so their own Apache-2.0
+# license is checked against the allow list like any dependency's.
 ignore = false
 
 # ---------------------------------------------------------------------------

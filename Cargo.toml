@@ -8,7 +8,7 @@ rust-version  = "1.94"
 license       = "Apache-2.0"
 repository    = "https://github.com/airsstack/claudestacks"
 authors       = ["rstlix0x0 <rstlix.dev@gmail.com>"]
-publish       = false
+publish       = true
 
 [workspace.dependencies]
 # Async runtime — core (tokio-only stance)

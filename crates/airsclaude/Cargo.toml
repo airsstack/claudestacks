@@ -1,6 +1,6 @@
 [package]
 name        = "airsclaude"
-description = "Unofficial Rust SDK for the Anthropic Claude Messages API."
+description = "Unofficial Rust SDK for Anthropic's Claude: the Messages API and the Agent SDK."
 version     = "0.1.0"
 edition.workspace      = true
 rust-version.workspace = true
@@ -11,6 +11,11 @@ publish.workspace      = true
 readme      = "README.md"
 keywords    = ["claude", "anthropic", "llm", "sdk", "ai"]
 categories  = ["api-bindings", "web-programming::http-client", "asynchronous"]
+# Repository-only files: agent guidance, local harness settings, and the
+# `claude`-CLI stand-in that only the integration tests spawn. Leaving the
+# stand-in out also drops its `[[bin]]` target, so `cargo install` never puts
+# it on a caller's PATH.
+exclude     = ["CLAUDE.md", ".claude/", "src/bin/airsclaude-agent-testchild.rs"]
 
 [lints]
 workspace = true

@@ -41,7 +41,7 @@ Before asking anything, check what is actually checkable from the evidence. If t
 command, or path, look at it. Run `git log` (scoped to the paths the evidence implicates, when it names
 any) to see whether anything relevant changed recently — a failure that started right after a touching
 commit is a different story from one with no correlated change. State every conclusion from this pass as
-an overridable assumption in the dialogue ("this looks tied to the `clauders::transport` change in
+an overridable assumption in the dialogue ("this looks tied to the `airsclaude::transport` change in
 `ad6c1af` — is that right, or unrelated?") rather than presenting it as settled fact; the user can correct
 it in one answer.
 

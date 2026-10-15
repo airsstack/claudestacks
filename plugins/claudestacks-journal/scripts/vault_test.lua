@@ -154,7 +154,7 @@ return {
   a_subdirectory_finds_the_checkout_above_it = function()
     local repo = fs.tempdir()
     fs.mkdir(path.join(repo, ".git"))
-    local deep = path.join(repo, "crates", "clauders")
+    local deep = path.join(repo, "crates", "airsclaude")
     fs.mkdir(deep)
     assert(vault.common_dir(deep) == path.join(repo, ".git"), tostring(vault.common_dir(deep)))
   end,

@@ -100,7 +100,7 @@ Ask 3–5 questions, one at a time, never a battery: problem, affected systems, 
 constraints, why-now. Prefer multiple-choice phrasing where a question has a natural small set of
 answers. Ask only when the answer changes what gets written — anything derivable from the repo, an input
 doc already loaded, or the shape of the conversation so far is derived instead and stated as an
-overridable assumption ("I'm assuming this affects only `clauders::transport` — correct?").
+overridable assumption ("I'm assuming this affects only `airsclaude::transport` — correct?").
 
 ## Hard gate — no solution content
 

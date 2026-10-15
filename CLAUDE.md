@@ -193,6 +193,12 @@ The third-party corpus lanes — `cargo make corpus-fetch` and `cargo make corpu
 `corpus-sweep` skill. Run both before a release; invoke that skill for how to read their rows and
 what repinning commits you to.
 
+Releasing a crate to crates.io is the `/release <crate>` skill (`.claude/skills/release/SKILL.md`),
+pictured for engineers in `RELEASING.md`. It is check-only: the version bump and a dated CHANGELOG
+entry reach `main` through a normal PR first, and the skill verifies them, runs the gates (the corpus
+lanes among them for `claudevs` and `claudevs-cli`), then publishes and tags only after an explicit
+yes for each. It never edits or commits.
+
 The plugin suite has its own check for a different reason: `cargo make plugins` runs `airsl check`
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different

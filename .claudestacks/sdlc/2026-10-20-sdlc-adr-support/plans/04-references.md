@@ -1,7 +1,7 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # ADR References Implementation Plan
@@ -196,3 +196,74 @@ file's opening sentence (:3) gains ADRs among what is reviewed.
 - Read top to bottom, `artifact-chain.md` lets a reader with no `airsl` derive the ADR
   block and every chain's ADR condition for a sample root: plan 07's walkthrough does
   that comparison against the real board.
+
+## Review findings
+
+One `claudestacks:reviewer` round over the batch (Tasks 1–3), then one fix round. Verdict
+before fixes: code 0🔴 4🟡 6🔵, spec 2🟡 2🔵; blocking: the first line below.
+
+- wording-rule — rows 6–8 and §10.4's `MMMM` said "sealed ADR" where plan 01 *Readings* make them count valid listers, so the fallback could name a different successor than the board — `artifact-chain.md` §10.4, §13.3 — fixed: rows 6–7 read "listed by a lister `MMMM`", row 8 "no lister lists it", `MMMM` "the lowest-numbered lister of `NNNN` (§13.3)"
+- wording-rule — I7's "lowest number first" was ambiguous between plan and ADR order — `artifact-chain.md` §10.3 — fixed: lowest plan, then lowest ADR within it (plan 03 :107-110)
+- wording-rule — the cycle rule dropped plan 01's "cached once known", making the fallback order-dependent — `artifact-chain.md` §13.3 — fixed, then superseded: the amended spec's `supersedes cycle` row replaced the whole cycle rule (Deviations)
+- wording-rule — the `ADRS:` heading format was unstated with no sample board — `artifact-chain.md` §13.4 — fixed: `<n> <word>`, comma-separated, non-zero counts, plan 01 Task 3 order
+- wording-rule — number-list sentence narrower than `lib/status.lua` (bare scalar; non-numeric block item) — `artifact-chain.md` §6 — fixed
+- nit — "(§10.4)" did not support "the spec may stop citing it" — `artifact-chain.md` §10.4 — fixed: points at C6 and `design`
+- nit — footer omitted roadmap, milestone and ADR body shapes — `artifact-chain.md` closing paragraph — fixed
+- nit — "checks are internal except the proof check" contradicted by the supersede check — `artifact-review.md` § Reviewing a draft ADR — fixed
+- nit — "last two bullets above" was position-dependent — `artifact-review.md` § Reviewing a draft ADR — fixed: named by bold leads, incomplete-review paragraph applies
+- not verified — §13.3 claims agreement with `scripts/lib/adr.lua`, which derived no rows when reviewed — `artifact-chain.md` §13.3 — open until plan 01 completes
+- addition — 🔴 tier pins on the one-option and supersede criteria are not in spec §8 — `artifact-review.md` — kept, precedent at `artifact-review.md:117`
+- spec amendment — spec §4.3's `MMMM` still said "sealed"; spec §4.2's I7 order and spec intro :14-15 likewise — `spec.md` — amended: all three fixed in the spec redesign of 2026-10-20 (Deviations)
+
+Fix verified by re-running every Proof grep after the fix round and again after the
+cycle-row sync (2026-10-20). `grep -cF` counts for the Task 1 list, in order, after the
+sync: `1 10 1 1 1 1 1 1 1 1 3 1 2 2 2 2 2 1 1 7 5 0` (the final `0` is
+`neither C1 nor C2`; four row reasons and `cycle` now also appear in §13.2, and the cycle
+row adds one `fix adr NNNN`); `supersedes cycle` 2, `still being worked out` 0;
+`534:### 11.7 Misplaced ADR keys`,
+`578:## 13. Architecture decision records`; templates.md `177 < 200 < 231`;
+artifact-review.md `100:## Reviewing a draft plan set`, `142:## Reviewing a draft ADR`.
+`cargo make plugins` before the fix round: `522 passed, 0 failed (23 files)` (the 23rd
+file is plan 01's `adr_test.lua`; nothing it runs reads these files).
+
+## Probe results
+
+No throwaway probe was run: every task's proof is its own grep list, run before (all
+absent) and after (all present) by each writer and again by the orchestrator. Section
+line citations in *Files that change* were checked against the file before Task 1
+(`artifact-chain.md`: §3 :25, §6 :91, §8 :196, §9 :204, §10 :240, §11 :338, §12 :466;
+`:94` "all ten keys", `:151` "neither C1 nor C2", `:209` skip list, `:462` ranking
+sentence — all as the plan states; `artifact-review.md` :3, :51, :99 and `templates.md`
+:177, :200 as stated).
+
+## Deviations
+
+- 2026-10-20 — §13's opening sentence widened from "a repository with no `adrs/` sees no
+  ADR behaviour" to "no `adrs/` directory, and no chain artifact carrying an `adrs` or
+  `disproves-adr` key", because rules K and I6 (spec.md:202-204, :218) fire on those keys
+  without `adrs/`. The same claim in spec.md:14-15 was put to the author, who ruled it a
+  wording nit: no `disproves` marker, fix when the spec next changes. It was fixed in the
+  spec redesign below.
+- 2026-10-20 — Spec redesigned mid-run, on the author's word. Plan 01's Task 2 review
+  found that plan 01's cycle rule (an in-progress ADR does not count as a lister) lets a
+  hand-closed `supersedes` loop or a self-listing ADR stay silent, breaking spec §2.4's
+  promise; plan 01 had said the spec did not address cycles. The author chose a new row:
+  `spec.md` was archived as `spec-superseded-2026-10-20.md`, and a draft adding
+  `INVALID (<file>: supersedes cycle)` / `fix adr NNNN`, the lister definition, and the
+  three wording amendments above was reviewed once (0🔴 4🟡 4🔵; nit 2, renaming
+  `superseded by nothing`, declined) and approved (fingerprint `9078f8c84ed0`). The author
+  re-confirmed all seven plans against it, plans 01 and 04 with this deviation. §13.2,
+  §13.3 and §13.4 were then synced: the cycle row, the spec's lister paragraph in place of
+  the in-progress rule and the number-order evaluation, the hand-edit paragraph of spec
+  §2.4, and "the ADR block adds no byte to the board".
+- 2026-10-20 — `templates.md`'s intro sentence (:3-4) also names `adr` among the skills
+  that write artifacts, beyond the title-line change the plan named.
+- 2026-10-20 — §13.4 adds that an ADR with no row is counted in the heading and not
+  listed; spec §5.2's sample implies it but its text does not say it.
+- 2026-10-20 — The review's fix round (Review findings) changed wording beyond the plan's
+  bullets: the lister wiring of rows 6–8 and `MMMM`, I7's tie order, the heading format
+  (and a cycle direction and caching rule, later replaced by the cycle row).
+- 2026-10-20 — Plan 03's review fix round added one sentence to §11.7: a misplaced key
+  counts when present whatever its value, an empty list included, as distinct from §6's
+  "an empty list means none" for reading citations. Spec §4.1 says only "`adrs` or
+  `disproves-adr` on `intent.md`"; it was not amended.

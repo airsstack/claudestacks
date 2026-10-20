@@ -1,7 +1,7 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # ADR Library Implementation Plan
@@ -255,3 +255,63 @@ Task 3 fixtures need no workaround.
   `adr_test.lua` tests added; the summary line reads `23 files`.
 - Every row of spec §5.1, the heading's order, and the second-generation supersession
   of spec §11 each have a named test above.
+
+## Review findings
+
+Three `claudestacks:reviewer` rounds, one per batch, each followed by one fix round:
+Task 1 (code 0🔴 2🟡 3🔵), Task 2 (code 0🔴 1🟡 6🔵, spec 1🟡 1🔵), and the cycle row plus
+Task 3 (code 0🔴 1🟡 11🔵, spec 1🟡 2🔵). No round named a blocking finding.
+
+- correctness — `normalize` went through `tonumber`, so a digit run past 2^63 raised in `string.format` and would crash the board — `lib/adr.lua` — fixed and verified: pads the digit string; `a_huge_number_normalizes_without_error` red before, green after
+- correctness — an empty `status:` parsed to `{}` and rendered `unknown status table: 0x…` — `lib/adr.lua` — fixed and verified: `an_empty_status_reads_missing_status` red before, green after (`lib/roadmap.lua:43`, `:67` have the same flaw, out of scope)
+- comment-vs-code — `fields`/`text` "nil for an unreadable file" — `lib/adr.lua` — fixed
+- test-coverage — no test for the `unreadable` reason — `adr_test.lua` — not fixed (nit; the pass-through path is exercised by missing frontmatter)
+- ordering — header points at `artifact-chain.md` §13, which exists only with plan 04 — `lib/adr.lua:5` — no change; plan 04 lands with this work
+- spec — a hand-closed `supersedes` loop or a self-listing ADR stayed silent under the plan's cycle rule, breaking spec §2.4 — `lib/adr.lua` — fixed by the spec redesign (Deviations): `supersedes cycle` row, pinned by exact-string tests
+- reversion-guard — empty `sealed:` unpinned — `adr_test.lua` — fixed and verified: mutation `sealed == nil` turns `a_sealed_status_without_sealed_is_invalid` red
+- reversion-guard — `settled` cache unpinned — `lib/adr.lua` — obsolete after the cycle row: the cache is speed-only (third review, M5)
+- correctness, cosmetic — row 5's "lowest" compared strings (`[10000, 9999]`) — `lib/adr.lua` — fixed and verified: `the_lowest_unknown_number_compares_numerically`, `the_lowest_unknown_number_is_named_whatever_the_written_order` red under their mutations
+- reversion-guard — loop edges starting only at sealed-status ADRs unpinned (mutation M1b green) — `lib/adr.lua:106` — fixed and verified: `a_loop_closed_through_a_draft_adr_is_not_a_cycle` red under M1b
+- reversion-guard — digit-before-non-digit branch of `lower` unpinned — `lib/adr.lua:86-88` — fixed and verified: `a_digit_number_is_lower_than_a_non_numeric_token` red under the flip
+- edge-case — `successor` of a duplicated number returned a lister — `lib/adr.lua` — fixed and verified: `successor_of_a_duplicated_number_is_nil` red before, green after
+- duplication — number count computed twice — `lib/adr.lua` — fixed: `scan` passes its count
+- test-strength — the exactly-one-file guard on loop edges cannot fail (a duplicated number already has no status) — `lib/adr.lua:108` — kept: the spec states the guard
+- comment-vs-code — lister comment, `row` comment, record field list (`disproven_by`, `next`), `heading` precondition — `lib/adr.lua` — fixed
+- efficiency — `lister` and `edges` re-parse `supersedes` per call (O(n²)) — `lib/adr.lua` — not fixed (harmless at realistic counts)
+- edge-case — `heading({})` returns `ADRS: ` — `lib/adr.lua` — documented: called only when at least one ADR file exists
+- plan drift — `disproven_by` is the string `<chain>/NN`, not `{ chain, plan }` (plan :104); `item.next` added — `lib/adr.lua` — kept, recorded under Deviations; the third review found no downstream reader needs the table (plan 03 :138-143 formats the string directly; `lib/roadmap.lua:26-27` stores `ref` the same way)
+- plan drift — *Readings* :74-81, Task 2 :156-158 and Risks :239-242 still state the replaced in-progress cycle rule — this plan — recorded under Deviations; the approved text is not edited
+
+Gate after the last fix round, as the coder reported it: `cargo make plugins` →
+`74 file(s) compiled, 0 failed`, `573 passed, 0 failed (23 files)`, fingerprint gate
+`8 cases passed` twice.
+
+## Probe results
+
+- Plan citations (`lib/roadmap.lua:25-30`, `:65`, `:75-80`, `:106`; `lib/status.lua:33`, `:48-50`, `:58`, `:67`, `:74`, `:137-138`, `:168-177`; `lib/fingerprint.lua:50` `M.of_text`) — `sed -n` over each — all as the plan states.
+- All-approved two-ADR cycle under the plan's original rule — run by the Task 2 coder — `0001` read `superseded by 0002 but still approved`, `0002` valid; evaluating `0002` first gives the mirror image. **Against the plan's claim** that the rule gives every cycle member one of §5.1's rows predictably; superseded by the cycle row.
+- Hand-closed loop (`0002` approved lists `[0001]`; `0001` superseded, hand-edited to list `[0002]`) and self-listing `0001` under the original rule — run by the Task 2 reviewer — both stayed valid with no row; `successor("0001")` returned `"0001"`. **Against spec §2.4**; led to the spec redesign.
+- Under the cycle row, the same cases plus both-approved, both-superseded and mixed loops, a loop through a `missing sealed` ADR, and an ADR listed only by loop members — `adr_test.lua` exact-string tests — each reads the amended spec §5.1 row; the third review confirmed the result is independent of number order.
+- Mutation runs: the Task 1 review (13 mutations, 12 red, the 13th equivalent), the Task 2 review (13, 11 red), the third review (22, 17 red; the five green ones are filed above), plus each coder's own one-line mutations — scratch scripts under the session scratchpad, not kept in the repository.
+
+## Deviations
+
+- 2026-10-20 — Spec redesigned mid-run, on the author's word. The Task 2 review showed the
+  plan's cycle rule (an in-progress ADR does not count as a lister) breaks spec §2.4, which
+  this plan's *Readings* had said did not address cycles. The author chose a new row: spec
+  §5.1 gained `INVALID (<file>: supersedes cycle)` / `fix adr NNNN`, and a lister became
+  "a sealed ADR that no row of the table invalidates and whose `supersedes` names it". The
+  amended spec was reviewed once and approved (`9078f8c84ed0`), and the author re-confirmed
+  this plan against it with this deviation. `lib/adr.lua` implements the cycle row in place
+  of the in-progress rule, so *Readings* :74-81, Task 2 :156-158 and Risks :239-242 describe
+  a rule the code no longer has.
+- 2026-10-20 — `disproven_by` is the string `<chain>/NN` rather than `{ chain, plan }`
+  (:104), and invalid records carry `next` for the two lister rows (`adr`,
+  `fix adr MMMM`); `M.row` defaults to `fix adr NNNN`. Both are documented in `scan`'s
+  record list.
+- 2026-10-20 — Each fix round ran in the same coder spawn as the next task: Task 1's
+  fixes with Task 2, and Task 2's fixes with the cycle row and Task 3.
+- 2026-10-20 — Tests beyond the plan's names: the record-shape and block-list round-trip
+  tests (Task 1), `the_lowest_lister_is_named` (Task 2), the cycle tests spec §11 now
+  lists, and one test per fix above. The heading test is split in two.
+- 2026-10-20 — No per-task commits were made; committing is the author's act.

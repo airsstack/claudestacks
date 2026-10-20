@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
 depends-on: [02]
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # Board Chain Rules for ADRs Implementation Plan
@@ -207,3 +207,50 @@ frontmatter `adrs: [..]` and seal ADRs with `fingerprint.of_text`:
   plan 02 did not cover has a named test in this plan.
 - `sh plugins/claudestacks-sdlc/scripts/status.sh`, run from the repository root,
   prints this repository's board unchanged.
+
+## Review findings
+
+One `claudestacks:reviewer` round over all three tasks: code 0🔴 1🟡 6🔵, spec 0🔴 1🟡 3🔵;
+blocking: none. The reviewer re-ran the gate (`625 passed, 0 failed (23 files)`), found
+`status.sh` and `attention.sh` output byte-identical (`cmp`) to HEAD's scripts for this
+repository, and ran 15 mutations (11 red; the survivors are filed below). The prose
+mirror (`artifact-chain.md` §10.3, §10.4, §11.7) agreed with the code row for row except
+for the empty-value K case.
+
+- duplication, unguarded — `lower` was copied into `status.lua` from `lib/adr.lua`; an `a < b` mutant passed every test and is wrong at five digits — `lib/status.lua` — fixed: `adr.lower` exported and used, with a test that fails under `a < b` (fix round)
+- spec/reference — K fires on `adrs: []` (plan Task 1's "whatever its value"), but §11.7 did not say so beside §6's "an empty list means none" — `artifact-chain.md` §11.7 — fixed: §11.7 states the key counts when present whatever its value; pinned by a test that fails under a non-empty-value mutant (fix round)
+- unguarded — C5's own plan winning over an earlier chain's mark — `lib/status.lua` — fixed: pinned by a test (fix round)
+- comment — `PLAN_01` comment claimed every C5–C7 test uses it — `status_test.lua` — fixed
+- test-strength — `a_spec_citing_an_invalid_adr_is_not_i6` asserted only the absence of `INVALID` — `status_test.lua` — fixed: asserts the C7 part
+- efficiency — `adr_conditions` resolved each cited number twice — `lib/status.lua` — fixed if trivial (fix round)
+- test-strength — the hook test's chain b row is also selected by `executing` — `status_test.lua` — not fixed
+- plan-accuracy — Task 3's `the_hook_shows_chains_with_broken_adr_citations` expects `3 need attention`; it must be 4, because a C5 chain needs a disproven ADR whose own `disproven by …` row is also an attention row — this plan — test asserts `3 open, 4 need attention`; recorded under Deviations and Probe results
+- stale citation — spec §9 cites `status.lua:605-623` — `spec.md` — no change
+- addition — seven tests and five test helpers beyond the plan (`add_chain`, `spec_citing`, `adr_in`, `disprove_in_b`, `PLAN_01`) — `status_test.lua` — kept, test-only; `chain_root` behaves as before
+
+Gate after the fix round (orchestrator run, 2026-10-20): `cargo make plugins` →
+`74 file(s) compiled, 0 failed`, `630 passed, 0 failed (23 files)`, fingerprint gate
+`8 cases passed` twice; `claude plugin validate --strict plugins/claudestacks-sdlc` →
+`✔ Validation passed`; `status.sh` prints this repository's board unchanged. Fix-round
+red evidence (coder): `M.lower` as `a < b` → 3 tests red; K requiring a non-empty value →
+`an_empty_adrs_key_on_an_intent_is_still_invalid` red; C5 preferring the other chain's
+mark → `a_chains_own_plan_wins_over_an_earlier_chains_mark` red. The strengthened
+`a_spec_citing_an_invalid_adr_is_not_i6` assertion was not seen red.
+
+## Probe results
+
+- Plan line citations into `status.lua` predate plan 02 (`:476` is now `:501`, `:588` now `:615`) — checked by plan 02's reviewer — the coder located code by function name.
+- **Against the plan:** the attention count in `the_hook_shows_chains_with_broken_adr_citations` — the coder ran the fixture — `3 open, 4 need attention`; the reviewer confirmed from `adr.row` and `ATTENTION_WORDS` that 3 cannot happen (spec §9).
+- Mutation runs: the coder's 37 one-line mutations (one equivalent: C3 before C7 can never differ, since C3 needs a draft spec and C7 an approved one; two survivors gained tests) and the reviewer's 15 — scratch copies, restored byte-identically (`cmp`).
+
+## Deviations
+
+- 2026-10-20 — `the_hook_shows_chains_with_broken_adr_citations` asserts
+  `3 open, 4 need attention`, not the plan's `3 need attention` (Probe results).
+- 2026-10-20 — `disproven_by` is plan 01's delivered string `<chain>/NN`, which C5's
+  `ADR NNNN disproven by <chain>/NN` part uses directly.
+- 2026-10-20 — `lower` lives in `lib/adr.lua` as `M.lower` (exported in the fix round), so
+  `status.lua` has no copy.
+- 2026-10-20 — All three tasks ran in one coder spawn, in order, each test-first; started
+  before plan 02 was `done`, on the author's word.
+- 2026-10-20 — No per-task commits were made; committing is the author's act.

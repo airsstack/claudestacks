@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
 depends-on: [01]
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # Board ADR Block Implementation Plan
@@ -152,3 +152,38 @@ half is pinned by inspection only.
 - `cargo make plugins` passes; every pre-existing test is unchanged.
 - `sh plugins/claudestacks-sdlc/scripts/status.sh`, run from the repository root,
   prints today's board for this repository unchanged (it holds no `adrs/`).
+
+## Review findings
+
+One `claudestacks:reviewer` round over all three tasks: code 0🔴 0🟡 4🔵, spec 0🔴 0🟡 3🔵;
+blocking: none. The reviewer re-ran the gate and 11 mutations (the SKIP entry, both
+appends, `empty`, `mark_disproofs`, ADR rows skipped with the heading kept, `draft` in
+`ATTENTION_WORDS`, the no-ADR early return, `board.adrs`, the indent, block placement);
+each turned a named test red.
+
+- test-count — the file went from 94 to 107 tests, not 92 to 105: the Risks regex `^  [a-z_0-9]+ = function\(\)` misses two names with uppercase letters; the delta of 13 is right — this plan's Risks — no change
+- comment — `row_line` does not mention the leading indent — `status_test.lua` — handed to plan 03's coder (same file)
+- test-style — `an_adrs_directory_is_not_a_chain` writes its ADR inline instead of using `adr_file` — `status_test.lua` — handed to plan 03's coder
+- plan-accuracy — un-skipping headings crashes the hook-skip test, so its heading half does go red, not "inspection only" — Task 3 Proof — no change
+- addition — five test helpers the plan did not list (`ADR_DRAFT`, `ADR_APPROVED`, `row_line`, `HEADER`, `lines_of`) — `status_test.lua` — kept, harmless
+- stale citations — plan 03's `status.lua` lines moved (`:476`→`:501`, `:588`→`:615`, derive about +2) — plan 03 — its coder was told to locate code by name
+- stale citations — spec's `status.lua:22` and `:449-454` moved +2 — `spec.md` — no change
+
+Gate (orchestrator run, 2026-10-20): `cargo make plugins` → `74 file(s) compiled, 0 failed`,
+`586 passed, 0 failed (23 files)`, fingerprint gate `8 cases passed` twice.
+`sh plugins/claudestacks-sdlc/scripts/status.sh` prints this repository's board with no
+`ADRS:` line; the reviewer found it byte-identical (`cmp`) to HEAD's `status.lua` output.
+
+## Probe results
+
+- Plan citations (`status.lua:10`, SKIP at `:21` — the plan says `:22`, `M.board` `:466-552`, `board.empty` `:471`, flat return `:513-516`, `UNASSIGNED` `:544-550`, `ATTENTION_WORDS` `:588`, `needs_attention` `:605-612`, count line `:649-651`; `status_test.lua:9` requires `lib.fingerprint`; 92 tests by the plan's regex) — `sed -n` and `grep -c` — as stated except SKIP's line.
+- Task 3's planned mutations (skip ADR rows keeping the heading; `draft` in `ATTENTION_WORDS`) — run by the coder and again by the reviewer — each turned its tests red.
+
+## Deviations
+
+- 2026-10-20 — All three tasks ran in one coder spawn, in order, each test-first; one
+  review covered the batch.
+- 2026-10-20 — Started before plan 01 was `done`, on the author's word (plan 01 was
+  code-complete and reviewed; only a test-and-comment fix round was still running on
+  `lib/adr.lua`).
+- 2026-10-20 — No per-task commits were made; committing is the author's act.

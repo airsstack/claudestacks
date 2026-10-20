@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
 depends-on: [03, 04]
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # ADR Skill Implementation Plan
@@ -157,3 +157,33 @@ skill's description (`skills/milestone/SKILL.md:1-4`). Its sections, in order:
 - `claude plugin validate --strict plugins/claudestacks-sdlc` exits 0.
 - `ls plugins/claudestacks-sdlc/skills` lists eleven directories, `adr` among them.
 - Plan 07's walkthrough runs every operation of the skill against a throwaway root.
+
+## Review findings
+
+Reviewer report: one round over both tasks, 0🔴 1🟡 6🔵 2❓; blocking set empty. Fix round
+re-verified with `claude plugin validate --strict plugins/claudestacks-sdlc` → `✔ Validation passed`.
+
+- risk — the `superseded by MMMM but still approved` exception did not refuse other operations or say *offer* — `skills/adr/SKILL.md:51-54` — fixed: refuse every other operation, offer *finish supersede* (:53-54).
+- question — approve's "listed ADR not `approved`" left invalid / unmatched numbers open — `skills/adr/SKILL.md:72` — fixed: read as in *Check before acting*; an `INVALID` row or no single matching file counts as not approved (:87-90).
+- nit — appended sentence not reflowed — `agents/artifact-reviewer.md:36` — fixed (:36-37).
+- nit — no ADR citation example — `agents/artifact-reviewer.md:81` — fixed: `0003-foo.md ## Decision` (`## Decision` is `templates.md:218`).
+- nit — duplicate-number wording holds only when no earlier row wins — `skills/adr/SKILL.md:35-36` — declined: copied from the milestone skill, harmless.
+- nit — "`<topic>` is the title in kebab-case" is unstated by spec/reference — `skills/adr/SKILL.md:85` — declined: a sensible default.
+- nit — the half-done supersede row is also reachable by a hand revert — `skills/adr/SKILL.md:115-117` — declined: mirrors spec §7.1 verbatim.
+- nit — reversion guard: only presence greps pin the prose — whole skill — declined: spec §11 accepts it; plan 07's walkthrough is the behavioural check.
+- nit — Task 2's kind-row grep prints two lines — plan wording — no change.
+- question — spec §2.2 allows a multi-number `supersedes` that no operation writes — spec — not changed; recorded as spec debt.
+
+## Probe results
+
+None run: both tasks are prose, and the plan names plan 07's walkthrough as their behavioural
+proof. Gates: `cargo make plugins` → `630 passed, 0 failed (23 files)`, fingerprint gate 8
+cases passed twice; `claude plugin validate --strict plugins/claudestacks-sdlc` → exit 0;
+`ls plugins/claudestacks-sdlc/skills | wc -l` → `11`.
+
+## Deviations
+
+- 2026-10-20 — `agents/artifact-reviewer.md`'s description and opening line say "artifact"
+  rather than "chain artifact", since an ADR is not a chain artifact.
+- 2026-10-20 — the review temp path is `<TMPDIR>/claudestacks-sdlc-adr-<NNNN>-01.md`, and
+  `amend` does not re-spawn the reviewer (one round per draft); the plan left both open.

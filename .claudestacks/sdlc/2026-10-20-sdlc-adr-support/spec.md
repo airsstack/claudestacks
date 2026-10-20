@@ -12,13 +12,15 @@ skill and cited only from a chain's `spec.md`. The status board checks every rel
 an ADR and the chains built on it — an accepted ADR edited in place, a cited ADR replaced,
 retired or not yet accepted, an ADR disproven by a plan's execution — through the same rules,
 rows and session-start hook that already report every other disagreement. A repository with
-no `adrs/` directory renders exactly as it does today.
+no `adrs/` directory, and no chain artifact carrying an `adrs` or `disproves-adr` key (§4.1,
+§4.2), renders exactly as it does today.
 
 ## 1. Design premises
 
 Every claim below was checked on 2026-10-20 against this worktree. Probes ran against a
 byte-identical copy of `plugins/claudestacks-sdlc/scripts/` in a throwaway directory and were
-deleted afterwards.
+deleted afterwards. Line citations into `status.lua` in this section are to the file as it
+stood before this work (commit `7e90ff0`); the work shifted them.
 
 **P1 — the board today treats an `adrs/` directory as a broken chain, and ignores keys on the
 wrong artifact.** Probe: a chain root holding `adrs/0001-x.md`, and a chain whose `intent.md`
@@ -136,7 +138,10 @@ supersedes: [0003]               # optional — the ADRs this one replaces
 | `supersedes` | list of ADR numbers | optional; read only on a **sealed** ADR — one whose status is `approved`, `superseded` or `deprecated` (§5.1) |
 | `sealed` | fingerprint | absent on a draft; written at approval; required on `approved`, `superseded` and `deprecated`; ignored on `draft` and `dropped` |
 
-`supersedes` may list more than one number, so one decision can replace two. It stays a link
+`supersedes` may list more than one number, so one decision can replace two. The `adr` skill
+writes one: *supersede N* writes `supersedes: [N]` (§7.1), and *amend* rewrites only the body.
+A second number reaches the list only by the author editing the draft's frontmatter by hand;
+*approve* and the board handle every listed number either way (§2.3, §5.1). It stays a link
 after the ADR carrying it is itself superseded or deprecated, so a chain of replacements
 (`0003` ← `0009` ← `0012`) keeps every earlier record valid.
 
@@ -170,9 +175,14 @@ edited freely. Once approved, the body is never edited: a decision that changes 
 that supersedes it. The board compares the body with `sealed` on every render (§5.1).
 
 The seal covers the body only, because a fingerprint excludes frontmatter (P4). A `supersedes`
-list added to or changed on a sealed ADR is not caught as an edit; it surfaces instead as the
-§5.1 row `superseded by MMMM but still <status>` on each newly listed ADR, and no skill acts on
-that row without the author's explicit word (§7.1).
+list added to or changed on a sealed ADR is not caught as an edit; it surfaces instead through
+§5.1's rows: `superseded by MMMM but still <status>` on each newly listed ADR that is not
+`superseded`, `supersedes cycle` on every ADR of a loop the list closes (an ADR listing itself
+included), `supersedes unknown MMMM` on the edited ADR for a number matching no file, and
+`superseded by nothing` on an ADR whose only lister dropped it. No skill acts on any of these
+rows without the author's explicit word (§7.1). One such edit shows no row: adding a number
+that is already `superseded` under another valid lister, which changes nothing a chain reads
+except, when the new lister is lower, the `MMMM` that C6 names.
 
 ## 3. Citation and disproof keys on chain artifacts
 
@@ -203,6 +213,10 @@ For every chain whose intent is `draft` or `approved`:
 | `disproves-adr` on `spec.md` | `INVALID (spec.md: disproves-adr not allowed here)` |
 | `adrs` on a plan | `INVALID (plans/NN: adrs not allowed here)` |
 
+A key counts when it is present, whatever its value, an empty list included: `adrs: []` on an
+intent is still reported. §3's "an empty list means none" is about reading citations; this rule
+is about where the key may appear.
+
 NEXT is `fix <chain>`. Checked intent first, then spec, then plans in number order. K ranks
 after the membership problems (`artifact-chain.md` §11.6) and before I2. Because K applies to
 `draft` chains as well, the reference states it in a section of its own ranked by reference, as
@@ -218,7 +232,8 @@ For a chain whose intent is `approved`, after I5:
 | I6 | a number in the spec's `adrs` matches no ADR file, or two | `INVALID (spec.md: unknown ADR NNNN)` / `INVALID (spec.md: ambiguous ADR NNNN)` |
 | I7 | a plan that is not `superseded` names in `disproves-adr` an ADR whose status is `approved`, and the spec's `adrs` does not hold that number (or there is no `spec.md`) | `INVALID (plans/NN: disproves uncited ADR NNNN)` |
 
-NEXT is `fix <chain>`. Within a rule, the lowest number first.
+NEXT is `fix <chain>`. Within I6, the lowest number first; within I7, the lowest plan, then the
+lowest number within that plan.
 
 I7 reads only live disproofs — those naming an ADR still `approved`. Once that ADR is superseded
 or deprecated, the disproof is history: the spec may stop citing it (§6.2) while the plan keeps
@@ -233,8 +248,6 @@ resolves: it is not I6, and the chain reads it as not approved (C7).
 
 For a chain whose intent is `approved`, alongside C1–C4:
 
-| # | Condition | STATE part | NEXT |
-|---|---|---|---|
 An ADR is **disproven** when its status is `approved` and a plan that is not `superseded`, in
 any chain whose directory parses, names it in `disproves-adr` (the same reading as the §5.1 row).
 
@@ -244,8 +257,8 @@ any chain whose directory parses, names it in `disproves-adr` (the same reading 
 | C6 | `spec.md` is `approved` and cites an ADR whose status is `superseded` or `deprecated` | `spec stale (ADR NNNN superseded by MMMM)` or `spec stale (ADR NNNN deprecated)` | `design` |
 | C7 | `spec.md` is `approved` and cites an ADR whose status is `draft` or `dropped`, or which is invalid | `spec blocked (ADR NNNN not approved)` | `adr` |
 
-`MMMM` is the lowest-numbered sealed ADR listing `NNNN` in `supersedes`. A superseded ADR that no
-sealed ADR lists is invalid (§5.1), so a chain citing it reads C7, not C6. When several numbers
+`MMMM` is the lowest-numbered lister of `NNNN` (§5.1). A superseded ADR that no lister lists is
+invalid (§5.1), so a chain citing it reads C7, not C6. When several numbers
 satisfy one condition, the part names the lowest; when several plans do, the lowest plan; when
 several chains disproved it, the first in listing order.
 
@@ -282,15 +295,25 @@ C6, C7 holds. Only a complete chain reads `chain complete` and is walked up to `
 | `approved`, `superseded` or `deprecated`, and no `sealed` | `INVALID (<file>: missing sealed)` | `fix adr NNNN` |
 | `approved`, `superseded` or `deprecated`, and the body's fingerprint ≠ `sealed` | `INVALID (<file>: edited after approval)` | `fix adr NNNN` |
 | sealed, and its `supersedes` names a number matching no ADR file | `INVALID (<file>: supersedes unknown MMMM)` | `fix adr NNNN` |
-| listed in the `supersedes` of a sealed ADR `MMMM`, and its status is `approved` | `INVALID (<file>: superseded by MMMM but still approved)` | `adr` |
-| listed in the `supersedes` of a sealed ADR `MMMM`, and its status is `draft`, `dropped` or `deprecated` | `INVALID (<file>: superseded by MMMM but still <status>)` | `fix adr MMMM` |
-| `superseded`, and no sealed ADR lists it | `INVALID (<file>: superseded by nothing)` | `fix adr NNNN` |
+| sealed, and following `supersedes` entries that each name exactly one ADR file, from it through sealed ADRs, leads back to it | `INVALID (<file>: supersedes cycle)` | `fix adr NNNN` |
+| listed by a lister `MMMM`, and its status is `approved` | `INVALID (<file>: superseded by MMMM but still approved)` | `adr` |
+| listed by a lister `MMMM`, and its status is `draft`, `dropped` or `deprecated` | `INVALID (<file>: superseded by MMMM but still <status>)` | `fix adr MMMM` |
+| `superseded`, and no lister lists it | `INVALID (<file>: superseded by nothing)` | `fix adr NNNN` |
 | disproven (§4.3) | `disproven by <chain>/NN` | `adr supersede NNNN` |
 | `draft` | `draft` | `approve or drop` |
 | otherwise | no row | |
 
 An invalid ADR has no status for any other rule: it counts in the heading as invalid and is read
 by chains as not approved.
+
+A **lister** of an ADR is a sealed ADR that no row of the table invalidates and whose
+`supersedes` names it; `MMMM` is the lowest-numbered one. A lister's validity therefore depends
+on its own listers, and so on along `supersedes`. The cycle row ends that walk: an edge of the
+walk is a sealed ADR's `supersedes` entry naming exactly one ADR file ("sealed" by status, as
+§2.2 defines it, whether or not its seal is intact), and every ADR on a loop of such edges is
+settled by the cycle row or an earlier one — `missing sealed`, `edited after approval` or
+`supersedes unknown` still win, first that holds — so no lister's validity depends on itself. A loop can arise only by hand-editing frontmatter, since *approve* refuses unless every
+listed ADR is `approved` (§7.1).
 
 The disproof is read from every chain whose directory parses, whatever its intent's status, so
 dropping or finishing a chain does not hide a known-broken decision. When several plans name the
@@ -317,7 +340,7 @@ DONE/DROPPED: 7 done, 2 dropped (not listed)
   superseded, deprecated, draft, dropped, invalid.
 - ADR rows have `kind = "adr"`, label `ADR NNNN`, indent 2, in number order (file name order on a
   duplicate).
-- With no such file, nothing prints and the board is byte-identical to today's.
+- With no such file, nothing prints: the ADR block adds no byte to the board.
 - A root holding ADRs and no chain renders the board, not the starter hint, as a root holding only
   a roadmap does (`artifact-chain.md:418`).
 - `board.open` stays the count of chain rows.
@@ -399,6 +422,9 @@ author's commit message.
 
 - **Never asks about ADRs.** It hands off to `/adr new` only when the author asks for a choice to
   be recorded as one, then writes the ADR's number into the draft spec's `adrs`.
+- **Writes `adrs` at step 8.** The spec's `adrs` holds every `approved` ADR the design relies on
+  (§3), whether read at step 3 or recorded through the hand-off above. Step 8 is therefore a
+  writer of `adrs` alongside the hand-off and the redesign.
 - **Reads approved ADRs before proposing approaches.** When `adrs/` exists, step 3 reads the
   title of every `approved` ADR and the body of each one that bears on the intent. Step 6 treats
   those decisions as settled: an approach that contradicts one says so and names the ADR, and
@@ -458,7 +484,7 @@ the rules this spec's §12 adds to `artifact-chain.md`.
 
 No change to the hook or to `ATTENTION_WORDS`. ADR problem rows are worded with `INVALID` or
 `disproven`, and the chain conditions with `disproven`, `stale` or `blocked`, so
-`needs_attention` (`status.lua:605-623`) selects them; the `ADRS:` heading is a heading and is
+`needs_attention` (`status.lua:780-798`, `ATTENTION_WORDS` at `:763`) selects them; the `ADRS:` heading is a heading and is
 skipped; a `draft` ADR row holds no attention word and is not shown.
 
 ## 10. Error handling
@@ -478,8 +504,8 @@ is written.
 
 | File | Pins |
 |---|---|
-| `scripts/adr_test.lua` (new) | scanning and ignored entries; four-digit parsing of inline and block lists, with normalisation; duplicate numbers; every row of §5.1, in order; the seal matching, edited and missing; both halves of supersession; a second-generation supersession (`0003` ← `0009` ← `0012`, and `0009` deprecated) leaving `0003` valid; disproof read from a chain whose intent is `done` and one whose intent is `dropped`; the heading's counts and order |
-| `scripts/status_test.lua` | `adrs/` no longer rendering as a chain (P1); every row of K, I6, I7 and their place in the invalid order; I6 winning over C7 for a duplicate number; I7 ignoring a disproof of a superseded ADR the spec no longer cites; C5 on the disproving chain and on a sibling chain that only cites the ADR; C5, C6, C7 parts, their STATE order and NEXT order; C6 and C7 and C5's citation half ignoring a draft spec; each of C5, C6, C7 preventing `chain complete`; the ADR block's placement in the flat and grouped layouts; no block and byte-identical output without `adrs/`; a root holding only ADRs rendering the board; the hook showing ADR problem rows and skipping the heading and a draft row |
+| `scripts/adr_test.lua` (new) | scanning and ignored entries; four-digit parsing of inline and block lists, with normalisation; duplicate numbers; every row of §5.1, in order; the seal matching, edited and missing; both halves of supersession; a two-ADR `supersedes` loop, a self-listing ADR, an ADR listed only by loop members, a loop through an ADR invalid by an earlier row, and an entry naming a duplicated number not counting as an edge; a second-generation supersession (`0003` ← `0009` ← `0012`) leaving `0003` valid, and separately a deprecated successor (`0003` ← `0009`, `0009` deprecated, listed by no ADR) leaving `0003` valid; disproof read from a chain whose intent is `done` and one whose intent is `dropped`; the heading's counts and order |
+| `scripts/status_test.lua` | `adrs/` no longer rendering as a chain (P1); every row of K, I6, I7 and their place in the invalid order; I6 winning over C7 for a duplicate number; I7 ignoring a disproof of a superseded ADR the spec no longer cites; C5 on the disproving chain and on a sibling chain that only cites the ADR; C5, C6, C7 parts, their STATE order and NEXT order; C6 and C7 and C5's citation half ignoring a draft spec; each of C5, C6, C7 preventing `chain complete`; the ADR block's placement in the flat and grouped layouts; no block and byte-identical output without `adrs/` for a root carrying no `adrs` or `disproves-adr` key; a root holding only ADRs rendering the board; the hook showing ADR problem rows and skipping the heading and a draft row |
 
 The 506 existing tests keep passing unchanged.
 

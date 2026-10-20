@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-20
 depends-on: [03, 04]
-built-on: c2d88a3e18f4
+built-on: 9078f8c84ed0
 ---
 
 # ADR Conditions in Existing Skills Implementation Plan
@@ -172,3 +172,35 @@ fingerprint), and prints the `ADRS:` block after the chain rows and before the
 - Every board wording from spec §4.3 appears in each skill table spec §7 assigns it to,
   by the `grep` checks above.
 - Plan 07's walkthrough drives each skill through each condition.
+
+## Review findings
+
+Reviewer report: one round over all four tasks, code 0🔴 0🟡 8🔵, spec 1🟡/❓; blocking set
+empty. Fix round re-verified with `claude plugin validate --strict plugins/claudestacks-sdlc`
+→ `✔ Validation passed`.
+
+- spec gap — nothing told `design` to cite an existing approved ADR the design relies on, so C5–C7 could never reach such a chain — `skills/design/SKILL.md` step 8 — fixed: step 8 writes `adrs` with every approved ADR the design relies on (:248-249), per spec §3:187 and `artifact-chain.md:130`; see Deviations.
+- nit — the step-6 hand-off wrote into a spec that may not exist yet — `skills/design/SKILL.md:220-222` — fixed: the number goes into `adrs` when step 8 writes the spec (:221-223); step 11 reads "written afresh by step 8" (:338-339).
+- nit — ADR re-confirmation named only a successor — `skills/design/SKILL.md:80-81` — fixed: "or for a deprecated ADR the decision being withdrawn".
+- nit — the disproof question and heading named only plan and spec — `skills/execute/SKILL.md:333`, `:339-343` — fixed (:333, :343-345).
+- nit — "after the ADR is superseded" left out deprecated — `skills/execute/SKILL.md:363` — fixed (:365).
+- nit — "every other open chain citing the ADR" was too broad — `skills/execute/SKILL.md:366-367` — fixed: "whose approved spec cites the ADR" (:369).
+- nit — the `chain complete` gloss said completion is only about the chain's text — `skills/execute/SKILL.md:434-435` — fixed (:437-438).
+- nit — "which also read the ADR rows" was imprecise — `skills/status/SKILL.md:25-26` — fixed: status and validity per §13.3 (:26-27).
+- nit — reversion guard: the frontmatter-only re-confirmation, the step-10 refusal and the `ADRS:` order are pinned by nothing but presence greps — declined: plan 07's walkthrough drives them.
+
+## Probe results
+
+None run: all four tasks are prose; plan 07's walkthrough is their behavioural proof. Gates:
+`cargo make plugins` → `630 passed, 0 failed (23 files)`; `claude plugin validate --strict
+plugins/claudestacks-sdlc` → exit 0; every Proof grep of Tasks 1–4 holds.
+
+## Deviations
+
+- 2026-10-20 — `design` step 8 now writes `adrs` with every approved ADR the design relies
+  on. Spec §7.2 lists only the hand-off and the redesign as writers of `adrs`; the step
+  follows spec §3's definition of the key ("the ADR numbers the spec's design relies on").
+  Spec §7.2's wording is not amended (spec debt).
+- 2026-10-20 — the hand-off paragraph sits in step 6; the plan gave it no location.
+- 2026-10-20 — `INVALID (spec.md: unknown ADR NNNN)` and its siblings fall under the existing
+  "any other `INVALID (…)`" rows of the `plan` and `execute` tables; no new row was added.

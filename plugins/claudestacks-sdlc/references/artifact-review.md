@@ -1,6 +1,7 @@
 # Artifact review criteria
 
-What a review of a draft chain artifact checks, by hop. Read by
+What a review of a draft chain artifact checks, by hop, and what a review of a draft ADR
+checks. Read by
 `claudestacks-sdlc:artifact-reviewer`, and by the calling skill directly when that agent
 is unavailable — this file is the single source, so the two can never drift.
 
@@ -137,3 +138,38 @@ though plan `01` says nothing about it.
   / validation / edge cases" without naming which; "write tests for the above" without
   naming each test and what it asserts; a task with no done-check command; a reference to
   a type, function, or constant introduced neither earlier in the plan nor in the codebase.
+
+## Reviewing a draft ADR
+
+Authority: none for a new ADR; the replaced ADR(s) — those the draft lists in `supersedes` —
+for a supersede. Body shape: `templates.md` § `adrs/NNNN-<topic>.md`. An ADR sits outside
+the chain, so there is no upstream document to trace to; the checks below are internal to
+the draft, except the proof check and, on a supersede, the replaced-ADR check, which
+reach outside it.
+
+- **No placeholders** — no `TBD`, `TODO`, "to be determined", or vague deferral language,
+  and no bracketed template prompt left in a section. Either the gap is filled or the
+  decision is made explicit.
+- **Options considered holds at least two real options, each with its trade-offs.** An
+  option that exists only to be rejected — a strawman nobody would choose, or one with no
+  trade-off stated — does not count. A section naming one option is a 🔴 finding.
+- **The decision follows from the context.** The forces the context names are the ones the
+  chosen option answers. A decision that answers a force the context never mentions, or
+  leaves a named force unanswered, is a finding.
+- **Consequences name costs as well as benefits.** A section listing only benefits is a
+  finding: every decision has a price, and an ADR that does not state it gives the next
+  reader nothing to weigh when the decision is reopened.
+- **Every claim carries its proof, by the same rule as a spec.** The criteria are those of
+  the spec section's **Every claim carries its proof, and the proof is the right kind**
+  and **External claims are cited, and the citations resolve** bullets, with everything
+  under the second — the paragraph on exhaustive lists and the closing paragraph that marks
+  the review incomplete when an external claim cannot be checked. The proof is the right
+  kind, external claims are cited and the citations resolve, an exhaustive list is checked
+  for completeness, and a review that could not check an external claim is marked
+  incomplete rather than passed — not restated here. A claim with no evidence is a finding
+  even when it is probably true.
+- **On a supersede, the context states what in the replaced ADR no longer holds.** Read each
+  ADR the draft lists in `supersedes` and check that the context names the specific part
+  that stopped being true or stopped being worth its cost. A context that only says the
+  decision is "outdated", or that never mentions the replaced ADR, is a 🔴 finding: the
+  replaced decision was approved, and the reason for reversing it is the content of this one.

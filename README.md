@@ -1,98 +1,167 @@
 # claudestacks
 
-The Claude-Code half of the author's personal AI technology stack: a Claude SDK written in Rust, an
-engine for testing Claude Code plugins deterministically, and the Claude Code plugin suite that
-packages the development methodology the other two are built with. It was migrated out of the
-`rstlix0x0/airsstack` monorepo with its history preserved, so everything here has the commits that
-produced it. That monorepo has since been deleted; this repository holds the only copy of the
-history it carried.
+A Claude toolkit in Rust: an SDK for calling Claude, a test runner for Claude Code plugins, and a
+Claude Code plugin suite for spec-driven development.
 
-## Rust crates
+```
+claudestacks
+├── crates/
+│   ├── airsclaude      Rust SDK for Claude                  ─► crates.io
+│   ├── claudevs        plugin test engine (library)         ─► crates.io
+│   └── claudevs-cli    the `claudevs` binary                ─► crates.io
+└── plugins/            five Claude Code plugins             ─► /plugin marketplace
+```
 
-A Cargo workspace under `crates/` — `resolver = "3"`, Edition 2024 — with three members:
+Pick the part you need. Each one works without the others.
 
-- **`airsclaude`** — the Claude SDK. Its driving objective is **100% feature parity and behavioral
-  compatibility with Anthropic's official SDKs** across three surfaces: the **Messages API** (the
-  stateless `POST /v1/messages` client), the **Agent SDK** (drives the `claude` Code CLI as a
-  subprocess over line-delimited JSON), and **Managed Agents** (server-hosted stateful agents). A
-  Rust caller gets what a Python or TypeScript caller gets, with idiomatic Rust ergonomics. The
-  Messages API and the Agent SDK are implemented; Managed Agents is not started. The pillar map and
-  internal structure are in [`crates/airsclaude/docs/architecture.md`](crates/airsclaude/docs/architecture.md);
-  the docs index is [`crates/airsclaude/docs/README.md`](crates/airsclaude/docs/README.md).
-- **`claudevs`** — the engine behind the Claude Code plugin lifecycle CLI: the canonical case model,
-  a deterministic test harness that spawns a plugin's hooks and scripts the way the Claude Code
-  runtime would, native-suite delegation, static wiring checks, and install-layout simulation. It
-  fills the gap between `claude plugin validate --strict`, which checks a manifest, and
-  `claude plugin eval`, which is not deterministic.
-- **`claudevs-cli`** — the `claudevs` binary.
+| I want to… | Use |
+| --- | --- |
+| call Claude from Rust | [`airsclaude`](#airsclaude) |
+| test a Claude Code plugin I wrote | [`claudevs`](#claudevs) |
+| give Claude Code a review-gated dev workflow | [the plugin suite](#the-plugin-suite) |
 
-`airsclaude` carries its HTTP transport in-tree as the `airsclaude::transport` module
-(`crates/airsclaude/src/transport/`) rather than depending on the `airs-transport` crate. So does
-[`airsstack/openrouter-rs`](https://github.com/airsstack/openrouter-rs), which vendored the same
-crate when it moved to its own repository. Vendoring lets the two copies diverge freely instead of
-coupling two repositories over one dependency.
+## airsclaude
+
+An unofficial Rust SDK for Claude, aiming for feature parity with Anthropic's official Python and
+TypeScript SDKs. It ships two independent clients:
+
+```
+                       ┌─► airsclaude::messages ──HTTP──► Anthropic API     (needs ANTHROPIC_API_KEY)
+your Rust program ─────┤
+                       └─► airsclaude::agent ──spawns──► `claude` CLI 2.0+  (no API key; uses the CLI's login)
+```
+
+| Client | Use it when | Covers |
+| --- | --- | --- |
+| Messages API | you want a model to answer and you control the loop | streaming, tools, prompt caching, thinking, structured output, vision, PDFs, citations, batches |
+| Agent SDK | you want an agent that reads files, runs commands and drives its own loop | `query`, stateful `Client`, in-process MCP tools, hooks, permissions, subagents, sessions |
+
+Managed Agents, the third official surface, is not implemented.
+
+**Install** (Rust 1.94+):
+
+```toml
+[dependencies]
+airsclaude = "0.1"
+tokio      = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+**Quick start:**
+
+```rust
+use airsclaude::messages::ContentBlock;
+use airsclaude::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::builder()?
+        .api_key(ApiKey::new(std::env::var("ANTHROPIC_API_KEY")?)?)
+        .build()?;
+
+    let req = MessageRequest::builder()
+        .model(ModelId::claude_sonnet_5())
+        .max_tokens(MaxTokens::new(1024))
+        .add_user_text("Say hi.")
+        .build();
+
+    let msg = client.messages().create(req).await?;
+    for block in &msg.content {
+        if let ContentBlock::Text(t) = block {
+            println!("{}", t.text);
+        }
+    }
+    Ok(())
+}
+```
+
+25 runnable examples ship with the crate:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... cargo run -p airsclaude --example 01_hello   # Messages API
+cargo run -p airsclaude --example agent_01_query                          # Agent SDK
+```
+
+More: [crate README](crates/airsclaude/README.md) (Agent SDK quick start) ·
+[docs](crates/airsclaude/docs/README.md) (tutorials, how-tos, parity tables).
+
+## claudevs
+
+Deterministic tests for Claude Code plugins. It runs a plugin's hooks and scripts the way Claude
+Code would, checks the wiring, and tries the plugin in its installed layout.
+
+```
+claude plugin validate --strict   manifest only
+claudevs check                    manifest ─► wiring ─► hook/script tests ─► installed-layout tests
+claude plugin eval                model-driven, so results vary run to run
+```
+
+**Install:**
+
+```bash
+cargo install claudevs-cli     # installs a binary named `claudevs`
+```
+
+**Use:**
+
+| Command | What it does |
+| --- | --- |
+| `claudevs check [PATH]` | the full gate above; every stage reports even if an earlier one fails |
+| `claudevs test [PATH]` | runs the plugin's test cases (`--installed` for the installed layout) |
+| `claudevs doctor [PATH]` | lists what this machine can and cannot run |
+| `claudevs migrate <case.yaml>` | converts a YAML case to Lua |
+
+Exit codes: `0` clean, `1` failures found, `2` claudevs itself could not run. Add `--json` to
+`test`, `check` or `doctor` for machine-readable output.
+
+More: [CLI README](crates/claudevs-cli/README.md) · [docs](crates/claudevs/docs/README.md).
 
 ## The plugin suite
 
-A marketplace (`.claude-plugin/marketplace.json`) of five plugins under `plugins/` that package this
-project's spec-driven, review-gated development methodology for
-[Claude Code](https://www.claude.com/product/claude-code):
+Five plugins for [Claude Code](https://www.claude.com/product/claude-code), installed from this
+repository's marketplace.
 
-| Plugin | What it provides |
+| Plugin | What you get |
 | --- | --- |
-| **`claudestacks`** | Execution engine: a TDD `coder`, a merged code+spec `reviewer`, a read-only `explorer`, an `orchestrate` driver, process guidelines, project-local snapshot memory, and `/claudestacks:discuss`, a communication protocol with topic-indexed agent output. |
-| **`claudestacks-sdlc`** | AI-native SDLC workflow: a committed `intent` → `design` → `plan` → `execute` chain under `.claudestacks/sdlc/`, with `distill`/`triage` feedback loops, optional `roadmap`s and `milestone`s, and a `status` board that reports artifacts drifting out of sync. |
-| **`claudestacks-guideline-rust`** | Rust engineering guidelines plus a strict Definition-of-Done, delivered as a single lazily-loaded skill the execution agents consult when they touch Rust. |
-| **`claudestacks-journal`** | Transparent, note-based experiential memory: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index (`capture` / `note` / `recall` / `link` / `review` / `helped`). |
-| **`claudestacks-cmux`** | Native [cmux](https://cmux.com) terminal control as four lazily-loaded skills (`cmux-control` hub, `cmux-workspace`, `cmux-browser`, `cmux-config`) over the real `cmux` CLI. Requires a cmux install on the machine. |
+| `claudestacks` | core agents (`coder`, `reviewer`, `explorer`), an `orchestrate` driver, snapshot memory, `/discuss` |
+| `claudestacks-sdlc` | an `intent → spec → plan → execute` workflow under `.claudestacks/sdlc/`, with roadmaps, ADRs and a `status` board |
+| `claudestacks-guideline-rust` | Rust guidelines and a Definition of Done the agents check against |
+| `claudestacks-journal` | an Obsidian-compatible journal with embedding-free recall |
+| `claudestacks-cmux` | control of the [cmux](https://cmux.com) terminal |
 
-The suite was renamed from `airsstack*` in the move, and two members did not come with it:
-`airsstack-okf` and `airsstack-plugin-dev` were dropped.
-
-The plugins are language-agnostic except for the guideline plugin: the agents obtain their
-Definition-of-Done and rules from whichever `*-guidelines` skill is installed, and degrade
-gracefully when none is present.
-
-Upstream attribution, restated from each plugin's own README: `claudestacks-sdlc` credits two
-lineages — the stage model and `distill`/`triage` feedback loops implement Anthropic's
-[AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook), while the
-`design` → `plan` → `execute` discipline (gated design dialogue, TDD plan format, checkpointed
-execution) descends from the retired `claudestacks-sdd`, itself adapted from the
-[superpowers](https://github.com/obra/superpowers) plugin. The reply rules in `claudestacks`'s
-communication protocol replace an earlier terseness mode inspired by
-[caveman](https://github.com/juliusbrussee/caveman).
-
-## Commands
-
-Standard Rust commands apply (`cargo build`, `cargo clippy`, `cargo fmt`). The pass/fail gate is a
-[cargo-make](https://github.com/sagiegurari/cargo-make) task set defined in `Makefile.toml`:
-
-| Command | What it runs |
-| --- | --- |
-| `cargo make dod` | The Definition of Done — format check, clippy, docs, tests, doctests, every step zero-warning. |
-| `cargo make dod-crate <crate>` | The same gate scoped to one crate while you work in it. |
-| `cargo make claudevs-check` | `claudevs check` over the fixture plugin corpus, both directions. |
-| `cargo make plugins` | Every check over the Lua plugin scripts (needs `cargo make install-airsl` first). |
-| `cargo make deny` | cargo-deny: security advisories, licenses, duplicate versions, sources. |
-
-`deny`, `plugins`, and `claudevs-check` are deliberately not part of `dod` — the gate is the five
-commands the guideline skill owns, and they answer different questions.
-
-## Installing the suite
-
-**Inside this repository**, the suite loads on its own: `.claude/settings.json` registers the
-in-repo directory marketplace and enables all five plugins. Restart Claude Code once to activate.
-
-**In another project**, install the `airsl` binary that every plugin hook runs on *first* —
-installing the plugins without it leaves every hook silently disabled, with no error anywhere:
+The SDLC workflow, in one picture:
 
 ```
+intent ──► design ──► plan ──► execute
+(problem)  (spec)    (tasks)   (code + review)
+
+feedback loops
+  failure evidence (a log, a bug)   ──► triage  ──► a new intent
+  a review finding in 2+ chains     ──► distill ──► a proposed config fix
+```
+
+### What each plugin needs
+
+The plugins' hooks and scripts are Lua, run by **`airsl`**, a separate binary. Install it first:
+without it the hooks switch off silently, with no error.
+
+```
+airsl (binary) ◄── hooks/scripts ── claudestacks
+               ◄──────────────────── claudestacks-sdlc
+               ◄──────────────────── claudestacks-journal ──requires──► claudestacks
+               ◄──────────────────── claudestacks-cmux ────requires──► cmux (binary)
+
+claudestacks-guideline-rust ── no runtime needs; read by claudestacks
+```
+
+### Install
+
+```bash
+# 1. the Lua runtime (needs a Rust toolchain)
 cargo install airsl-cli --locked
 ```
 
-Then install from the GitHub marketplace:
-
 ```
+# 2. inside Claude Code: add the marketplace, then install what you want
 /plugin marketplace add airsstack/claudestacks
 /plugin install claudestacks@claudestacks
 /plugin install claudestacks-sdlc@claudestacks
@@ -101,8 +170,31 @@ Then install from the GitHub marketplace:
 /plugin install claudestacks-cmux@claudestacks
 ```
 
-Each plugin has its own README under `plugins/<name>/` with the full component list. Everything is
-namespaced (`claudestacks:<name>`, `claudestacks-sdlc:<name>`, `claudestacks-journal:<name>`, …).
+If `airsl` is installed but the hooks still cannot find it, set
+`AIRSL_BIN` to the binary's full path.
+
+Inside this repository the marketplace is already registered by `.claude/settings.json`; enable
+plugins with `/plugin`. Each plugin's README under `plugins/<name>/` lists its full contents.
+
+## Working on this repository
+
+| Command | Runs |
+| --- | --- |
+| `cargo make dod` | format, clippy, docs, tests, doctests — the gate CI runs |
+| `cargo make dod-crate <crate>` | the same gate for one crate |
+| `cargo make claudevs-check` | `claudevs check` over the fixture plugins |
+| `cargo make plugins` | checks and tests the plugin Lua (`cargo make install-airsl` first) |
+| `cargo make deny` | advisories, licenses, duplicate versions |
+
+Releasing a crate: [RELEASING.md](RELEASING.md).
+
+## Credits
+
+- `claudestacks-sdlc` implements Anthropic's
+  [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook); its
+  design → plan → execute discipline is adapted from [superpowers](https://github.com/obra/superpowers).
+- The `claudestacks` reply rules replace an earlier mode inspired by
+  [caveman](https://github.com/juliusbrussee/caveman).
 
 ## License
 

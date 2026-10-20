@@ -203,7 +203,7 @@ The plugin suite has its own check for a different reason: `cargo make plugins` 
 then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` binary installed
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different
 questions — `check` compiles every file including the drivers no test loads, `test` runs the
-506 tests across 22 files — and either can be run alone as `cargo make plugins-check` /
+630 tests across 23 files — and either can be run alone as `cargo make plugins-check` /
 `cargo make plugins-test`. They are separate jobs in `.github/workflows/lua.yml`, a workflow of its
 own filtered to `plugins/**`, because it gates the Lua rather than the Rust workspace. If either
 workflow file is missing, add it by hand: a session whose GitHub token lacks the `workflow` scope
@@ -232,7 +232,7 @@ plugin skills and references — invoke the relevant skill rather than expecting
 | Plugin | What it provides |
 |---|---|
 | `claudestacks` | coder, reviewer, explorer; orchestration driver; process guidelines; project-local snapshot memory; /discuss communication protocol |
-| `claudestacks-sdlc` | AI-native SDLC workflow: committed intent → spec → plan → execute chain with distill/triage loops, artifact sync checks, and optional roadmaps and milestones (`.claudestacks/sdlc/`) |
+| `claudestacks-sdlc` | AI-native SDLC workflow: committed intent → spec → plan → execute chain with distill/triage loops, artifact sync checks, optional roadmaps and milestones, and optional architecture decision records (`.claudestacks/sdlc/`) |
 | `claudestacks-guideline-rust` | Rust engineering guidelines and the Definition of Done |
 | `claudestacks-journal` | Obsidian-compatible journal vault kept outside the repo, written by isolated subagents |
 | `claudestacks-cmux` | native cmux terminal control (control / workspace / browser / config) |

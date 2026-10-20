@@ -7,7 +7,8 @@ skills, guided one question at a time, implement Anthropic's
 single-author scale — every stage gates on frontmatter state, and nothing in the chain is
 ever deleted. The board also checks that related artifacts still agree, and optional
 roadmaps and milestones sit above the chains with progress that is counted, never
-written down.
+written down. Optional architecture decision records keep a decision that outlives one
+chain, and the board flags a chain whose spec rests on one that has been overturned.
 
 ## Install
 
@@ -59,8 +60,9 @@ question at a time, never a battery.
   findings while the defects that matter are wrong premises no review can catch. Appends
   durable `## Review findings`, `## Probe results` and `## Deviations` sections to the
   plan before flipping it `done`; walks the intent up to `done` once every sibling plan is
-  `done` or `superseded` with at least one `done`, no stale spec stands, and no spec or
-  intent is disproven, then rolls up the chain's milestone and roadmap if it has one.
+  `done` or `superseded` with at least one `done`, no stale spec stands, no spec or
+  intent is disproven, and no ADR the spec cites is disproven, replaced, retired or not
+  approved, then rolls up the chain's milestone and roadmap if it has one.
 - **`distill`** (loop) — scans `## Review findings` across chains for a finding recurring in
   two or more chains, and proposes a concrete, minimal config edit per finding — accept /
   edit / skip, one at a time. Never edits without a per-proposal accept.
@@ -83,6 +85,8 @@ nothing here is git-ignored, and nothing is ever deleted, only superseded or dro
 │   └── platform/
 │       ├── roadmap.md
 │       └── 01-auth.md                     # one file per milestone
+├── adrs/                                  # optional; created by the adr skill on first use
+│   └── 0001-retry-policy.md               # one decision per file, NNNN-<topic>.md
 ├── REVIEW.md                              # review policy, from template
 └── 2026-08-24-webhook-reliability/        # one chain = one intent
     ├── intent.md
@@ -112,13 +116,19 @@ reports a disagreement instead of offering the next step:
 | `plan NN <status>: blocked (spec not approved)` | a live plan sits beside a draft spec | `design` |
 | `spec disproven by plan NN` | executing that plan showed a claim of the spec to be wrong | `design` |
 | `intent disproven by plan NN` | the same, on a spec-skip chain, where the claim was the intent's | `intent` |
+| `ADR NNNN disproven by plan NN`, or `ADR NNNN disproven by <chain>/NN` | executing a plan, of this chain or of another, showed a decision of an ADR the spec cites to be wrong | `adr` |
+| `spec stale (ADR NNNN superseded by MMMM)`, or `spec stale (ADR NNNN deprecated)` | an ADR the approved spec cites has been replaced or retired | `design` |
+| `spec blocked (ADR NNNN not approved)` | an approved spec cites an ADR that is a draft, dropped or invalid | `adr` |
 | `INVALID (… missing built-on)` | an approved artifact carries no fingerprint | `design` or `plan` |
 
 Nothing is repaired automatically: the owning skill asks whether the artifact still
-holds and records the answer. `intent`, `design`, `plan` and `execute` read the board
-before they act. `execute` refuses a plan while the board reads `INVALID`, a stale spec or
+holds and records the answer. `intent`, `design`, `plan`, `execute` and `adr` read the
+board before they act. `execute` refuses a plan while the board reads `INVALID`, a stale spec or
 a disproven spec or intent (except for the plan that raised it), and while that plan's own
-part reads `stale` or `blocked`; a part naming a different plan does not stop it. A chain
+part reads `stale` or `blocked`; a part naming a different plan does not stop it. It
+refuses on the ADR conditions too: `spec stale (ADR …)` and `spec blocked (ADR …)`, and
+`ADR NNNN disproven by plan NN` for every plan but plan `NN`; `ADR NNNN disproven by
+<chain>/NN`, raised by another chain, stops every plan of this one. A chain
 with an approved spec or a live plan from before version 0.2.0 carries no `built-on` and
 reads `INVALID` until `design` or `plan` re-confirms it.
 
@@ -143,19 +153,42 @@ agent gives the same answer. A milestone closes by roll-up when every member cha
 `done` or `dropped` with at least one `done`, and a roadmap closes the same way from its
 milestones. A closed milestone takes no new work.
 
+## Architecture decision records
+
+Optional, like roadmaps: a repository with no `adrs/` directory, and no chain artifact
+carrying an `adrs` or `disproves-adr` key, sees no new question and no new row. An ADR states one decision, why it was made and what it costs, as one file,
+`adrs/NNNN-<topic>.md`, in a single series shared by the whole repository.
+
+- **`adr`** — the only skill that writes an ADR or changes its status: write a new one,
+  approve a draft, supersede or deprecate an approved one, amend a draft, drop or un-drop
+  it, and finish a supersede the board shows half done.
+
+A chain cites the ADRs its design relies on in one spec frontmatter key, `adrs`, and no
+other artifact carries it. Approving an ADR seals it: its body is fingerprinted and never
+edited again, so a decision that changes is a new ADR that supersedes the old one, or the
+old one is retired by deprecation. An edited sealed ADR reads `INVALID` on the board.
+
+Executing a plan can show a decision to be wrong. The plan then names the ADR in a
+`disproves-adr` key, and the board shows every open chain whose approved spec cites it
+`ADR NNNN disproven by …` until the `adr` skill supersedes or deprecates it. The board
+lists the ADRs in a block of their own after the chains, headed `ADRS:`, with a row for
+each ADR that needs one. `references/artifact-chain.md` §10.3, §10.4, §11.7 and §13 are
+the authority.
+
 ## Session-start hook
 
 `hooks/hooks.json` declares one `SessionStart` hook. It prints one line counting the
 open chains and the rows that need attention, then those rows: anything invalid, stale,
-blocked, disproven or complete, any plan still marked `executing`, and the open chain or
-milestone row left under a dropped milestone or roadmap. It needs the `airsl` runtime,
+blocked, disproven or complete, any plan still marked `executing`, the open chain or
+milestone row left under a dropped milestone or roadmap, and any ADR row that reads
+invalid or disproven. It needs the `airsl` runtime,
 prints nothing without it, and never fails a session.
 
 ## Operational skills
 
 Two more skills serve the chain rather than advance it. They ship under `skills/` like
-the six pipeline skills and the two roadmap skills above — ten skills in all; nothing
-here uses a `commands/` directory.
+the six pipeline skills, the two roadmap skills and the `adr` skill above — eleven skills in
+all; nothing here uses a `commands/` directory.
 
 - **`/claudestacks-sdlc:status`** — a deterministic board over every chain, roadmap and
   milestone: state per artifact, every sync disagreement, each milestone's progress, and

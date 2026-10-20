@@ -38,8 +38,8 @@ When that prints nothing, `airsl` is not installed: derive the row by hand, the 
 makes, and tell the user what the row reads then.
 
 The row's wording, and what each condition means, come from the sync rules in
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Four of them are this skill's to
-clear:
+`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. These are this skill's to clear, or
+to name to the user when another skill clears them:
 
 | The row reads | Do |
 |---|---|
@@ -47,6 +47,9 @@ clear:
 | `INVALID (spec.md: missing built-on)` | Offer re-confirmation, below. |
 | `spec disproven by plan NN` | Tell the user that executing plan `NN` disproved a claim of this spec, and that the redesign path (step 11) is what clears it. On their word, follow step 11. The condition ends when the new `spec.md`'s text differs from the text that was disproven — a replacement with the same body leaves it standing. |
 | `plan NN <status>: blocked (spec not approved)` | Tell the user the spec is still `draft`, and take it through the user review gate (step 10). Approving it clears the condition. |
+| `ADR NNNN disproven by plan NN`, or `ADR NNNN disproven by <chain>/NN` | Tell the user the ADR this spec cites is disproven, and that the `adr` skill supersedes or deprecates it. Nothing here clears it. |
+| `spec stale (ADR NNNN superseded by MMMM)`, or `spec stale (ADR NNNN deprecated)` | Offer the ADR re-confirmation, below. |
+| `spec blocked (ADR NNNN not approved)` | Tell the user the ADR this spec cites is not approved, and that the `adr` skill approves it. Nothing here clears it. |
 
 Any other condition on the row is not this skill's to clear. Say what the row reads, in
 the board's own words, and carry on under the state gate above.
@@ -70,6 +73,22 @@ for them.
 
 Re-confirmation is never inferred from silence or from an answer to another question,
 and never given on the user's behalf.
+
+**ADR re-confirmation.** An approved spec lists the ADRs its design relies on in its
+`adrs` frontmatter key. When one of them has since been superseded or deprecated, ask the
+user one question: *does this spec still hold under the successor as it now reads* — or,
+for a deprecated ADR, *without that decision*? Show them the successor as it reads, or for
+a deprecated ADR the decision being withdrawn; do not answer for them.
+
+- **An explicit yes** — in `spec.md`'s frontmatter, replace the ADR's number in `adrs`
+  with its successor or successors, or remove it when the ADR was deprecated, and change
+  nothing else in the file. `adrs` is frontmatter, so the spec's fingerprint does not move
+  and its plans stay as they are. The spec stays `approved`. Then render the board again:
+  another condition may have been standing behind this one.
+- **A no** — offer the redesign path (step 11), and follow it only on the user's
+  explicit word. A no is not that word; until they give it, the row stays as it reads.
+
+This is never inferred from silence or from an answer to another question either.
 
 ## Hard gate
 
@@ -149,6 +168,10 @@ is visible.
    plugin is not installed — do the locating inline here and tell the user the agent was
    unavailable. Never fail hard for want of the main plugin.
 
+   When `.claudestacks/sdlc/adrs/` exists, also read the title of every `approved` ADR
+   in it, and the body of each one that bears on the intent. Reading is not asking: with
+   no `adrs/` directory this step is unchanged.
+
 4. **Ground every external claim against the artifact, before writing any of them down.**
    A spec that describes an outside system — a documented API, a CLI's behaviour, a file
    format, a wire protocol — is asserting facts this repository does not own. Fetch the
@@ -190,6 +213,15 @@ is visible.
    recommendation and explain why you favor it. Invite the user to redirect before
    committing to any path.
 
+   An `approved` ADR read in step 3 is a settled decision. An approach that contradicts
+   one says so and names the ADR, and taking that approach means superseding the ADR
+   through the `adr` skill, on the user's word.
+
+   This skill never asks whether a choice should be an ADR. When the user asks for one to
+   be recorded, hand off to the `adr` skill's *new* operation. The new ADR's number goes
+   into `adrs` when step 8 writes the spec, or into the draft spec's `adrs` if it already
+   exists.
+
 7. **Present the design section by section.** Walk through the design in sections
    scaled to their complexity. At minimum, cover architecture, key components and their
    responsibilities, data flow, error handling, and testing strategy. Each section must
@@ -212,6 +244,9 @@ is visible.
 
    and write the 12 characters it prints. If it prints nothing, the intent has no
    fingerprint: stop and name the file rather than write a spec against it.
+
+   It also carries `adrs`: the number of every approved ADR the design relies on,
+   including one recorded through the step-6 hand-off. Omit the key when there are none.
 
 9. **Review the spec — by an agent, not by yourself.** You wrote every line of this
    spec and held the dialogue that produced it, so you are the weakest available reader
@@ -279,6 +314,14 @@ is visible.
    say so, and the approval question becomes whether the spec still holds against the
    intent as it now reads.
 
+   Also before you ask, check every number in the spec's `adrs`. Refuse to take the spec
+   to approval while any of them is unknown, ambiguous, invalid, disproven, or not
+   `approved`: name the ADR and its status, and say that the `adr` skill is what moves it.
+   A draft spec's citations raise no `ADR NNNN disproven by …`, `spec stale (ADR …)` or
+   `spec blocked (ADR …)` part on the board, and a healthy `superseded` or `deprecated`
+   ADR has no ADR row, so for each cited number read the ADR's row when it has one and
+   its `status` from its file when it has none — the same rule the `adr` skill follows.
+
    Only on explicit approval, flip `spec.md`'s frontmatter `status: draft → approved`
    and write the intent's current fingerprint as `built-on`, in the same edit, as the
    last step of this interaction. Then render the board again (Sync check) and tell the
@@ -291,7 +334,9 @@ is visible.
     `status: approved → superseded` — `artifact-chain.md` §7.2 assigns this transition
     to `design`, and the archived file must not go on reading `approved` forever. Only
     then write a fresh `spec.md` with `status: draft`, starting again from step 1.
-    `spec.md` — the unsuffixed name — is always the governing spec for the chain.
+    `spec.md` — the unsuffixed name — is always the governing spec for the chain. The
+    fresh spec's `adrs` is written afresh by step 8 from the new design; a number the
+    archived spec cited is carried over only when the new design still relies on that ADR.
 
 12. **Hand off.** The `plan` skill is the only next step from an approved spec — do not
     write code or scaffold files yourself; the approved spec is the handoff artifact.

@@ -51,6 +51,9 @@ board words it, and what clears it — when the row reads any of:
 | `INVALID (plans/NN: missing built-on)` | the `plan` skill |
 | any other `INVALID (…)` | the user, in the file the row names |
 | `spec stale (intent changed)` | the `design` skill |
+| `spec stale (ADR …)` | the `design` skill |
+| `spec blocked (ADR …)` | the `adr` skill |
+| `ADR NNNN disproven by <chain>/NN` | the `adr` skill, with no exception |
 | `plan NN <status>: blocked (spec not approved)`, for the plan you were given | the `design` skill |
 | `plan NN <status>: stale (spec changed)` or `plan NN <status>: stale (intent changed)`, for the plan you were given | the `plan` skill |
 
@@ -64,6 +67,13 @@ refuse to start or resume every plan of the chain except one: the plan whose own
 the run that raised the condition. Every other plan waits — a `draft` plan you are asked
 to run included — until the `design` skill (for `spec disproven`) or the `intent` skill
 (for `intent disproven`) has brought the text up to date.
+
+**While the row reads `ADR NNNN disproven by plan NN`**, refuse to start or resume every
+plan of the chain except plan `NN` itself, which may finish the run that raised the
+condition. Every other plan waits — a `draft` plan you are asked to run included — until
+the `adr` skill has superseded or deprecated the ADR. A sibling chain's disproof reads
+`ADR NNNN disproven by <chain>/NN` instead, and no plan of this chain is exempt from it
+(the table above).
 
 ## State gate
 
@@ -320,7 +330,7 @@ already accepted, while the defects that actually matter are wrong premises — 
 review round can catch, because a reviewer checks the diff against the plan and a wrong plan
 is exactly what it will confirm. The probe step above is what replaces the extra rounds.
 
-## When execution disproves the plan or the spec
+## When execution disproves the plan, the spec or an ADR
 
 Execution is the first time a plan's claims meet the artifact they describe, so this is where
 a wrong premise surfaces. When a probe comes back against the plan, the code fix is only half
@@ -329,7 +339,10 @@ the work — the other half is that the chain now lies to whoever executes the n
 Stop and put it to the author as **its own question**: *the plan's premise is disproven —
 amend the plan and the spec now, or after this run?* Do not fold it into a question about the
 implementation and read the answer as covering both. Approving a code change is not approving
-the record.
+the record. The question also asks which claim broke — the plan's, the spec's, a cited
+ADR's, or several — since each is recorded differently. When a cited ADR's claim broke,
+the question covers it too: an ADR is superseded or deprecated through the `adr` skill,
+not amended.
 
 **Record the debt before you continue.** When what the probe disproved is a claim of the
 plan's authority — the chain's `spec.md`, or its `intent.md` on the spec-skip path —
@@ -346,8 +359,20 @@ complete, until the authority's text changes — at which point the marker match
 nothing and stops having any effect. A disproven claim that belongs to the plan alone,
 not to its authority, writes no marker.
 
-Writing the key is not a `status` flip, so render the board again afterwards and tell the
-user what the row reads: an `INVALID` result replaces the whole row, so the condition
+When what the probe disproved is a claim of an ADR the spec cites, write that ADR's
+number into the running plan's `disproves-adr` frontmatter key, a list such as `[0003]`,
+before any further task and whichever answer the author gives. Numbers are added, never
+removed, and the key stays after the ADR is superseded or deprecated: the board stops
+reading it then. Name only an ADR the spec's `adrs` cites — the board reads any other as
+`INVALID (plans/NN: disproves uncited ADR NNNN)`, which replaces the chain's whole row.
+From then on the board reads `ADR NNNN disproven by plan NN` on this chain and
+`ADR NNNN disproven by <chain>/NN` on every other open chain whose approved spec cites
+the ADR; this plan may finish its run, no other plan starts, and the chain cannot
+complete until the `adr` skill supersedes or deprecates the ADR. Superseding it is the
+`adr` skill's, and the author authorizes it.
+
+Writing either key is not a `status` flip, so render the board again afterwards and tell
+the user what the row reads: an `INVALID` result replaces the whole row, so the condition
 you just recorded may not show until it is cleared.
 
 Sibling plans were written against the old text and cannot see the commit that corrected it.
@@ -409,15 +434,19 @@ After a plan flips to `done` — or when you were given a bare chain name whose 
 `chain complete` — render the board (Sync check) and read the chain's row.
 
 - **The row reads `chain complete`.** Every plan is `done` or `superseded`, with at least
-  one `done`, and nothing is owed on the chain's text. Flip the chain's `intent.md`
+  one `done`, and none of the conditions in the next bullet holds: neither the chain's
+  text nor an ADR its spec cites is holding it open. Flip the chain's `intent.md`
   `status: approved → done` and tell the user the chain is complete — the second
   transition that fires without a fresh approval question, a consequence of state already
   earned on the individual plans.
 - **Every plan is settled, but the row reads `spec stale (intent changed)`,
-  `spec disproven by plan NN` or `intent disproven by plan NN`.** The chain is not
-  complete. Leave the intent `approved`, and say which condition holds it open and which
-  skill clears it: `design` for the two `spec` conditions, `intent` for
-  `intent disproven`. The walk-up fires on a later run, once the text is up to date.
+  `spec disproven by plan NN`, `intent disproven by plan NN`, `ADR NNNN disproven by …`,
+  `spec stale (ADR …)` or `spec blocked (ADR …)`.** The chain is not complete. Leave the
+  intent `approved`, and say which condition holds it open and which skill clears it:
+  `design` for `spec stale` (either form) and `spec disproven`, `intent` for
+  `intent disproven`, the `adr` skill for `ADR NNNN disproven by …` and
+  `spec blocked (ADR …)`. The walk-up fires on a later run, once the text is up to date
+  and the ADRs are settled.
 - **Other plans remain `draft`, `approved`, or `executing`.** Leave the intent as is and
   say what is still open.
 

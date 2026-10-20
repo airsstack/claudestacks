@@ -91,6 +91,9 @@ it — when the row reads any of:
 | `spec stale (intent changed)` | the `design` skill |
 | `spec disproven by plan NN` | the `design` skill |
 | `intent disproven by plan NN` | the `intent` skill |
+| `ADR NNNN disproven by plan NN` or `ADR NNNN disproven by <chain>/NN` | the `adr` skill |
+| `spec stale (ADR NNNN superseded by MMMM)` or `spec stale (ADR NNNN deprecated)` | the `design` skill |
+| `spec blocked (ADR NNNN not approved)` | the `adr` skill |
 | `plan NN <status>: blocked (spec not approved)` | the `design` skill |
 | `INVALID (spec.md: missing built-on)` | the `design` skill |
 | any other `INVALID (…)`, except `INVALID (plans/NN: missing built-on)` | the user, in the file the row names |

@@ -35,6 +35,8 @@ is normative, not descriptive.
 │       ├── roadmap.md
 │       ├── 01-auth.md                     # one file per milestone; NN orders them
 │       └── 02-billing.md
+├── adrs/                                  # optional; created on first use by the adr skill
+│   └── NNNN-<topic>.md                    # one file per decision; NNNN orders them (§13)
 ├── REVIEW.md                              # review policy, from template
 └── 2026-08-24-webhook-reliability/        # one chain = one intent
     ├── intent.md
@@ -48,6 +50,8 @@ is normative, not descriptive.
   nested inside any chain.
 - `roadmaps/` is optional and is never created by `setup`. Chains stay flat at the
   chain root whether or not they belong to a milestone (§11).
+- `adrs/` is optional and is never created by `setup`. It holds one repository-wide
+  series of architecture decision records, not one series per chain (§13).
 - `REVIEW.md` lives directly under `.claudestacks/sdlc/`, one copy per repository.
 - Within a chain directory: `intent.md` and `spec.md` are singular files; `plans/`
   holds one file per plan.
@@ -91,7 +95,7 @@ is normative, not descriptive.
 ## 6. Frontmatter schema
 
 Every chain artifact (`intent.md`, `spec.md`, each `plans/NN-<topic>.md`) opens with
-YAML frontmatter. The full schema, all ten keys:
+YAML frontmatter. The full schema, all twelve keys:
 
 ```yaml
 ---
@@ -106,8 +110,10 @@ source: triage                # optional; absent = human-originated
 spec: skipped                 # optional, intent only; §8
 milestone: platform/01        # optional, intent only; §11
 depends-on: [01]              # optional, plan only; empty/absent = independent
+adrs: [0003]                  # optional, spec only; §13
 built-on: 7df83709971b        # spec and plan; §10
 disproves: 7df83709971b       # optional, plan only; §10
+disproves-adr: [0003]         # optional, plan only; §10.4
 ---
 ```
 
@@ -121,14 +127,24 @@ disproves: 7df83709971b       # optional, plan only; §10
 | `spec` | string (`skipped`) | optional; intent only (§8) |
 | `milestone` | string (`<roadmap>/<NN>`) | optional; intent only (§11); absent means a simple chain |
 | `depends-on` | list of plan numbers (e.g. `[01]`) | optional; plan only; empty/absent means independent |
+| `adrs` | list of ADR numbers (e.g. `[0003]`) | optional; spec only; the ADRs the spec's design relies on (§13) |
 | `built-on` | fingerprint (12 hex characters, §10) | required on an `approved` spec and on an `approved` or `executing` plan; written when the artifact is drafted |
 | `disproves` | fingerprint (12 hex characters, §10) | optional; plan only; written by `execute`, never removed |
+| `disproves-adr` | list of ADR numbers (e.g. `[0003]`) | optional; plan only; the ADRs whose premise the plan's execution disproved (§10.4); written by `execute`, never removed |
 
 Provenance fields (`derived-from-prd`, `derived-from-rfc`) are omitted entirely — not
 written as an empty list — when nothing seeded the artifact.
 
 A roadmap file and a milestone file carry `status` and `created` and no other key
 (§11).
+
+An ADR file carries `status`, `created`, and optionally `supersedes` and `sealed` (§13).
+`sealed` and `supersedes` are read only from files in `adrs/`; on a chain artifact they
+are ignored. A number list (`adrs`, `disproves-adr`, `supersedes`) is read as
+`depends-on` is: a block list's items, or every run of digits in any string value (an
+inline list, or a bare scalar such as `adrs: 3`), each numeric token normalised to four
+digits (`3` → `0003`); a non-numeric block item passes through unchanged, so a typo reads
+as an unknown number rather than vanishing; an absent key or an empty list means none.
 
 ## 7. States and transitions
 
@@ -141,6 +157,7 @@ A roadmap file and a milestone file carry `status` and `created` and no other ke
 | plan | `draft → approved → executing → done`; `superseded` from draft/approved/executing |
 | roadmap | `draft → approved → done`; `dropped` from `draft` or `approved`; `dropped → draft` |
 | milestone | `draft → approved → done`; `dropped` from `draft` or `approved`; `dropped → draft` |
+| adr | `draft → approved`; `approved → superseded`; `approved → deprecated`; `draft → dropped`; `dropped → draft` |
 
 ### 7.2 Transitions
 
@@ -148,7 +165,7 @@ A roadmap file and a milestone file carry `status` and `created` and no other ke
 |---|---|---|
 | intent `— → draft` | file written | `intent` |
 | intent `draft → approved` | user approves at the intent gate (in-session or on later re-invocation) | `intent` |
-| intent `approved → done` | the chain is complete: all its plans are `done` or `superseded`, with at least one `done`, and neither C1 nor C2 holds (§10.4) | `execute` (walk-up) |
+| intent `approved → done` | the chain is complete: all its plans are `done` or `superseded`, with at least one `done`, and none of C1, C2, C5, C6, C7 holds (§10.4) | `execute` (walk-up) |
 | intent `→ dropped` | user declares the idea dead | `intent` |
 | spec `— → draft` | file written | `design` |
 | spec `draft → approved` | user approves at the design review gate | `design` |
@@ -169,6 +186,12 @@ A roadmap file and a milestone file carry `status` and `created` and no other ke
 | milestone `approved → done` | roll-up (§12) | the skill running the roll-up |
 | milestone `→ dropped` | the author's instruction | `milestone` |
 | milestone `dropped → draft` | the author un-drops it | `milestone` |
+| adr `— → draft` | file written | `adr` |
+| adr `draft → approved` | the author approves; `sealed` is written in the same edit | `adr` |
+| adr `approved → superseded` | an ADR listing it in `supersedes` is approved, in the same interaction — no fresh question, a consequence of that approval | `adr` |
+| adr `approved → deprecated` | the author's instruction | `adr` |
+| adr `draft → dropped` | the author's instruction | `adr` |
+| adr `dropped → draft` | the author un-drops it | `adr` |
 
 ### 7.3 Flip rule
 
@@ -183,9 +206,10 @@ act — no skill in this plugin commits.
 flips the state back on the user's explicit instruction. Nothing is ever deleted, so
 git history plus the current value of the `status` field is the complete record of an
 artifact's life. The only transitions that fire without a fresh approval question are
-the mechanical ones: plan `approved → executing`, the intent's `done` walk-up, and the
-milestone's and roadmap's `done` roll-up (§12) — all are consequences of state already
-earned elsewhere, not new decisions.
+the mechanical ones: plan `approved → executing`, the intent's `done` walk-up, the
+milestone's and roadmap's `done` roll-up (§12), and an ADR's `approved → superseded`
+flip that follows the approval of an ADR listing it (§7.2) — all are consequences of
+state already earned elsewhere, not new decisions.
 
 Two things differ for roadmaps and milestones. Un-dropping one always returns it to
 `draft`, and the author approves it again. And `done` is final: a closed milestone or
@@ -193,21 +217,27 @@ roadmap is not reopened, amended or dropped; work that arrives after one closed 
 a simple chain or belongs to a new milestone. Amending a roadmap's or milestone's body
 leaves its status as it was.
 
+An ADR's `superseded` and `deprecated` are final, not reversible: reviving a retired
+decision is a new ADR.
+
 ## 8. Spec skip
 
 Small chains may go straight from intent to plan, skipping design. During the intent
 dialogue the user may set `spec: skipped` in the intent's frontmatter; the skill
 records a one-line reason next to it in the body. The `plan` skill accepts an
 `approved` intent directly, with no `spec.md` present, only when this flag is set on
-that intent — `plan` reads the flag but never sets it itself.
+that intent — `plan` reads the flag but never sets it itself. A chain that skips its
+spec cannot cite an ADR, since only a spec carries `adrs` (§6); a chain that needs one
+runs `design`.
 
 ## 9. NEXT derivation (status board)
 
 These are the rules the status board's NEXT column executes — by `scripts/status.lua`
 when `airsl` is installed, and by hand, from this file, when it is not (the fallback
 tier of `/claudestacks-sdlc:status`). The board scans the chain root one level deep:
-every directory is a chain except `prds/`, `rfcs/` and `roadmaps/`, and a plain file is
-not a row. Roadmaps, milestones and the grouped layout are in §11.
+every directory is a chain except `prds/`, `rfcs/`, `roadmaps/` and `adrs/`, and a plain
+file is not a row. Roadmaps, milestones and the grouped layout are in §11; the ADR block
+is in §13.
 Derivation reads states and fingerprints only, no judgment call. For a chain whose
 intent is `approved`, the sync rules of §10 are applied first; the list below decides
 NEXT only when none of them does:
@@ -298,11 +328,30 @@ number.
 | I3 | `spec.md` is `approved` and has no `built-on` | `INVALID (spec.md: missing built-on)` |
 | I4 | a live plan exists, there is no `spec.md`, and the intent has no `spec: skipped` | `INVALID (plans/NN: no spec and no skip flag)` |
 | I5 | a live plan has no `built-on` | `INVALID (plans/NN: missing built-on)` |
+| I6 | a number in the spec's `adrs` matches no ADR file, or two | `INVALID (spec.md: unknown ADR NNNN)` / `INVALID (spec.md: ambiguous ADR NNNN)` |
+| I7 | a plan that is not `superseded` names in `disproves-adr` an ADR whose status is `approved`, and the spec's `adrs` does not hold that number (or there is no `spec.md`) | `INVALID (plans/NN: disproves uncited ADR NNNN)` |
 
 A superseded spec is renamed (§4), so `spec.md` itself is never legitimately
 `superseded`.
 
+For I6 the lowest number first; for I7 the lowest plan number, then within that plan the
+lowest ADR number.
+
+I7 reads only live disproofs — those naming an ADR still `approved`. Once that ADR is
+superseded or deprecated, the disproof is history: the spec may stop citing it (C6 sends
+the spec to `design` for that) while the plan keeps its `disproves-adr` value, as it
+must, and no rule reads it again. This is the property `disproves` has by stopping
+matching (§10.2).
+
+A number matching two files is I6 (`ambiguous`), whatever else is wrong with either file.
+A number matching exactly one file that is itself invalid for another reason (§13.3)
+still resolves: it is not I6, and the chain reads it as not approved (C7, §10.4).
+
 ### 10.4 Conditions, STATE and NEXT
+
+An ADR is **disproven** when its status is `approved` and a plan that is not
+`superseded`, in any chain whose directory parses, names it in `disproves-adr` (the same
+reading as the ADR row of §13.3).
 
 | # | Condition | STATE part | NEXT |
 |---|---|---|---|
@@ -310,30 +359,49 @@ A superseded spec is renamed (§4), so `spec.md` itself is never legitimately
 | C2 | a plan that is not `superseded` carries `disproves` equal to the current fingerprint of its authority | `spec disproven by plan NN`; on the spec-skip path `intent disproven by plan NN` | `design`; on the spec-skip path `intent` |
 | C3 | a live plan's authority is `spec.md` and that spec is `draft` | `plan NN <status>: blocked (spec not approved)` | `approve spec` |
 | C4 | a live plan's `built-on` differs from its authority's fingerprint, and C3 does not hold for it | `plan NN <status>: stale (spec changed)`; on the spec-skip path `plan NN <status>: stale (intent changed)` | `plan` |
+| C5 | a plan of this chain that is not `superseded` names a disproven ADR in `disproves-adr`; or `spec.md` is `approved` and cites a disproven ADR | `ADR NNNN disproven by plan NN` when a plan of this chain disproved it; otherwise `ADR NNNN disproven by <chain>/NN`, naming the disproving chain | `adr` |
+| C6 | `spec.md` is `approved` and cites an ADR whose status is `superseded` or `deprecated` | `spec stale (ADR NNNN superseded by MMMM)` or `spec stale (ADR NNNN deprecated)` | `design` |
+| C7 | `spec.md` is `approved` and cites an ADR whose status is `draft` or `dropped`, or which is invalid | `spec blocked (ADR NNNN not approved)` | `adr` |
 
 `<status>` is the plan's own status. C3 and C4 read live plans only. C2 reads every plan
 except `superseded` ones, because a plan can finish its run with the debt still owed;
 when several plans satisfy it, the part names the lowest number.
+
+`MMMM` is the lowest-numbered lister of `NNNN` (§13.3), so a sealed ADR that is itself
+invalid is never `MMMM`. A superseded ADR that no lister lists is invalid (§13.3), so a
+chain citing it reads C7, not C6. When
+several numbers satisfy one condition, the part names the lowest; when several plans do,
+the lowest plan; when several chains disproved it, the first in listing order.
+
+C5 is how a disproof reaches every open chain built on the decision: the disproving
+chain, and every other chain whose approved spec cites the ADR. C6 and C7, and C5's
+citation half, read an approved spec only, as C1 does. A draft spec citing a draft or
+disproven ADR is ordinary mid-design; `design` refuses to approve it until the ADR is
+approved and not disproven. C5 clears when the ADR is superseded or deprecated — a sealed
+body never changes, so unlike `disproves` it cannot clear by a text edit.
 
 **STATE.** When no invalid result holds, the cell is built in this order,
 comma-separated, with the `(triage)` tag last:
 
 1. the C1 part, if C1 holds;
 2. the C2 part, if C2 holds;
-3. for a chain with plans, one part per plan in number order: `plan NN <status>`, or the
+3. the C5 part, if C5 holds;
+4. the C6 part, if C6 holds;
+5. the C7 part, if C7 holds;
+6. for a chain with plans, one part per plan in number order: `plan NN <status>`, or the
    C3 or C4 form for a plan they hold for;
-4. for a chain without plans, the single state of §9 (`intent approved`,
+7. for a chain without plans, the single state of §9 (`intent approved`,
    `intent approved (spec skipped)`, `spec draft`, `spec approved`), except that
-   `spec approved` is omitted when C1 holds.
+   `spec approved` is omitted when C1, C6 or C7 holds.
 
-**NEXT.** The first of C1, C2, C3, C4 that holds decides it, per the table. Only when
-none holds does the list in §9 apply. A chain with a standing C2 therefore never offers
-`execute NN`.
+**NEXT.** The first of C1, C2, C5, C6, C7, C3, C4 that holds decides it, per the table.
+Only when none holds does the list in §9 apply. A chain with a standing C2, C5, C6 or C7
+therefore never offers `execute NN`.
 
-**A chain is complete** when every plan is settled, at least one is `done`, and neither
-C1 nor C2 holds. Only a complete chain reads `chain complete` and only a complete chain
-is walked up to `done` (§7.2). While C1 or C2 stands the cell is built by the list
-above and the intent stays `approved`.
+**A chain is complete** when every plan is settled, at least one is `done`, and none of
+C1, C2, C5, C6, C7 holds. Only a complete chain reads `chain complete` and only a
+complete chain is walked up to `done` (§7.2). While any of C1, C2, C5, C6 or C7 stands
+the cell is built by the list above and the intent stays `approved`.
 
 ## 11. Roadmaps and milestones
 
@@ -461,7 +529,28 @@ These apply to every chain whose intent is `draft` or `approved`, in either layo
 
 The two invalid results rank after I1 and before I2 (§10.3). In a repository with no
 roadmap directory, a chain carrying a `milestone` key therefore renders the first row
-of this table in the flat layout.
+of this table in the flat layout. Rule K (§11.7) ranks after these two.
+
+### 11.7 Misplaced ADR keys
+
+Rule K sits beside §11.6 because it ranks with those results, not because it concerns
+roadmaps: it applies whether or not any roadmap exists, so the opening sentence of §11
+does not exclude it.
+
+It applies to every chain whose intent is `draft` or `approved`:
+
+| Found | Reported |
+|---|---|
+| `adrs` or `disproves-adr` on `intent.md` | `INVALID (intent.md: <key> not allowed here)` |
+| `disproves-adr` on `spec.md` | `INVALID (spec.md: disproves-adr not allowed here)` |
+| `adrs` on a plan | `INVALID (plans/NN: adrs not allowed here)` |
+
+A key counts when it is present, whatever its value, an empty list included: `adrs: []`
+on an intent is still reported. That differs from §6, where an empty list means none,
+because §6 is about reading citations and this rule is about where the key may appear.
+
+NEXT is `fix <chain>`. Checked intent first, then spec, then plans in number order. K
+ranks after §11.6's membership problems and before I2 (§10.3).
 
 ## 12. Roll-up
 
@@ -490,8 +579,112 @@ true, for the roadmap concerned:
 A roll-up that was missed is visible: the board reads `milestone complete` or
 `roadmap complete` with NEXT `roll up` (§11.4, §11.5).
 
+## 13. Architecture decision records
+
+Architecture decision records (ADRs) are optional. A repository with no `adrs/`
+directory, and no chain artifact carrying an `adrs` or `disproves-adr` key, has no ADR
+behaviour of any kind. An ADR's body shape is in `references/templates.md`.
+
+### 13.1 Files
+
+- An ADR is a file `.claudestacks/sdlc/adrs/NNNN-<topic>.md`. `NNNN` is four digits;
+  `<topic>` is kebab-case. Four digits (up to 9999), not the two that plans and
+  milestones use, because this series is repository-wide and grows for the life of the
+  repository rather than one chain or one roadmap.
+- `adrs/` is created by the `adr` skill on first use. `setup` never creates it.
+- A new ADR takes the next number after the highest `NNNN` of any file in `adrs/`
+  matching `^%d%d%d%d%-.+%.md$`, whatever its status or validity. A number is never
+  reused.
+- Any other entry in `adrs/` is ignored, as are subdirectories.
+- Nothing in `adrs/` is renamed or deleted.
+- Two files sharing a number are both invalid (§13.3).
+
+### 13.2 Seal and supersession
+
+| Key | Type | Optionality |
+|---|---|---|
+| `status` | `draft`, `approved`, `superseded`, `deprecated`, `dropped` | required |
+| `created` | date | required |
+| `supersedes` | list of ADR numbers | optional; read only on a **sealed** ADR — one whose status is `approved`, `superseded` or `deprecated` (§13.3) |
+| `sealed` | fingerprint | absent on a draft; written at approval; required on `approved`, `superseded` and `deprecated`; ignored on `draft` and `dropped` |
+
+`supersedes` may list more than one number, so one decision can replace two. It stays a
+link after the ADR carrying it is itself superseded or deprecated, so a chain of
+replacements (`0003` ← `0009` ← `0012`) keeps every earlier record valid.
+
+`sealed` holds the fingerprint (§10.1) of the ADR's body taken at approval. A draft's body
+may be edited freely. Once approved, the body is never edited: a decision that changes
+is a new ADR that supersedes it. The board compares the body with `sealed` on every
+render (§13.3).
+
+The seal covers the body only, because a fingerprint excludes frontmatter. A
+`supersedes` list added to or changed on a sealed ADR is not caught as an edit; it
+surfaces instead through the rows of §13.3: `superseded by MMMM but still <status>` on
+each newly listed ADR that is not `superseded`, `supersedes cycle` on every ADR of a loop
+the list closes (an ADR listing itself included), `supersedes unknown MMMM` on the edited
+ADR for a number matching no file, and `superseded by nothing` on an ADR whose only
+lister dropped it. No skill acts on any of these rows without the author's explicit
+word. One such edit shows no row: adding a number that is already `superseded` under
+another valid lister, which changes nothing a chain reads except, when the new lister is
+lower, the `MMMM` that C6 names (§10.4).
+
+### 13.3 ADR rows
+
+The board derives every ADR's row, by `scripts/lib/adr.lua` when `airsl` is installed and
+by hand from this section when it is not. In order, the first that holds:
+
+| Condition | STATE | NEXT |
+|---|---|---|
+| unreadable, unparseable, missing or unknown `status` | `INVALID (<file>: <reason>)` | `fix adr NNNN` |
+| two files share the number | `INVALID (<file>: duplicate number NNNN)` | `fix adr NNNN` |
+| `approved`, `superseded` or `deprecated`, and no `sealed` | `INVALID (<file>: missing sealed)` | `fix adr NNNN` |
+| `approved`, `superseded` or `deprecated`, and the body's fingerprint ≠ `sealed` | `INVALID (<file>: edited after approval)` | `fix adr NNNN` |
+| sealed, and its `supersedes` names a number matching no ADR file | `INVALID (<file>: supersedes unknown MMMM)` | `fix adr NNNN` |
+| sealed, and following `supersedes` entries that each name exactly one ADR file, from it through sealed ADRs, leads back to it | `INVALID (<file>: supersedes cycle)` | `fix adr NNNN` |
+| listed by a lister `MMMM`, and its status is `approved` | `INVALID (<file>: superseded by MMMM but still approved)` | `adr` |
+| listed by a lister `MMMM`, and its status is `draft`, `dropped` or `deprecated` | `INVALID (<file>: superseded by MMMM but still <status>)` | `fix adr MMMM` |
+| `superseded`, and no lister lists it | `INVALID (<file>: superseded by nothing)` | `fix adr NNNN` |
+| disproven (§10.4) | `disproven by <chain>/NN` | `adr supersede NNNN` |
+| `draft` | `draft` | `approve or drop` |
+| otherwise | no row | |
+
+An invalid ADR has no status for any other rule: it counts in the heading as invalid and
+is read by chains as not approved.
+
+The disproof is read from every chain whose directory parses, whatever its intent's
+status, so dropping or finishing a chain does not hide a known-broken decision. When
+several plans name the ADR, the row names the first chain in listing order and its lowest
+plan.
+
+A **lister** of an ADR is a sealed ADR that no row of the table invalidates and whose
+`supersedes` names it; `MMMM` is the lowest-numbered one. A lister's validity therefore
+depends on its own listers, and so on along `supersedes`. The cycle row ends that walk: an
+edge of the walk is a sealed ADR's `supersedes` entry naming exactly one ADR file
+("sealed" by status, as §13.2 defines it, whether or not its seal is intact), and every ADR
+on a loop of such edges is settled by the cycle row or an earlier one — `missing sealed`,
+`edited after approval` or `supersedes unknown` still win, first that holds — so no
+lister's validity depends on itself. A loop can arise only by hand-editing frontmatter,
+since the `adr` skill's *approve* refuses unless every listed ADR is `approved`.
+
+### 13.4 Layout
+
+When `adrs/` holds at least one file matching §13.1, one block follows every chain row,
+in either layout (§9, §11.3), and precedes the `DONE/DROPPED` line.
+
+- The block's first line is a heading: `ADRS: ` followed by the non-zero counts, each
+  written `<n> <word>` (`2 approved`, `1 invalid`) and separated by a comma and a space, in the order approved,
+  superseded, deprecated, draft, dropped, invalid — `ADRS: 2 approved, 1 draft`. An
+  invalid ADR counts only as invalid.
+- Below it, one row per ADR that has a row (§13.3), labelled `ADR NNNN`, indented two
+  spaces, in number order (file name order on a duplicate). An ADR with no row is
+  counted in the heading and not listed.
+- With no such file, nothing prints: the ADR block adds no byte to the board.
+- A root holding ADRs and no chain renders the board, not the starter hint, as a root
+  holding only a roadmap does (§11.3).
+- The board's `open` count stays the count of chain rows.
+
 ---
 
 This file owns paths, naming, frontmatter keys, and states. Artifact **body shapes** —
-the sections inside an `intent.md`, `spec.md`, or plan file — are owned by
-`references/templates.md`; change one, check the other.
+the sections inside an `intent.md`, `spec.md`, plan, roadmap, milestone or ADR file — are
+owned by `references/templates.md`; change one, check the other.

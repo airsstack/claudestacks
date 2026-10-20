@@ -1,12 +1,14 @@
 -- The claudestacks-sdlc status board: scans the committed chain root,
 -- parses artifact frontmatter, derives each chain's STATE and NEXT, and
 -- renders the board, grouped under roadmaps and milestones when `roadmaps/`
--- holds at least one roadmap directory, and lists the rows that need
--- attention as the session-start text.
+-- holds at least one roadmap directory and followed by an ADR block when
+-- `adrs/` holds an ADR file, and lists the rows that need attention as the
+-- session-start text.
 --
 -- Code side of the rules whose prose mirror is `references/artifact-chain.md`
 -- (spec §5.1 NEXT derivation, §2.3 frontmatter); the two MUST agree.
 
+local adr = require("lib.adr")
 local fingerprint = require("lib.fingerprint")
 local roadmap = require("lib.roadmap")
 
@@ -19,7 +21,7 @@ local M = {}
 M.ROOT = ".claudestacks/sdlc"
 
 -- Top-level entries that are not chains.
-local SKIP = { prds = true, rfcs = true, [roadmap.DIR] = true }
+local SKIP = { prds = true, rfcs = true, [roadmap.DIR] = true, [adr.DIR] = true }
 
 -- Parses the YAML subset the skills write: `key: value` scalars (inline
 -- `# comments` stripped) and block lists (`key:` followed by `- item`
@@ -294,15 +296,146 @@ local function membership_problem(intent, roadmaps)
   return "intent.md: " .. why .. " milestone " .. (type(value) == "string" and value or "")
 end
 
+-- The first ADR key a chain carries where it may not, as the reason, or nil:
+-- `adrs` then `disproves-adr` on the intent, `disproves-adr` on the spec, then
+-- `adrs` on each plan in number order. A key counts as present whatever its
+-- value. Only a spec carries `adrs` and only a plan carries `disproves-adr`.
+local function misplaced_key(chain)
+  for _, key in ipairs({ "adrs", "disproves-adr" }) do
+    if chain.intent[key] ~= nil then
+      return "intent.md: " .. key .. " not allowed here"
+    end
+  end
+  if chain.spec and chain.spec["disproves-adr"] ~= nil then
+    return "spec.md: disproves-adr not allowed here"
+  end
+  for _, plan in ipairs(chain.plans) do
+    if plan.adrs ~= nil then
+      return "plans/" .. plan.num .. ": adrs not allowed here"
+    end
+  end
+  return nil
+end
+
+-- The first citation or disproof of an approved chain that the ADRs do not
+-- bear out, as the reason, or nil. I6: the lowest number in the spec's `adrs`
+-- that `adr.resolve` finds unknown or ambiguous, whatever the spec's status; a
+-- number resolving to one invalid file is not I6. I7: the lowest plan that is
+-- not `superseded` naming in `disproves-adr` a valid `approved` ADR the spec
+-- does not cite (or any such ADR when there is no spec.md), and the lowest
+-- such number within it. `adrs` is lib/adr's scan.
+local function citation_problem(chain, adrs)
+  local cited = adr.numbers(chain.spec and chain.spec.adrs)
+
+  local unresolved, why
+  for _, num in ipairs(cited) do
+    local item, reason = adr.resolve(adrs, num)
+    if not item and (not unresolved or adr.lower(num, unresolved)) then
+      unresolved, why = num, reason
+    end
+  end
+  if unresolved then
+    return "spec.md: " .. why .. " ADR " .. unresolved
+  end
+
+  local held = {}
+  for _, num in ipairs(cited) do
+    held[num] = true
+  end
+  for _, plan in ipairs(chain.plans) do
+    if plan.status ~= "superseded" then
+      local uncited
+      for _, num in ipairs(adr.numbers(plan["disproves-adr"])) do
+        local item = adr.resolve(adrs, num)
+        if item and item.status == "approved" and not held[num]
+          and (not uncited or adr.lower(num, uncited)) then
+          uncited = num
+        end
+      end
+      if uncited then
+        return "plans/" .. plan.num .. ": disproves uncited ADR " .. uncited
+      end
+    end
+  end
+  return nil
+end
+
+-- The STATE parts of conditions C5, C6 and C7 for an approved chain, each nil
+-- when its condition does not hold. An ADR is disproven when `adr.mark_disproofs`
+-- set its `disproven_by`. C5: the lowest disproven ADR that a plan of this chain
+-- which is not `superseded` names in `disproves-adr`, or that an approved spec
+-- cites; read as disproven by the lowest such plan, else by the chain and plan
+-- the ADR was marked with. C6 and C7 read an approved spec only: C6, the
+-- lowest cited ADR that is `superseded` or `deprecated`; C7, the lowest cited
+-- ADR that is `draft`, `dropped` or invalid. `adrs` is lib/adr's scan, and
+-- every number the spec cites resolves, since I6 ranks before these.
+local function adr_conditions(chain, adrs)
+  local spec = chain.spec
+  local cited = spec and spec.status == "approved" and adr.numbers(spec.adrs) or {}
+
+  local plan_of = {}
+  for _, plan in ipairs(chain.plans) do
+    if plan.status ~= "superseded" then
+      for _, num in ipairs(adr.numbers(plan["disproves-adr"])) do
+        plan_of[num] = plan_of[num] or plan.num
+      end
+    end
+  end
+
+  local disproven, stale, blocked
+  local function note_disproven(num, item)
+    if item and item.disproven_by and (not disproven or adr.lower(num, disproven)) then
+      disproven = num
+    end
+  end
+  for num in pairs(plan_of) do
+    note_disproven(num, adr.resolve(adrs, num))
+  end
+  for _, num in ipairs(cited) do
+    local item = adr.resolve(adrs, num)
+    note_disproven(num, item)
+    if item and (item.status == "superseded" or item.status == "deprecated") then
+      if not stale or adr.lower(num, stale) then
+        stale = num
+      end
+    elseif item and item.status ~= "approved" then
+      if not blocked or adr.lower(num, blocked) then
+        blocked = num
+      end
+    end
+  end
+
+  local out = {}
+  if disproven then
+    local by = plan_of[disproven] and "plan " .. plan_of[disproven]
+      or adr.resolve(adrs, disproven).disproven_by
+    out.c5 = "ADR " .. disproven .. " disproven by " .. by
+  end
+  if stale then
+    local item = adr.resolve(adrs, stale)
+    out.c6 = item.status == "superseded"
+      and "spec stale (ADR " .. stale .. " superseded by " .. adr.successor(adrs, stale) .. ")"
+      or "spec stale (ADR " .. stale .. " deprecated)"
+  end
+  if blocked then
+    out.c7 = "spec blocked (ADR " .. blocked .. " not approved)"
+  end
+  return out
+end
+
 -- STATE and NEXT for one chain, per the NEXT-derivation and sync rules in
 -- `references/artifact-chain.md` §9 and §10, and the membership rules of §11.
--- States and fingerprints only, no judgment. `roadmaps` is lib/roadmap's
--- scan; absent means none exist.
-function M.derive(chain, roadmaps)
+-- States and fingerprints only, no judgment. Misplaced ADR keys, invalid ADR
+-- citations and the ADR conditions C5, C6 and C7 are reported through
+-- `misplaced_key`, `citation_problem` and `adr_conditions` above. `roadmaps`
+-- is lib/roadmap's scan and `adrs` is lib/adr's, disproofs marked; absent
+-- means none exist.
+function M.derive(chain, roadmaps, adrs)
   if chain.invalid then
     return "INVALID (" .. chain.invalid .. ")", "fix " .. chain.name
   end
   roadmaps = roadmaps or {}
+  adrs = adrs or {}
 
   local intent = chain.intent
   local tag = intent.source == "triage" and " (triage)" or ""
@@ -311,7 +444,7 @@ function M.derive(chain, roadmaps)
     return intent.status, ""
   end
   if intent.status == "draft" then
-    local problem = membership_problem(intent, roadmaps)
+    local problem = membership_problem(intent, roadmaps) or misplaced_key(chain)
     if problem then
       return "INVALID (" .. problem .. ")", "fix " .. chain.name
     end
@@ -331,19 +464,22 @@ function M.derive(chain, roadmaps)
     end
   end
 
-  -- A broken membership ranks after the results above and before I2-I5.
-  local problem = membership_problem(intent, roadmaps)
+  -- A broken membership ranks after the results above, then a misplaced ADR
+  -- key, both before I2-I5.
+  local problem = membership_problem(intent, roadmaps) or misplaced_key(chain)
   if problem then
     return "INVALID (" .. problem .. ")", "fix " .. chain.name
   end
 
   local sync = M.sync(chain)
-  if sync.invalid then
-    return "INVALID (" .. sync.invalid .. ")", "fix " .. chain.name
+  local invalid = sync.invalid or citation_problem(chain, adrs)
+  if invalid then
+    return "INVALID (" .. invalid .. ")", "fix " .. chain.name
   end
 
-  -- The sync parts lead the cell, and the first standing condition decides
-  -- NEXT ahead of the states-only derivation below.
+  -- The sync and ADR parts lead the cell, and the first standing condition
+  -- decides NEXT ahead of the states-only derivation below.
+  local conds = adr_conditions(chain, adrs)
   local parts = {}
   if sync.c1 then
     parts[#parts + 1] = "spec stale (intent changed)"
@@ -351,8 +487,16 @@ function M.derive(chain, roadmaps)
   if sync.c2 then
     parts[#parts + 1] = sync.word .. " disproven by plan " .. sync.c2
   end
+  for _, key in ipairs({ "c5", "c6", "c7" }) do
+    if conds[key] then
+      parts[#parts + 1] = conds[key]
+    end
+  end
   local sync_next = (sync.c1 and "design")
     or (sync.c2 and (sync.word == "intent" and "intent" or "design"))
+    or (conds.c5 and "adr")
+    or (conds.c6 and "design")
+    or (conds.c7 and "adr")
     or (sync.blocked and "approve spec")
     or (sync.stale and "plan")
     or nil
@@ -391,9 +535,11 @@ function M.derive(chain, roadmaps)
         next_draft = plan.num
       end
     end
-    if every_settled and done_count > 0 and not sync.c1 and not sync.c2 then
+    if every_settled and done_count > 0 and not sync.c1 and not sync.c2
+      and not conds.c5 and not conds.c6 and not conds.c7 then
       -- The chain's work is finished and only the walk-up is owed. A
-      -- standing C1 or C2 keeps the chain open: the debt outlives the plans.
+      -- standing C1, C2, C5, C6 or C7 keeps the chain open: the debt
+      -- outlives the plans.
       return "chain complete" .. tag, "execute walk-up"
     end
     local nxt = sync_next
@@ -412,9 +558,13 @@ function M.derive(chain, roadmaps)
     return table.concat(parts, ", ") .. tag, nxt
   end
 
-  if sync.c1 then
-    -- `spec approved` is left out: the stale part already says it.
+  if sync.c1 or conds.c6 or conds.c7 then
+    -- `spec approved` is left out: a stale or blocked part already says it.
     return table.concat(parts, ", ") .. tag, sync_next
+  end
+  if conds.c5 then
+    -- Without plans only the citation half holds, so the spec is approved.
+    return table.concat(parts, ", ") .. ", spec approved" .. tag, sync_next
   end
   if intent.spec == "skipped" then
     return "intent approved (spec skipped)" .. tag, "plan"
@@ -453,27 +603,50 @@ local function pad(text, width)
   return text .. string.rep(" ", width - #text)
 end
 
+-- The ADR block's rows, appended after every other board row: a heading
+-- counting the ADRs by state, then one `ADR NNNN` row, indented, for each ADR
+-- that `adr.row` gives a row. Nothing for no ADR file.
+local function append_adr_block(rows, adrs)
+  if #adrs == 0 then
+    return
+  end
+  rows[#rows + 1] = { kind = "heading", label = adr.heading(adrs), indent = 0, notes = {} }
+  for _, item in ipairs(adrs) do
+    local state, nxt = adr.row(item)
+    if state then
+      rows[#rows + 1] = {
+        kind = "adr", label = "ADR " .. item.num, state = state, next = nxt,
+        indent = 2, notes = {},
+      }
+    end
+  end
+end
+
 -- The board for one chain root, as data: { rows, done, dropped, open,
--- empty }. `done` and `dropped` are the tail counts, `open` the number of
--- chain rows, and `empty` is true when the root holds neither a chain nor a
--- roadmap. Each row is { kind, label, state, next, indent, notes }: `kind`
--- is "chain", "milestone", "roadmap" or "heading" (a heading has a label
--- only), and `notes` are its `⤷` annotation lines in print order.
+-- empty, adrs }. `done` and `dropped` are the tail counts, `open` the number
+-- of chain rows, `empty` is true when the root holds no chain, no roadmap
+-- and no ADR file, and `adrs` is the scanned ADR list (see `adr.scan`, with
+-- disproofs marked). Each row is { kind, label, state, next, indent, notes }:
+-- `kind` is "chain", "milestone", "roadmap", "adr" or "heading" (a heading
+-- has a label only), and `notes` are its `⤷` annotation lines in print order.
 --
 -- With no roadmap directory the rows are the open chains, flat. With one,
 -- they are grouped: each roadmap, its milestones, each milestone's open
 -- member chains indented, then `UNASSIGNED` over every other open chain.
+-- With at least one ADR file, the ADR block follows every other row.
 function M.board(rootdir)
   local chains = M.scan(rootdir)
   local roadmaps = roadmap.scan(rootdir, M.read_artifact)
+  local adrs = adr.scan(rootdir, M.read_artifact)
+  adr.mark_disproofs(adrs, chains)
   local board = {
-    rows = {}, done = 0, dropped = 0, open = 0,
-    empty = #chains == 0 and #roadmaps == 0,
+    rows = {}, done = 0, dropped = 0, open = 0, adrs = adrs,
+    empty = #chains == 0 and #roadmaps == 0 and #adrs == 0,
   }
 
   local unassigned, by_milestone = {}, {}
   for _, chain in ipairs(chains) do
-    local state, nxt = M.derive(chain, roadmaps)
+    local state, nxt = M.derive(chain, roadmaps, adrs)
     local intent = chain.intent
     local milestone = intent and intent.milestone ~= nil
       and roadmap.resolve(roadmaps, intent.milestone) or nil
@@ -512,6 +685,7 @@ function M.board(rootdir)
 
   if #roadmaps == 0 then
     board.rows = unassigned
+    append_adr_block(board.rows, adrs)
     return board
   end
 
@@ -548,6 +722,7 @@ function M.board(rootdir)
       rows[#rows + 1] = row
     end
   end
+  append_adr_block(rows, adrs)
   return board
 end
 

@@ -1,9 +1,9 @@
-# Artifact Templates — body shapes for intent, spec, plan, roadmap, and milestone
+# Artifact Templates — body shapes for intent, spec, plan, roadmap, milestone, and ADR
 
 The body-shape authority for the `claudestacks-sdlc` skills. When `intent`, `design`,
-`plan`, `roadmap`, or `milestone` writes a new artifact, it reproduces the shape shown
-here: frontmatter plus the body sections below it. Bracketed text is guidance for the
-writing skill, not content to leave in the file.
+`plan`, `roadmap`, `milestone`, or `adr` writes a new artifact, it reproduces the shape
+shown here: frontmatter plus the body sections below it. Bracketed text is guidance for
+the writing skill, not content to leave in the file.
 
 ## `intent.md`
 
@@ -196,6 +196,37 @@ created: <YYYY-MM-DD>
 Both carry `status` and `created` and no other frontmatter key. Neither body lists
 milestones, chains, progress or finished work: `artifact-chain.md` §11 says where
 those come from.
+
+## `adrs/NNNN-<topic>.md`
+
+````markdown
+---
+status: draft
+created: <YYYY-MM-DD>
+supersedes: [0003]               # optional — the ADRs this one replaces
+---
+
+# ADR <NNNN>: <title>
+
+## Context
+
+[the forces at play and why a decision is needed now]
+
+## Options considered
+
+[at least two real options, each with its trade-offs]
+
+## Decision
+
+[what was decided]
+
+## Consequences
+
+[what follows from the decision, the costs included]
+````
+
+`sealed` is written by the `adr` skill at approval and never by hand. The body is never
+edited after approval (`artifact-chain.md` §13.2).
 
 ## A parked intent
 

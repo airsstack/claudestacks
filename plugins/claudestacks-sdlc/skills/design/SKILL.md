@@ -123,17 +123,28 @@ to catch a behaviour that differs from what the code appears to say. Delete the 
 afterwards; keep their output in the spec as the evidence.
 
 **A probe answers one question about what already exists — it never builds what the spec
-describes.** A few lines, one run, one fact. Implementing the feature to see whether the
-design works is a prototype, and a prototype here means `execute` writes the same code
-again later: in the playbook the code is written in Build, after the plan is accepted. A
-question only the new code could answer goes into the spec as an open risk for the plan to
-carry.
+describes.** A few lines, one run, one fact, using tools and code that already exist.
+Implementing the feature to see whether the design works is a prototype, and a prototype
+here means `execute` writes the same code again later: in the playbook the code is written
+in Build, after the plan is accepted. This stage is where probes and throwaway tests belong:
+`plan` runs nothing new and `execute` does not stop to ask, so a fact left unproven here is
+never proven by anyone who can still change the design. A question only the new code could
+answer is not a claim the spec may make — reshape it into a statement about what already
+exists that a probe can settle, or cut it.
 
 Record the evidence inline, next to the claim, at the precision someone else could re-run.
 A spec section whose claims carry no citations is not finished, however confident it reads.
 
-**A claim you cannot prove does not go in.** Write "not verified" beside it, or leave it out
-and say so in the dialogue. An unproven claim admitted here becomes a plan's constant, then a
+**The claim ledger.** The rule above covers every sentence of the spec that asserts
+behaviour or an external fact, not only the design sections. That includes an error-handling
+bullet ("a project below the baseline turns the gate red"), a risk note, a non-goal that
+rests on a fact, and the label a probe is described with ("a virtual root" when the probe
+ran a different shape). Each is a claim, and each needs the run or citation that proves it.
+Step 8 builds the ledger and step 10 refuses to present the spec while a row is empty.
+
+**A claim you cannot prove does not go in.** Prove it with a probe now, or leave it out and
+say so in the dialogue; a "not verified" marker left in the spec is an unproven claim, and
+the ledger refuses it. An unproven claim admitted here becomes a plan's constant, then a
 test's expected value, and every gate between here and there compares documents to each other
 rather than to the world — so it will not be caught until code meets reality.
 
@@ -190,7 +201,7 @@ is visible.
 
    Every external claim that reaches `spec.md` carries a citation to what you actually read
    — `<local file>:<line>`, a byte offset, a version. A claim you cannot cite does not go
-   in the spec; write "not verified" or leave it out. Counts, exhaustive lists, and
+   in the spec; cite it or leave it out. Counts, exhaustive lists, and
    negative existence claims ("the reference documents no such field") are the shapes that
    go wrong most often and cost most later — check each one individually.
 
@@ -206,7 +217,9 @@ is visible.
    keep the dialogue moving. Never ask a battery of questions at once; ask one, get the
    answer, then ask the next. Ask only when the answer changes the spec about to be
    written; anything derivable from the intent, the repo, or a loaded guideline is
-   derived and stated as an overridable assumption.
+   derived and stated as an overridable assumption. This is the last stage that talks to
+   the author: `plan` asks nothing and `execute` does not stop to ask, so every question
+   about the design and its facts is asked and answered here.
 
 6. **Propose 2–3 approaches.** Once you understand the intent well enough, present two
    or three distinct approaches along with their trade-offs. Lead with your
@@ -247,6 +260,13 @@ is visible.
 
    It also carries `adrs`: the number of every approved ADR the design relies on,
    including one recorded through the step-6 hand-off. Omit the key when there are none.
+
+   **Build the claim ledger before the review.** Walk the written spec sentence by sentence
+   and list every one that asserts behaviour or an external fact, with the run or citation
+   that proves it. Write each proof into the spec beside its claim, so the reviewer, the
+   `plan` skill, and a later reader find it where the claim is. A claim with no proof is
+   either probed now — existing tools and code only, never the feature — or removed. The
+   spec leaves this step with no row empty.
 
 9. **Review the spec — by an agent, not by yourself.** You wrote every line of this
    spec and held the dialogue that produced it, so you are the weakest available reader
@@ -309,7 +329,13 @@ is visible.
    it again. **Do not re-spawn the reviewer**; step 9 has already run and runs once per
    spec.
 
-   Before you ask, compute the intent's fingerprint again and compare it with the
+   Before you ask, walk the claim ledger again over the draft as it now reads — the
+   review's fixes and the author's changes add sentences. Refuse to present the spec for
+   approval while any claim lacks its recorded run or citation: probe it now or remove it.
+   A spec presented with an unproven claim is not ready to ask about, and `plan` will send
+   it back.
+
+   Also before you ask, compute the intent's fingerprint again and compare it with the
    spec's `built-on`. If they differ, the intent changed while this spec was a draft:
    say so, and the approval question becomes whether the spec still holds against the
    intent as it now reads.

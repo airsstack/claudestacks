@@ -29,7 +29,7 @@ If your task references a spec or plan (e.g. under `docs/specs/` or `docs/plans/
 4. Run; confirm green.
 5. Refactor; keep green.
 
-Tests are colocated with the code they cover, per the guidelines, unless a structural exemption applies — cite it inline.
+Tests go where the loaded guideline places them — beside the code or in a separate tree — unless a structural exemption it defines applies; cite it inline.
 
 ## Carry the comments with the code
 

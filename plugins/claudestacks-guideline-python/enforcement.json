@@ -1,0 +1,7 @@
+{
+  "stack": "python",
+  "detect": ["pyproject.toml"],
+  "match": ["**/*.py", "**/*.pyi", "**/pyproject.toml"],
+  "skill": "claudestacks-guideline-python:python-guidelines",
+  "phase": ["code", "design"]
+}

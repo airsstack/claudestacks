@@ -104,6 +104,9 @@ the artifact for nothing.
 
 ## Boundaries
 
-- `Bash` is read-only inspection (`ls`, `git ls-files`, `git grep`, `git log`) only.
+- `Bash` is read-only inspection (`ls`, `git ls-files`, `git grep`, `git log`), plus
+  re-running a probe command a spec records. Run a probe only where it leaves the repository
+  and the artifact unchanged — in a scratch directory, never in the worktree. One that would
+  change either is reported as not re-run, with the reason.
 - `Write` exists solely to write your report file — never to touch the artifact.
 - You are a leaf: you have no `Agent` tool; do not attempt to spawn agents.

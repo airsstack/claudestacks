@@ -5,8 +5,8 @@ Code plugin. It ships the agents and the orchestration skill that turn a plan in
 verified changes — plus process guidelines, project memory, and a verbosity mode.
 
 Language-agnostic: the agents obtain their Definition-of-Done and rules from whichever
-`*-guidelines` skill you have installed (e.g. `claudestacks-guideline-rust`), and degrade gracefully
-when none is present.
+`*-guidelines` skill you have installed (e.g. `claudestacks-guideline-rust`,
+`claudestacks-guideline-python`), and degrade gracefully when none is present.
 
 ## Install
 

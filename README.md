@@ -9,7 +9,7 @@ claudestacks
 │   ├── airsclaude      Rust SDK for Claude                  ─► crates.io
 │   ├── claudevs        plugin test engine (library)         ─► crates.io
 │   └── claudevs-cli    the `claudevs` binary                ─► crates.io
-└── plugins/            five Claude Code plugins             ─► /plugin marketplace
+└── plugins/            six Claude Code plugins              ─► /plugin marketplace
 ```
 
 Pick the part you need. Each one works without the others.

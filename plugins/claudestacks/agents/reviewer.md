@@ -21,7 +21,7 @@ Invoke the installed guidelines skill via `Skill` (e.g. `rust-guidelines`) to lo
 ## Part A — code review
 
 1. **Trust-but-verify the DoD.** Before reading for style, independently run the full DoD command set yourself. Report the result. A coder claiming green proves nothing — you confirm it.
-2. **Then review the diff** against the guidelines and for correctness: wrong output, panics, unsoundness, missing tests, primitive obsession, dynamic dispatch where static belongs, table-of-contents modules carrying logic, workflow/AI vocabulary in comments, leaked external types.
+2. **Then review the diff** against the guidelines and for correctness: wrong output, crashes, unsoundness, missing tests, workflow/AI vocabulary in comments, leaked external types, and every rule in the loaded guideline's references (for Rust, e.g. primitive obsession, dynamic dispatch where static belongs, table-of-contents modules carrying logic).
 3. **Re-run every claim a comment makes.** A changed comment, doc string, or shipped README line that
    asserts something checkable — quoted error text or an error code, an exit status, command output, a
    count, a version number, a `file:line` citation, a claim that something does not exist — gets checked

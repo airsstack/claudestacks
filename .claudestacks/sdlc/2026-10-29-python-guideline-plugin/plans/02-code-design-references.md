@@ -1,8 +1,8 @@
 ---
-status: approved
+status: executing
 created: 2026-10-29
 depends-on: [01]
-built-on: 80fae45ab510
+built-on: fd450d45d88d
 ---
 
 # Python Code-Design References Implementation Plan
@@ -288,3 +288,63 @@ for every `B`, `BLE`, `TRY` or `E` code the file names (`uvx ruff@0.17.3 rule <C
 - Every rule in the eight files carries a citation or names the probe that backs it; the
   reviewer rejects one that does not.
 - The commit bodies hold each probe's command, exit code and rule code.
+
+## Review findings
+
+Tasks 1-4, report `41-reviewer-p02-tasks1-4.md`, blocking: init-export-only.md cycle label,
+protocols-and-composition.md example.
+- blocking — sibling import through `__init__` labelled gate-enforced; the reverse load order
+  passes all five steps — fixed: held by review, green row added.
+- blocking — the shipped Protocol example failed `ruff format --check` and `ruff check` (D100,
+  I001) — fixed: the probed shape ships; format/check/mypy/pytest exit 0.
+- risk — typing.md required quoted forward references below a 3.14 floor, beyond spec §5 —
+  fixed: either form below 3.14, review-held; "deprecated" reason dropped (pep-0749.rst:91-95).
+- question — mypy `exhaustive-match` into the baseline — declined: stays a project option; the
+  spec §4.1 baseline is unchanged.
+- nits fixed — full Google quote (pyguide.md:2108-2110), guideline-reasoning label, process
+  narration removed, plain `Ident = int` passes all five steps (UP040 reads only `TypeAlias`) →
+  review-held, re-wraps, nested backticks. Kept — `google-style-guide.md` pointer (plan 04).
+
+Tasks 5-8, report `42-reviewer-p02-tasks5-8.md`, blocking: none.
+- risk — narrow `except X: pass` labelled gate — fixed: only `contextlib.suppress(<X>)` with a
+  reason comment, review-held.
+- risk — LOG015/G201 depend on Ruff's default rule set; `select =` drops them silently — fixed:
+  strict-quality.md checklist rejects any `select =` key.
+- nits fixed — BLE001 row, G201 provenance, nested backticks, idioms.md AVOID section, 404
+  sentence dropped, leakage grep robust to absent operands; bare `except:` with a bare `raise`
+  body draws no E722 — row qualified.
+- Verified after both fix rounds: `claudevs check plugins/claudestacks-guideline-python` exit 0;
+  12 reference bullets in the SKILL.md index section.
+
+## Probe results
+
+All runs: uv 0.13.6, ruff 0.17.3, mypy 2.4.1, pytest 9.2.0, CPython 3.12.16 (3.13.18 / 3.14.10
+for floor rows); full command/exit/output per probe in handoffs 31-38, 43, 44.
+- Task 1 — missing `@override`: mypy exit 1 `explicit-override`; unclosed `match` with
+  `assert_never`: mypy exit 1 `arg-type`; without it: all five exit 0; `TypeAlias`: `UP040`.
+- Task 2 — swapped `NewType`s: mypy exit 1 `arg-type`; `NewType` accepts `-5` at runtime; frozen
+  dataclass `list` field appendable; positional `bool`: `FBT001`; literal `65535`: `PLR2004`.
+- Task 3 — every planned probe as predicted.
+- Task 4 — implicit re-export fails mypy and `F401`; explicit `__all__` passes; `F403` and
+  `F822` (in `__init__`) not enabled → review-held.
+- AGAINST THE PLAN — Task 5: A005 does not fire on a nested `src/<pkg>/logging.py` without
+  `strict-checking = true`; a name-import cycle fails pytest (exit 2) rather than passing; a
+  function-level import fails `PLC0415`.
+- Task 6 — `D100`-`D107`, `D415`, `D417` etc. fire; leakage passes all five → review-held.
+- Task 7 — `E722`, `BLE001`+`S110`+`SIM105`, `B904`, `TRY*` fire; Google 2.4's own example fails
+  `TRY003`/`PLR2004`; `contextlib.suppress(Exception)` passes → review-held.
+- Task 8 — `B006`, `PTH*` fire; missing `encoding=` and `gather` pass → review-held; B006 skips an
+  immutable-annotated mutable default; Ruff 0.17.3's default rule set includes LOG015, G201,
+  B006, BLE001 (407 rules enabled with an empty config).
+
+## Deviations
+
+- 2026-10-30 — Plan re-confirmed against spec `fd450d45d88d` by the orchestrator: plan 02 encodes
+  none of the amended claims (§7, §1.4, §3, §5 test-mandate row).
+- 2026-10-30 — All eight tasks ran in parallel; each coder wrote only its reference, and the
+  orchestrator added the eight SKILL.md index entries and README names in spec §5 order. Task
+  briefs were read from the plan directly, not through task-briefer.
+- 2026-10-30 — Probe contradictions (Task 5) were written into the reference as observed rather
+  than stopping the run, under the updated execute policy.
+- 2026-10-30 — Task 6 source `astral-sh/ruff/main/docs/settings.md` returns 404; the plan's
+  fallback `uvx ruff@0.17.3 config lint.pydocstyle.convention` was used.

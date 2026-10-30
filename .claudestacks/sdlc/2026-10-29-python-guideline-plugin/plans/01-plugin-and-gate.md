@@ -1,7 +1,8 @@
 ---
-status: approved
+status: executing
 created: 2026-10-29
-built-on: 80fae45ab510
+built-on: fd450d45d88d
+disproves: 000a1ac79911
 ---
 
 # Python Guideline Plugin and Gate Implementation Plan
@@ -242,3 +243,83 @@ Definition-of-Done, delivered as a lazily-loaded skill."}`.
   silent for a standalone script.
 - `test ! -e plugins/claudestacks-guideline-python/skills/python-guidelines/modern-python.md`
   exits 0.
+
+## Review findings
+
+Round 1 (Tasks 1, 2, 4, 5), reviewer report `11-reviewer-p01-batch1-2.md`, blocking: none.
+- risk — README lists `strict-quality` before the file exists — README.md:33; resolved by Task 3
+  landing in the same working tree before any commit.
+- risk — gate rule "Ruff and mypy have no warning severity that exits 0" omits the review-held
+  Ruff configuration warning — SKILL.md:27-29; fixed: rule added. Verified by gate-block diff
+  (`diff exit 0`) and `claudevs check plugins/claudestacks-guideline-python` → `2 stages run, 0
+  failed, 2 skipped`.
+- nit — SKILL.md lead-in did not name `references/strict-quality.md`, and had no closing
+  cross-mention line — SKILL.md:13-15, end; fixed.
+- nit — "library" used without its definition — SKILL.md:46-47; fixed ("any project published to
+  a package index").
+- nit — "The main plugin's agents are language-agnostic" is false until plan 05 —
+  README.md:37-39; declined, plan 05 makes it true.
+- nit — no CI job runs `claudevs check` over this plugin — repository; declined, same gap as the
+  Rust plugin, out of scope.
+- drift — SKILL.md restates §4/§7 policy beside strict-quality.md — SKILL.md:44-56; declined,
+  the gate rules state the bar the way the Rust skill does.
+- spec drift — §3 "no warning severity" vs §4.2 COM812 — declined: §3 says "in this
+  configuration", i.e. the baseline, which selects no `COM` rule.
+
+Round 2 (Task 3), reviewer report `13-reviewer-p01-batch3.md`, blocking: strict-quality.md:19 and
+spec §7.
+- blocking — "an existing project that does not meet the baseline goes red" is false —
+  strict-quality.md:19, SKILL.md:55-56, spec §7; fixed after the spec amendment (see
+  Deviations): the gate cannot see a missing baseline, review holds it; checklist line added.
+  Verified: `sh scratchpad/rv3/nobaseline.sh` → `[0]` on all five gate commands.
+- risk — "a cooldown overrides an exact pin" — strict-quality.md:188; fixed: "makes a newer
+  exact pin unsatisfiable", `uv lock` exit 1 quoted.
+- nits fixed — cooldown example conflicts with the baseline pins (:176), "the list above" scope
+  (:61), unmarked `--all-packages` claim (:112), restated gate command (:148), uncited
+  `uv audit --help` paraphrase (:169), 135-column line (:186), `uv audit` stated twice
+  (:168/:195), undated doc URLs (:9).
+- Fix round verified by `claudevs check plugins/claudestacks-guideline-python` → exit 0 and
+  `grep 'goes red'` → no match in SKILL.md or strict-quality.md.
+
+## Probe results
+
+- Task 1 — `claudevs check plugins/claudestacks-guideline-python` before: exit 1, `No manifest
+  found in directory`; after: exit 0, `2 stages run, 0 failed, 2 skipped` (one non-gating
+  `ICON_MISSING` warning, also printed for `claudestacks-guideline-rust`).
+- Task 2 — SKILL.md gate block vs spec §3 block: `diff exit 0` (re-run after the spec moved to
+  :247-251).
+- Task 4 — dispatcher, cwd at a throwaway git repo with `pyproject.toml`:
+  `match path: src/pkg/m.py`, `EMIT claudestacks-guideline-python:python-guidelines`,
+  `outcome: 1 pointer(s)`; cwd at a directory without `pyproject.toml`, fresh TMPDIR:
+  `GATE 2 no detect marker`, `outcome: 0 pointer(s)` (`scratchpad/p01t4/run.sh`).
+- Task 3 — clean probe from the shipped toml block and SKILL.md commands: all five exit 0; 13/13
+  spec §1.2 defect rows fail their named step; `"COM"` added: COM812 warning on stderr, both
+  Ruff steps exit 0; `uv audit` on uv 0.13.6 warns "experimental" unless
+  `--preview-features audit-command` is passed.
+- Task 3 — cooldown: a global `exclude-newer` before ruff 0.17.3's upload also refuses
+  mypy==2.4.1 and pytest==9.2.0; isolated with `exclude-newer-package`; `uv lock` exit 1 on the
+  newer pin, exit 0 with `Updated ruff v0.17.3 -> v0.17.2` once relaxed to `ruff>=0.17`.
+- AGAINST THE SPEC — no-baseline project (dev pins, no `[tool.*]` tables, undocumented public
+  `print()`): sync/format/check/mypy/pytest all `[0]` (`scratchpad/rv3/nobaseline.sh`).
+- AGAINST THE SPEC — virtual workspace root (no `[project]`): plain `uv sync --locked
+  --all-groups` then `import core` exit 0; spec §1.4's evidence came from a root declaring
+  `[project]` (`gate-probe/ws2/pyproject.toml:1`) (`scratchpad/fix3/ws.sh`).
+
+## Deviations
+
+- 2026-10-29 — Batches 1 and 2 shared one review instead of one each; batch 1 was four
+  exactly-checked files (spec §2.2 byte match, LICENSE `cmp`).
+- 2026-10-29 — Task 3's `SKILL.md` fixes from review round 1 were applied inline by the
+  orchestrator rather than by a fresh coder (three Markdown edits).
+- 2026-10-29 — Task 3 cooldown probe used `exclude-newer-package`, not the global
+  `exclude-newer` the task names, for the reason in Probe results.
+- 2026-10-30 — Spec §7 amended in place (author's choice) after the no-baseline probe; plans 01
+  and 03 re-confirmed against fingerprint `000a1ac79911`.
+- 2026-10-30 — Spec §1.4 and §3 amended in place (author's choice) after the virtual-root probe;
+  SKILL.md:40-42 aligned; plan 03 Task 3 text and its `plain_sync_leaves_members_out` probe
+  amended; plans 01 and 03 re-confirmed against `d7c1758b7610`. Plans 02, 04, 05, 06 read
+  `stale (spec changed)` and await their own re-confirmation.
+- 2026-10-30 — Coder reports 09, 10, 15 and 16 were not written to the handoff directory; their
+  summaries reached the orchestrator and the probe outputs remain in the scratchpad.
+- 2026-10-30 — Spec §5 `test-mandate.md` row amended (see plan 03 Deviations); plans 01 and 03
+  re-confirmed against `fd450d45d88d`.

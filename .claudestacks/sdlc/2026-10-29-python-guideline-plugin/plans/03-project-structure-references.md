@@ -1,8 +1,8 @@
 ---
-status: approved
+status: executing
 created: 2026-10-29
 depends-on: [01]
-built-on: 80fae45ab510
+built-on: fd450d45d88d
 ---
 
 # Python Project-Structure References Implementation Plan
@@ -139,22 +139,25 @@ separate tree, and the visibility reason for colocating does not apply because t
 `plugins/claudestacks-guideline-rust/skills/rust-guidelines/references/workspace.md` where it
 applies (why a workspace, root manifest shape, member manifest shape, directory layout,
 inter-member dependencies): use a workspace only for packages developed together that can share
-one lockfile, one environment and one `requires-python`; a virtual root holding the spec §4.1
+one lockfile, one environment and one `requires-python`; a root holding the spec §4.1
 baseline with `testpaths = ["packages"]` and the test ignores keyed `"packages/*/tests/**"`; the
 gate with `--all-packages`; `tests/<member>_tests/` per member; members declaring every package
 they import; separate projects joined by path dependencies otherwise. It states the differences
-from Cargo the spec proved (§1.4): plain `uv sync` leaves members uninstalled, `requires-python` is
-the intersection, and uv cannot stop a member importing another member's dependency.
+from Cargo the spec proved (§1.4): a plain `uv sync` leaves members uninstalled when the root
+declares `[project]` (a virtual root installs them; `--all-packages` covers both),
+`requires-python` is the intersection, and uv cannot stop a member importing another member's
+dependency. *(Amended 2026-10-30 with spec §1.4.)*
 
 **Sources:** uv `concepts/projects/workspaces.md` (spec §1.4: :177-200, :202-205, :209);
 `concepts/projects/dependencies.md` for `{ workspace = true }` sources; spec §1.4 and §1.6
 evidence.
 
 **Proof:** written first, seen failing, then passing — a workspace probe built as spec §1.4
-describes (virtual root with the baseline, members `core` and `api` made with `uv init --lib`,
-each with `src/<m>/` and `tests/<m>_tests/`):
+describes (a root declaring `[project]` with the baseline, members `core` and `api` made with
+`uv init --lib`, each with `src/<m>/` and `tests/<m>_tests/`):
 - `plain_sync_leaves_members_out` — `uv sync --locked --all-groups` exits 0 and
-  `uv run --locked python -c "import core"` then exits 1.
+  `.venv/bin/python -c "import core"` then exits 1; in a copy whose root drops `[project]`
+  (a virtual root), the same import exits 0.
 - `workspace_gate_is_green` — the five gate commands with `--all-packages` all exit 0.
 - `member_defects_fail_the_gate` — each spec §1.4 planted defect (unused import in `core`, wrong
   return type in `core`, failing test in `api`), in a fresh copy, fails its step.
@@ -180,3 +183,66 @@ each with `src/<m>/` and `tests/<m>_tests/`):
 - `claudevs check plugins/claudestacks-guideline-python` exits 0.
 - Every rule in the three files carries a citation or names its probe; the commit bodies hold the
   probe outputs.
+
+## Review findings
+
+Task 1 (`project-layout.md`), report `17-reviewer-p03-task1.md`, blocking: :53, :131.
+- blocking — `src/` layout "enforced by the gate" holds only under uv_build's default
+  `module-root`; `module-root = ""` passes all five steps — fixed, relabelled.
+- blocking — dev tools in `[project] dependencies` pass all five steps — fixed, split from the
+  gate-enforced `[project.optional-dependencies]` case.
+- risk — displaced test directory "not noticed" contradicts its probe (ruff exit 1) — fixed.
+- nits fixed — probe name unintroduced, `pep-0621.rst:113-119`, lock refresh unstated, uncited
+  "an application ships none" (dropped), two long lines, PEP 723 "not surfaced" now cites
+  `enforcement.json` `detect` and the dispatcher trace. Declined — citation key legend (resolves).
+- Verified: `claudevs check plugins/claudestacks-guideline-python` → `2 stages run, 0 failed, 2
+  skipped`.
+
+Task 2 (`test-mandate.md`), report `22-reviewer-p03-task2.md`, blocking: :45-48, :208.
+- blocking — "every directory carries `__init__.py` … for mypy" overclaims; `tests/__init__.py`
+  alone passes the gate — fixed: top file is what mypy needs, deeper ones review-held; one rule
+  for both project forms; table rows added.
+- blocking — skip/xfail "none | review" is partly false: boolean `skipif` without `reason=` fails
+  the pytest step — fixed, split; matching line in strict-quality.md aligned.
+- nits fixed — probe names, `match=` rule labelled (PT011), workspace table row, index order now
+  spec §5 order (strict-quality, test-mandate, project-layout, workspace).
+- spec §5 :355 wording vs §1.6 — resolved by amendment (Deviations).
+
+Task 3 (`workspace.md`), report `24-reviewer-p03-task3.md`, blocking: :5-6, :240.
+- blocking — rules without gate/review labels — fixed: every rule labelled from a fresh probe,
+  11 table rows added.
+- blocking — undeclared-sibling row wrong in condition and exit code — fixed: fails only when
+  declared in `dependencies` without `[tool.uv.sources]`, exit 2 with `uv.lock` present, 1
+  without.
+- risks/nits fixed — :80 tables named, :184 both lock cases, wraps, `.git/` artifact explained,
+  Rust sibling cited by section, bullet count, uncited Cargo implication dropped, "a module
+  pytest collects", test-tree rule aligned with test-mandate.md.
+- Verified after all fix rounds: `claudevs check` exit 0; each of the four references counts 1
+  in the SKILL.md index section.
+
+## Probe results
+
+- Task 1 — `uv init --lib --python 3.12 p`: `src/p/py.typed`, `.python-version` `3.12`,
+  `requires-python = ">=3.12"`. `uv init --app --python 3.14 a` declares `[build-system]`
+  (uv_build) — the plan's "if it does not" branch did not fire. Floor mismatch (`>=3.12`,
+  `.python-version` 3.14, `from warnings import deprecated`): all five exit 0 → review-held.
+- Task 2 — duplicate basenames, no `__init__.py`, cold cache: `mypy --strict .` exit 2
+  `Duplicate module named "test_models"`; with inits: gate exit 0, planted wrong return → mypy
+  exit 1; missing test file: all five exit 0; `_helper` import: all five exit 0;
+  `ruff rule PLC2701`: "This rule is in preview and is not stable."
+- Task 3 — root declaring `[project]`: plain sync then `import core` exit 1, `--all-packages`
+  exit 0; virtual root: plain sync `import core` exit 0; full gate with `--all-packages` green on
+  both shapes (`5 passed`); planted defects fail ruff/mypy/pytest; undeclared sibling dependency:
+  all five exit 0 → review-held.
+
+## Deviations
+
+- 2026-10-30 — Task 3's `plain_sync_leaves_members_out` and its Change text amended before the
+  task ran, with spec §1.4 (virtual-root correction, see plan 01 Deviations).
+- 2026-10-30 — Spec §5 `test-mandate.md` row amended in place: the tree starts at `tests/` (single
+  project) or `<member>_tests/` (workspace, member's `tests/` carries none); mypy needs only the
+  top file, the rest review-held. Settled by the orchestrator from the author's earlier decision
+  ("`__init__.py` in every test dir", "workspace tests in `<m>_tests/`"); plans 01 and 03
+  re-confirmed against `fd450d45d88d`.
+- 2026-10-30 — Task 1 started while plan 01 was built but not yet `done` (author's goal named
+  both plans).

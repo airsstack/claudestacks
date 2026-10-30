@@ -109,8 +109,8 @@ tests against the newer interpreter only.
 
 ### 1.4 Workspaces need `--all-packages`
 
-Probe: a virtual root (`[tool.uv.workspace] members = ["packages/*"]`, no `[build-system]`) and
-one member made with `uv init --lib packages/core`, then `uv lock`.
+Probe: a workspace root that declares `[project]` (`[tool.uv.workspace] members = ["packages/*"]`,
+no `[build-system]`) and one member made with `uv init --lib packages/core`, then `uv lock`.
 
 ```
 uv sync --locked --all-groups                    exit 0
@@ -121,7 +121,15 @@ uv sync --locked --all-groups --all-packages     exit 0
 uv run --locked python -c "import core"  (after an --all-packages sync)   ok, exit 0
 ```
 
-The full gate in a workspace, with the §4.1 baseline in the virtual root's `pyproject.toml`
+*Amended 2026-10-30 after plan 01 disproved the earlier label:* this section first called the
+root above "virtual", but the probe's root declared `[project]` (`gate-probe/ws2/pyproject.toml:1`).
+A truly virtual root — `[tool.uv.workspace]` and no `[project]` table — behaves differently under
+uv 0.13.6: a plain `uv sync --locked --all-groups` installs the members (`import core` exit 0
+after it, and again after a later plain sync). So a root that declares `[project]` leaves the
+members out of a plain sync and a virtual root installs them; `--all-packages` installs them in
+both cases, which is why the gate always carries it in a workspace.
+
+The full gate in a workspace, with the §4.1 baseline in the root's `pyproject.toml`
 (`testpaths = ["packages"]`, per-file ignores keyed `"packages/*/tests/**"`) and two members
 `core` and `api`, each with `src/<m>/` and the §1.6 test layout:
 
@@ -253,8 +261,9 @@ Rules of the gate, stated in `SKILL.md` the way the Rust skill states its own:
 - **`--no-fix` is what keeps step 3 a check** (§1.2, `fix = true` row).
 - **`--strict` stays on the command line** even though the baseline sets `strict = true`, so the
   gate states its own bar as the Rust gate states `-D warnings`.
-- **`--all-packages` in a workspace**: without it the gate tests an environment without the
-  members (§1.4). In a workspace the gate runs from the root, and the §4.1 baseline lives in
+- **`--all-packages` in a workspace**: without it, a root that declares `[project]` gives the
+  gate an environment without the members; a virtual root installs them either way, and the
+  flag covers both (§1.4). In a workspace the gate runs from the root, and the §4.1 baseline lives in
   the root `pyproject.toml` with `testpaths = ["packages"]` and the test ignores keyed
   `"packages/*/tests/**"` (§1.4).
 - **No `uv lock --check` step** (§1.2) and **no coverage threshold** (author decision,
@@ -343,7 +352,7 @@ written and grounded during execution; this section fixes each file's scope.
 | `init-export-only.md` | `__init__.py` holds a docstring, `__all__`, and re-exports; implementation lives in sibling modules | `mod-rs-export-only.md` | typing spec "Distributing type information"; Google 2.2, 2.3 |
 | `modularity.md` | one responsibility per module, one canonical type per concept, no import cycles, no module named after a standard-library module | `modularity.md` | Google 2.2, 2.3; Python import reference |
 | `docstring-discipline.md` | Google-convention docstrings on every public module, class and function (PEP 257 underneath); comments and docstrings carry no planning paths, plan identifiers, workflow vocabulary, or AI/agent names | `doc-comment-discipline.md` | PEP 257; Google 3.8; Ruff `D` with `convention = "google"` |
-| `test-mandate.md` | every logic-bearing module under `src/` has a matching `tests/…/test_<module>.py`; every directory of the test tree carries an `__init__.py`, and in a workspace each member's tests sit in `tests/<member>_tests/` (§1.6); boundary and error paths are tested, not only the happy path; structural exemptions are named and cited; held by review, not a script | `unit-test-mandate.md` | pytest goodpractices (§1.5); pytest import modes |
+| `test-mandate.md` | every logic-bearing module under `src/` has a matching `tests/…/test_<module>.py`; every directory of the test tree carries an `__init__.py`, the tree starting at `tests/` in a single project and at `tests/<member>_tests/` in a workspace member, whose own `tests/` carries none (§1.6); mypy needs only the top file, the rest is policy held by review (amended 2026-10-30); boundary and error paths are tested, not only the happy path; structural exemptions are named and cited; held by review, not a script | `unit-test-mandate.md` | pytest goodpractices (§1.5); pytest import modes |
 | `errors.md` | a project exception hierarchy, `raise … from` inside `except`, no bare or catch-all `except`, `except*` for exception groups | — | Google 2.4; PEP 3134, 654; Ruff `B904`, `BLE`, `TRY` |
 | `idioms.md` | no mutable defaults, `pathlib` over `os.path`, explicit `encoding=`, `logging` not `print` in library code, `asyncio.TaskGroup` for concurrent tasks | — | Google 2.12; `pathlib`, `logging`, `asyncio` docs; Ruff `B006`, `PTH`, `T20` |
 | `project-layout.md` | `src/` layout, `tests/` at the root, committed files (`pyproject.toml`, `uv.lock`, `.python-version`) and ignored ones (`.venv`, `dist`), `[project]` and `[build-system]` always declared, `py.typed` in libraries, dev tools in `[dependency-groups]`; a short section on standalone PEP 723 scripts | — | PEP 517, 561, 621, 723, 735; packaging guide "src layout vs flat layout"; uv docs |
@@ -388,8 +397,13 @@ version string says" (:304, :211), so the bump matters for installed users only.
 - **`uv` missing, or a gate tool missing from the lock.** The step's command fails, which fails
   the gate; `SKILL.md` names `uv` as the one prerequisite and the `dev` group as where the
   tools come from.
-- **An existing project that does not meet the baseline.** The gate goes red, as intended; the
-  guideline does not offer a weaker tier.
+- **An existing project that does not meet the baseline.** Adopting the baseline on a
+  non-conforming project turns the gate red, as intended; the guideline does not offer a weaker
+  tier. The gate cannot detect a missing baseline, so review holds its presence. *Amended
+  2026-10-30 after plan 01 disproved the earlier "the gate goes red":* a fresh
+  `uv init --lib --python 3.12` project keeping the `dev` pins of §4.1 but none of the `[tool.*]`
+  tables, with an undocumented public function calling `print()`, passed all five §3 commands
+  under uv 0.13.6 (`[0]` for sync, format, check, mypy, pytest).
 
 ## 8. Proof
 

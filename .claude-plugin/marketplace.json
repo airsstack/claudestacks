@@ -22,6 +22,11 @@
       "description": "Rust engineering guidelines and Definition-of-Done, delivered as a lazily-loaded skill."
     },
     {
+      "name": "claudestacks-guideline-python",
+      "source": "./plugins/claudestacks-guideline-python",
+      "description": "Python engineering guidelines and Definition-of-Done, delivered as a lazily-loaded skill."
+    },
+    {
       "name": "claudestacks-journal",
       "source": "./plugins/claudestacks-journal",
       "description": "Transparent, note-based experiential memory for the development agent: an Obsidian-compatible journal vault with a deterministic, embedding-free recall index."

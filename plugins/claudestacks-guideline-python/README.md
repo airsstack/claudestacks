@@ -32,7 +32,7 @@ not a defect.
   the sync adds `--all-packages` and the gate runs from the root.
 - **Rule references** (progressive disclosure, loaded on demand): strict-quality, typing,
   strong-types, protocols-and-composition, init-export-only, modularity, docstring-discipline,
-  test-mandate, errors, idioms, project-layout, workspace.
+  test-mandate, errors, idioms, project-layout, workspace, google-style-guide.
 
 ## How it pairs with `claudestacks`
 

@@ -102,5 +102,10 @@ Read the one that matches your task:
   ["packages"]` and the `"packages/*/tests/**"` ignores; why the gate needs `--all-packages`;
   `tests/<member>_tests/` per member; every member declaring each package it imports; path
   dependencies between separate projects otherwise; what the gate sees and what review holds.
+- `references/google-style-guide.md` — a citable index of Google Python Style Guide sections
+  (`G-2.4`, `G-3.16`, …), each pointing at the reference that applies it; where the guideline or the
+  gate departs from the guide (lint, imports, exceptions, `from __future__`, line length, TODO
+  comments, import order, type annotations), the entry says so and quotes the reference that
+  governs.
 
 When a reference cross-mentions another rule, read that reference too if it bears on your change.

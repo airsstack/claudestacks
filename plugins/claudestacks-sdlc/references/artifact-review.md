@@ -12,7 +12,7 @@ The skill that spawned it fixes the draft and holds the user's approval gate.
 
 | Emoji | Tier | Use for |
 |---|---|---|
-| 🔴 | blocking | a placeholder, a requirement with no coverage, a forward reference, or a contradiction that would produce wrong work |
+| 🔴 | blocking | a placeholder, a requirement with no coverage, a forward reference, an unproven claim, or a contradiction that would produce wrong work |
 | 🟡 | risk | an ambiguity with a likely-but-unconfirmed reading, or a section whose root in the authority is weak |
 | 🔵 | nit | wording, ordering, or a body-shape deviation that changes nothing material |
 | ❓ | question | needs the author's intent before it can be judged |
@@ -72,8 +72,16 @@ Authority: the chain's `intent.md`. Body shape: `templates.md` § `spec.md`.
   exists to eliminate. Quoted material is the shape that decays first — error text and
   error codes, exit statuses, a command's rendered output, a version number, a count — and
   each one has to have been produced by a run in the same change that wrote it down, not
-  predicted from what the code looks like it would do. Re-run the cheap ones yourself and
-  report any whose output differs.
+  predicted from what the code looks like it would do.
+
+  **Re-run every recorded probe whose command you can run**, not a sample, and report any
+  whose output differs from the one the spec quotes. Check that the probe exercised the shape
+  the text names: a probe described as running against a virtual root that ran a different
+  shape proves nothing about the shape it names. Walk the spec for claims no probe or citation
+  covers — an error-handling bullet and a risk note assert behaviour as much as a design
+  section does. **An unproven claim is 🔴 blocking**, however plausible it reads; the spec
+  stage is the last one where it can be probed, so it cannot be left for `plan` or `execute`.
+  Say which probes you could not run, and why, rather than counting them as passed.
 - **External claims are cited, and the citations resolve.** Every assertion about a system
   outside this repository — a documented API, a CLI's behaviour, a file format, a wire
   protocol — carries a citation to a fetched artifact (`<local file>:<line>`, a byte
@@ -116,24 +124,25 @@ though plan `01` says nothing about it.
 - **No implementation code** — a task holding a function body, a test body, or a diff is a
   🔴 finding. The plan names files, behaviour, and tests; `execute` writes the code. A
   command line the implementer runs is not code in this sense.
-- **External claims inherited from the spec are re-checked, not assumed.** Where a task
-  encodes a fact about an outside system — a constant, an exhaustive match, a documented
-  field name, a count in a test assertion — verify it against the fetched artifact, not
-  against the spec that supplied it. A plan that faithfully transcribes a wrong spec is
-  still a plan that will produce wrong code, and this is the last gate before someone
-  writes it.
+- **Every fact a task encodes traces to a recorded proof in the spec.** Where a task
+  encodes a fact about an outside system or about code it does not create — a constant, an
+  exhaustive match, a documented field name, a count in a test assertion, how existing code
+  behaves — find the probe run or the citation the spec records for it. A fact with none is
+  🔴 blocking: the plan does not verify anything itself, so a fact the spec never proved is
+  one nobody proved, and the finding sends the spec back to `design` rather than asking the
+  plan to patch it. Name the fact and the task that encodes it.
 - **A claim the plan makes about what already exists traces to something opened, not to
   the draft it came from.** A count, a version, a field name, a statement about how code
-  the task does not create behaves: each cites the `file:line` or the fetched artifact it
-  came from, and each goes stale silently when the thing it quotes moves on. Where a claim
-  cites nothing, that is a finding even if it reads as obviously true. A claim that only
-  running new code could settle belongs under the plan's `## Risks`, not asserted as fact.
+  the task does not create behaves: each cites the spec's recorded proof or the `file:line`
+  it came from, and each goes stale silently when the thing it quotes moves on. Where a
+  claim cites nothing, that is a finding even if it reads as obviously true. A premise that
+  only running new code could settle has no place in a plan at all, `## Risks` included:
+  it is an unproven claim in the spec, and it is 🔴.
 
-  This bullet and the one above it are the only two that leave the chain. The rest compare
-  the plan set to the document above it, so a premise the spec got wrong is *confirmed* by
-  each of them rather than caught, and another pass of the same comparison raises
-  confidence in that premise without ever testing it. Rounds do not substitute for the
-  artifact.
+  This bullet and the one above it are the only two that look past comparing documents:
+  they hold the plan to the proofs the spec recorded, so a fact that reached a task without
+  one cannot pass as confirmed by the spec it was copied from. Rounds do not substitute for
+  the recorded proof.
 - **No placeholders** — `TBD`, `TODO`, `implement later`; "add appropriate error handling
   / validation / edge cases" without naming which; "write tests for the above" without
   naming each test and what it asserts; a task with no done-check command; a reference to

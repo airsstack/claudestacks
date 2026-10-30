@@ -262,9 +262,12 @@ marks a checkpoint, that is a hard stop: present the batch and wait for "continu
 
 ## Prove what the task assumes, with a throwaway test
 
-Every fact a task asserts about something it does not create is a place the plan can be
-wrong, and the plan is not evidence for itself. The `task-briefer` hands you that list —
-work it before the coder starts.
+The spec's claims were proven before the plan was written, so this step is a cheap
+confirmation, not first-time discovery: the plan is not evidence for itself, and the world
+may have moved since the spec's probes ran. Every fact a task asserts about something it
+does not create is still a place the plan can be wrong. The `task-briefer` hands you that
+list — work it before the coder starts. A check that fails is handled by *When execution
+disproves the plan, the spec or an ADR*, below, without asking the author.
 
 Sort each asserted fact into one of three:
 
@@ -286,9 +289,9 @@ plausible invented content instead of an error.
 
 **Where a test the task names under Proof already exercises the claim, the coder's red-green
 run of it IS the probe — do not write a second one.** Only claims the plan never puts under a
-test of its own need one of yours, and the plan's `## Risks` section lists the questions its
-author left for this step to settle. Probes are for the load-bearing and unproven, not for
-every literal in the file.
+test of its own need one of yours; where the spec records a probe for the claim, re-running
+that probe is the cheapest one. Probes are for the load-bearing, not for every literal in
+the file.
 
 ## Verification budget — do not over-verify
 
@@ -332,26 +335,38 @@ is exactly what it will confirm. The probe step above is what replaces the extra
 
 ## When execution disproves the plan, the spec or an ADR
 
-Execution is the first time a plan's claims meet the artifact they describe, so this is where
-a wrong premise surfaces. When a probe comes back against the plan, the code fix is only half
-the work — the other half is that the chain now lies to whoever executes the next plan.
+Execution is the first time a plan's claims meet the artifact they describe, so a wrong
+premise can still surface here. It is a defect of an earlier stage, not a question for the
+author: `design` was to prove every claim of the spec before it was approved, and `plan` to
+refuse a spec that did not. By now the author has settled the design, so **do not stop to ask
+about it.** The code fix is only half the work — the other half is that the chain now lies to
+whoever executes the next plan — and both halves are done without a pause. When a check comes
+back against the plan:
 
-Stop and put it to the author as **its own question**: *the plan's premise is disproven —
-amend the plan and the spec now, or after this run?* Do not fold it into a question about the
-implementation and read the answer as covering both. Approving a code change is not approving
-the record. The question also asks which claim broke — the plan's, the spec's, a cited
-ADR's, or several — since each is recorded differently. When a cited ADR's claim broke,
-the question covers it too: an ADR is superseded or deprecated through the `adr` skill,
+1. **Fix what the task needs.** Build to what the check showed, and give the coder the
+   result (step 4 of the loop). Carry on with the run.
+2. **Record it as a defect of the stage that let it through.** In `## Deviations`, a dated
+   entry naming the claim, the stage it belongs to — the spec's, the plan's, a cited ADR's —
+   the command and its real output, and what was built instead. The check itself goes in
+   `## Probe results`, marked as against the plan.
+3. **Record the debt on the board**, below, when the claim was the spec's or an ADR's.
+4. **Report it once**, in the completion report. That is the author's first sight of it, and
+   it names the skill that clears the board's condition.
+
+Do not edit the approved `spec.md` yourself. Any change to its text moves its fingerprint,
+every plan of the chain then reads `stale (spec changed)`, and re-confirming a plan is never
+`execute`'s to do (`artifact-chain.md` §10.2). The marker below is the record, and `design`
+corrects the text after the run. An ADR is superseded or deprecated through the `adr` skill,
 not amended.
 
-**Record the debt before you continue.** When what the probe disproved is a claim of the
+**Record the debt before you continue.** When what the check disproved is a claim of the
 plan's authority — the chain's `spec.md`, or its `intent.md` on the spec-skip path —
 write `disproves` into the frontmatter of the plan you are running, holding that
 authority's current fingerprint:
 
     sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
 
-Write it whichever answer the author gives, and before any further task runs. The key
+Write it before any further task runs, without asking. The key
 holds one fingerprint: a later disproof by the same plan overwrites it, and it is never
 removed. From then on the board reads `spec disproven by plan NN` (or
 `intent disproven by plan NN`), no sibling plan can start, and the chain cannot
@@ -359,9 +374,9 @@ complete, until the authority's text changes — at which point the marker match
 nothing and stops having any effect. A disproven claim that belongs to the plan alone,
 not to its authority, writes no marker.
 
-When what the probe disproved is a claim of an ADR the spec cites, write that ADR's
+When what the check disproved is a claim of an ADR the spec cites, write that ADR's
 number into the running plan's `disproves-adr` frontmatter key, a list such as `[0003]`,
-before any further task and whichever answer the author gives. Numbers are added, never
+before any further task, without asking. Numbers are added, never
 removed, and the key stays after the ADR is superseded or deprecated: the board stops
 reading it then. Name only an ADR the spec's `adrs` cites — the board reads any other as
 `INVALID (plans/NN: disproves uncited ADR NNNN)`, which replaces the chain's whole row.
@@ -371,29 +386,37 @@ the ADR; this plan may finish its run, no other plan starts, and the chain canno
 complete until the `adr` skill supersedes or deprecates the ADR. Superseding it is the
 `adr` skill's, and the author authorizes it.
 
-Writing either key is not a `status` flip, so render the board again afterwards and tell
-the user what the row reads: an `INVALID` result replaces the whole row, so the condition
-you just recorded may not show until it is cleared.
+Writing either key is not a `status` flip, so render the board again afterwards and note
+what the row reads for the completion report: an `INVALID` result replaces the whole row, so
+the condition you just recorded may not show until it is cleared.
 
 Sibling plans were written against the old text and cannot see the commit that corrected it.
 A commit body is not where the next plan's author looks. Amending a `draft` plan is the `plan`
 skill's; superseding an approved `spec.md` is the `design` skill's, and amending the intent
-on the spec-skip path is the `intent` skill's. The author authorizes each.
+on the spec-skip path is the `intent` skill's. Those happen after the run, on the author's
+word, once the completion report has named the defect.
 
 ## When to stop and ask
 
-Stop immediately when a dependency is missing or ambiguous, a verification fails repeatedly
-in a way the plan does not explain, the plan has a gap where guessing would be risky, or an
-unexpected conflict appears — a naming collision, a changed API, a test suite in a state the
-plan did not anticipate.
+A premise that failed a check is not a reason to stop; it is recorded and the run carries on
+(above). Stop only for a genuine blocker:
 
-Ask the one focused question that unblocks you, not every concern at once.
+- a dependency is missing or ambiguous;
+- a verification fails repeatedly in a way nothing recorded explains;
+- the next step is destructive or irreversible — deleting data, a force push, a
+  migration that cannot be rolled back — and the plan does not name it;
+- the branch is protected (*Safety guard*, above).
+
+Ask the one focused question that unblocks you, not every concern at once. It is never a
+question about whether the spec is right.
 
 ## Completion
 
 Present the whole run: what was built batch by batch, the verifications and their evidence,
 the reviewer reports, every probe whose result contradicted the plan, and any deviation from
-the plan and how it was resolved.
+the plan and how it was resolved. Defects of earlier stages come first, each with its
+evidence and the skill that clears it: this report is the one place the author sees them,
+because the run did not stop to ask.
 
 Before flipping the plan to `done`, append three sections to the plan file, in this order:
 
@@ -412,7 +435,8 @@ Before flipping the plan to `done`, append three sections to the plan file, in t
    the record that a premise was checked rather than assumed, and it is what a later reader
    needs to know which claims are still only plausible.
 3. **`## Deviations`** — a dated entry for every departure from the plan as written, what
-   changed and why. Omit only if execution followed the plan exactly.
+   changed and why; an entry for a disproven claim is marked as a defect of the stage it
+   came from (spec, plan, or ADR). Omit only if execution followed the plan exactly.
 
 Those three sections are where the run's *reasoning* goes: why a premise turned out wrong,
 what was weighed and rejected, what a deviation cost. Not into source comments. A comment

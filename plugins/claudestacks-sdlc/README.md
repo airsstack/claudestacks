@@ -41,13 +41,18 @@ question at a time, never a battery.
 - **`design`** — an `approved` intent becomes `spec.md`. Refuses a `draft`, `dropped`, or
   `done` intent, naming the file and the command that advances it. Explores 2–3 approaches
   with a recommendation, self-reviews for placeholders and scope creep, traces every section
-  back to the intent. Writes: `draft → approved` at the user's design-review approval.
+  back to the intent. Proves every claim of the spec with a probe or throwaway test it
+  actually runs (existing tools and code only, never the feature) and refuses to present a
+  spec with an unproven claim; every question to the author is asked here. Writes:
+  `draft → approved` at the user's design-review approval.
 - **`plan`** — an `approved` spec (or an `approved` intent carrying `spec: skipped`) becomes
   one or more `plans/NN-<topic>.md` files, each with an explicit `depends-on:` so independent
   plans are visibly parallelizable across worktrees. A plan follows the playbook's
   `plan.md` — files that change, order of work, risks, proof — and carries no code; the
-  code is written in `execute`. Asks the author nothing until the set is written, then asks
-  once: accept the whole set. Writes: `draft → approved` for every plan in the set together.
+  code is written in `execute`. Refuses to write any plan while a spec claim a task depends
+  on has no recorded proof, and sends the spec back to `design`. Asks the author nothing
+  until the set is written, then asks once: accept the whole set. Writes: `draft → approved`
+  for every plan in the set together.
 - **`execute`** — a plan, referenced as `<chain>/<NN>`, becomes a reviewed, verified diff.
   Takes the instruction to run an unchanged `draft` plan as its approval, resumes an
   `executing` one, and does not silently re-run a `done` or `superseded` one; warns if a
@@ -55,7 +60,9 @@ question at a time, never a battery.
   independent work and runs each batch as parallel `coder` spawns, with subagent detail
   kept on disk through the main plugin's context-handoff protocol. Every fact a task asserts about something it
   does not create is proven first — a symbol lookup for structure, a throwaway test that
-  is actually run for behaviour — because the plan is not evidence for itself. One review
+  is actually run for behaviour — because the plan is not evidence for itself. A check that
+  fails is recorded as a defect of the earlier stage, the run carries on, and the author
+  sees it once, in the completion report; `execute` does not stop to ask about the spec. One review
   spawn and one fix round per batch, deliberately: extra rounds find shrinking code
   findings while the defects that matter are wrong premises no review can catch. Appends
   durable `## Review findings`, `## Probe results` and `## Deviations` sections to the

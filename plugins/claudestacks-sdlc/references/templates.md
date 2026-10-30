@@ -65,7 +65,8 @@ built-on: <fingerprint>          # of intent.md — see artifact-chain §10
 
 [as many numbered `##` sections as the design needs — one per concern: design
 premises, data model, component structure, error handling, testing, rollout, whatever
-the shape of the thing calls for]
+the shape of the thing calls for. Every sentence that asserts behaviour or an external
+fact carries its recorded probe run or citation beside it]
 
 ## 2. <section title>
 
@@ -133,8 +134,8 @@ introduces by name and one-line purpose]
 
 ## Risks
 
-- [what the change could break, which step is most risky, options not taken, and any
-  question only running code can answer — `execute` settles those with a probe]
+- [what the change could break, which step is most risky, and options not taken — never an
+  unproven premise for `execute` to settle; that goes back to the spec]
 
 ## Proof
 

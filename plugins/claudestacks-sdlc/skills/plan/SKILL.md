@@ -25,14 +25,16 @@ So, in this skill:
 - **Write no implementation code and no test code** — not in the plan, not in a scratch file,
   not as a prototype to check the plan works. No function bodies, no test bodies, no diff.
   `execute`'s coder writes the tests and the implementation, test-first.
-- **Run nothing that builds or exercises new code.** Reading files, `grep`, `git log`, a
-  binary's `--help`, and fetching documentation to a local file are the whole toolset.
+- **Run no probe and no new verification.** Proving the spec's claims was `design`'s job,
+  and it finished before the spec was approved. Reading files, `grep` and `git log` are the
+  whole toolset here, used to map the files and name the work, not to check the spec.
 - **Name, don't write.** A task names the files, the types or functions it introduces (by
   name and one-line purpose; their shape belongs to the spec), the behaviour that changes,
   and each test by name with what it asserts in prose.
 
-A question that only running new code could answer is a risk, not a reason to prototype:
-write it under the plan's `## Risks` and let `execute` settle it with a probe.
+A question that only running new code could answer does not become a risk for `execute` to
+settle. The spec has to stop depending on it; see *The spec must be verified before it is
+planned*, below.
 
 Three principles bind the content:
 
@@ -125,10 +127,10 @@ questions included. Planning asks the author nothing more. The plan set, its dep
 shape, the order of work and the risks are all derived from the spec, the repo and the
 loaded guideline, and the author sees them once, at the acceptance gate below.
 
-The one exception is a spec that cannot be planned as written: it contradicts the artifact
-(see *Re-verify*, below), or it leaves open something a plan must decide — which file owns a
-behaviour, where a boundary falls, which of two readings it means. That is a defect in the
-spec, not a planning question. Do not resolve it as an assumption, and do not ask the author
+The one exception is a spec that cannot be planned as written: a claim a task depends on
+carries no recorded proof (see *The spec must be verified before it is planned*, below), or it leaves open
+something a plan must decide — which file owns a behaviour, where a boundary falls, which of
+two readings it means. That is a defect in the spec, not a planning question. Do not resolve it as an assumption, and do not ask the author
 to settle it here. Stop before writing any plan, name the gap in one line, and send it back to
 the `design` skill, which owns the spec.
 
@@ -160,28 +162,30 @@ sentence without an "and". If a plan's goal sentence needs an "and", split it in
 plans. Tasks are not objectives — three tasks implementing parts of one feature belong in one
 plan.
 
-## Re-verify the spec's external claims before they become code
+## The spec must be verified before it is planned
 
 A plan turns the spec's prose into the facts a test will assert — values, exhaustive lists, field
-names — the exact forms that are painful to correct once written. **This is the last gate before
-someone writes code, and the spec is not a trustworthy source for facts about outside systems.**
-Checking a fact means reading the artifact, never building code to see what happens.
+names, how existing code behaves — the exact forms that are painful to correct once written. **A
+stored plan means ready to execute, so this is a gate, not a check:** `design` proved every claim
+of the spec with a run or a citation before the author approved it, and this skill refuses to
+write plans over a spec where that did not happen.
 
-Before writing a task that encodes such a fact, check it against the artifact — not against the spec
-that supplied it. Fetch documentation as raw source into a local file and grep it (`curl -sS -L
-'<doc-url>.md' -o "${TMPDIR:-/tmp}/<name>.md"`); never through a summarizing fetch tool, which
-truncates long pages and invents plausible content past the cutoff. Prefer the shipped artifact —
-type declarations, the binary's `--help` — over documentation about it.
+Before writing any plan, walk the spec and list every claim a task will depend on. Each one must
+carry its recorded proof in the spec, beside the claim: a probe's command with its real output, a
+`<file>:<line>` citation, or the command behind a count. Presence is what you check. You run no
+probe of your own and fetch nothing to confirm — a plan that quietly re-verifies is a plan that
+quietly decides, and a fact proved only here is a fact the spec still lies about.
 
-Every count, exhaustive list, field name, and negative existence claim that reaches a task carries a
-citation to what you read: `<file>:<line>`. **Check exhaustive lists for completeness, not just for
-correctness** — a list where every entry is right but three entries are missing reads as verified and
-is not. Where a fact already lives in a type the plan is building, have the task read it from there
-rather than restating it; a second copy in a task is a copy that drifts.
+When any such claim has no recorded proof, write no plan at all. Name the claim in one line, say
+that its spec carries no run for it, and send the spec back to the `design` skill, which owns the
+spec and its probes. Do not plan around the gap, do not carry the claim into `## Risks` for
+`execute` to settle, and do not ask the author to wave it through. Sibling plans written over the
+same spec would all quote the unproven text.
 
-When the artifact contradicts the spec, do not quietly plan around it. Stop, tell the author which
-claim failed and what the artifact says, and fix the spec — a plan that faithfully implements a wrong
-spec still produces wrong code, and the sibling plans are still quoting the same wrong text.
+Where a fact already lives in a type the plan is building, have the task read it from there rather
+than restating it; a second copy in a task is a copy that drifts. On the spec-skip path there is no
+spec to carry proofs: a task encodes only what the intent states, and a fact beyond it that a task
+would depend on is a reason to run `design`, not to assume.
 
 ## File structure first
 
@@ -266,8 +270,9 @@ both — a plan that says only "similar to Task N" is no longer standalone.
 
 After the last task, the plan closes with the playbook's two plan-wide sections:
 
-- **`## Risks`** — what the change could break, which step is most risky, what the plan
-  chose not to do, and any question only running code can settle (for `execute` to probe).
+- **`## Risks`** — what the change could break, which step is most risky, and what the plan
+  chose not to do. It holds no unproven premise for `execute` to settle: a plan that needs
+  one is not ready to execute, and the spec it came from goes back to `design`.
 - **`## Proof`** — the plan-wide checks that show every task's work holds together.
 
 ## Before saving — review by an agent
@@ -292,10 +297,10 @@ plans to the author. Do not re-spawn the reviewer over the revised set, and do n
 it again when the author asks for changes — revise and present.
 
 Rounds beyond the first return progressively smaller findings about the plan's internal
-reasoning, while the defects that actually reach code are wrong external facts. No round
-can catch those, because every criterion but the grounding ones compares documents to each
-other — grounding against the artifact is what replaces them. A plan set that would need a
-second round needs rewriting, not re-reviewing.
+reasoning, while the defects that actually reach code are wrong facts. No round can catch
+those, because every criterion but the grounding ones compares documents to each other —
+the proofs the spec recorded, and the gate above that demands them, are what replace
+rounds. A plan set that would need a second round needs rewriting, not re-reviewing.
 
 One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
 requirement satisfied in plan `03` is covered even though plan `01` says nothing about
@@ -327,7 +332,7 @@ than the report that reviewed it was not.
 
 The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
 § *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
-the two that ground the set's claims outside it, no implementation code, and the
+the two that hold the set's claims to the proofs the spec recorded, no implementation code, and the
 no-placeholder list. Hold yourself to that no-placeholder list while drafting
 rather than waiting for the agent to find them — a plan that reaches the reviewer full
 of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can

@@ -1,7 +1,7 @@
 ---
-status: approved
+status: done
 created: 2026-10-29
-built-on: 80fae45ab510
+built-on: fd450d45d88d
 ---
 
 # Stack-Neutral Agent Wording Implementation Plan
@@ -80,3 +80,30 @@ tasks' changes.
 
 - `grep -rn colocated plugins/claudestacks/agents` finds nothing.
 - `claudevs check plugins/claudestacks` exits 0 and `cargo make plugins` exits 0.
+
+## Review findings
+
+Batch with plans 04 and 06, report `20261030-095405-ef9d/02-reviewer-plans-04-06.md`: plan 05
+compliant, no finding of its own.
+- nit, declined — no committed check guards `coder.md:32` / `reviewer.md:24` against a revert;
+  the checks live only in the run's scratchpad. The plan asks for none; review holds the text.
+
+## Probe results
+
+No throwaway probe: every asserted fact is a line this plan rewrites or a check it names.
+Proving checks, red before the edit, green after (scratchpad `p05/check.sh`):
+- `coder_no_longer_says_colocated` — before `1`, after `0`.
+- `coder_line_matches_spec` — before FAIL, after PASS (`sed -n 32p` vs spec §6 text, `diff -q`).
+- `reviewer_line_matches_spec` — before FAIL, after PASS.
+- `only_two_lines_changed` — `git diff --numstat`: `1 1` for each file.
+- `version_is_bumped` — before `0.2.1`, after `0.2.2`.
+- `claudevs check plugins/claudestacks` — exit 0 (ICON_MISSING and the existing
+  `globs_test.lua` wiring warning, both non-gating).
+- `cargo make plugins` — `630 passed, 0 failed (23 files)`.
+
+## Deviations
+
+- 2026-10-30 — Re-confirmed against spec `fd450d45d88d` on the author's instruction to execute
+  plans 04-06; the spec's amendments (§1.4, §3, §5 test-mandate row, §7) do not touch §6.
+- 2026-10-30 — Executed inline by the orchestrator (two-line text edit and a version bump),
+  reviewed by the batch reviewer. Not committed; the commit gate is the author's.

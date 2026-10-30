@@ -1,5 +1,5 @@
 ---
-status: executing
+status: done
 created: 2026-10-29
 depends-on: [01]
 built-on: fd450d45d88d

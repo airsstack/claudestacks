@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-29
 depends-on: [01]
-built-on: 80fae45ab510
+built-on: fd450d45d88d
 ---
 
 # Repository Text Implementation Plan
@@ -101,3 +101,35 @@ the repository` with all three tasks' changes.
 - `git grep -n 'claudestacks-guideline-python' -- README.md CLAUDE.md plugins/claudestacks/README.md .claude/settings.json .claude-plugin/marketplace.json`
   finds each file (the marketplace from plan 01).
 - `git grep -n -i 'five plugins' -- README.md CLAUDE.md plugins` finds nothing.
+
+## Review findings
+
+Batch with plans 04 and 05, report `20261030-095405-ef9d/02-reviewer-plans-04-06.md`: plan 06
+compliant.
+- drift, accepted — `README.md` Rust dependency line padded with two `─` so its arrow aligns
+  with the longer Python line (`README.md:154-155`).
+- compliant — `plugins/claudestacks/README.md:8` paragraph rewrapped; unwrapped it ran about
+  134 columns against a paragraph wrapped at 100 or less, the case the plan allows.
+
+## Probe results
+
+No throwaway probe: every insertion point was located by text before editing. Proving checks,
+red before, green after (scratchpad `p06/check.sh`):
+- `readme_names_python_plugin_three_times` — before `0`, after `3`.
+- `readme_count_is_six` — before Six=0 Five=1, after Six=1 Five=0.
+- `claude_md_lists_python_plugin` — before `0`, after `1`.
+- `claude_md_gate_line_unchanged` — PASS before and after (`cmp` against `HEAD`'s line 173).
+- `claudestacks_readme_names_both` — before FAIL, after PASS.
+- `settings_lists_python_plugin` — before `KeyError`, after `False`.
+- `settings_is_valid_json` — PASS.
+- Plan Proof `git grep -c` — `.claude-plugin/marketplace.json:2`, `.claude/settings.json:1`,
+  `CLAUDE.md:1`, `README.md:3`, `plugins/claudestacks/README.md:1`; `five plugins` finds nothing.
+
+## Deviations
+
+- 2026-10-30 — Re-confirmed against spec `fd450d45d88d` on the author's instruction to execute
+  plans 04-06; the amendments do not touch §2.3.
+- 2026-10-30 — Started while plan 01 is built but not yet `done` (author's goal named 04-06).
+- 2026-10-30 — The Rust dependency line in `README.md` changed (two `─` added) to align the new
+  line, beyond "aligned with the Rust line".
+- 2026-10-30 — Executed inline by the orchestrator, reviewed by the batch reviewer. Not committed.

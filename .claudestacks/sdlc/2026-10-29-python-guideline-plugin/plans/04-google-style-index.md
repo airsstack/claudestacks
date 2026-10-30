@@ -1,8 +1,8 @@
 ---
-status: approved
+status: done
 created: 2026-10-29
 depends-on: [02, 03]
-built-on: 80fae45ab510
+built-on: fd450d45d88d
 ---
 
 # Google Python Style Guide Index Implementation Plan
@@ -89,3 +89,88 @@ covered by PEP 8 alone. Record that decision table in the commit body.
 - `SKILL.md`'s reference index lists all thirteen files of spec §5, each once:
   `sed -n '/^## Reference index/,$p' SKILL.md | grep -c '^- \`references/'` is 13, and each of the
   thirteen names appears once in that output.
+
+## Review findings
+
+Batch with plans 05 and 06, report `20261030-095405-ef9d/02-reviewer-plans-04-06.md`, blocking:
+`google-style-guide.md:9` and Task 1 (one cause).
+- blocking — the baseline `extend-select` applies five sections the index omitted: 2.5
+  `PLW0603`, 2.8 `SIM118`, 2.10 `C417`, 2.14 `E711`/`E712`, 3.11 `SIM115`; the file's "only the
+  sections a reference or the gate applies" was false — fixed, five entries → `strict-quality.md`,
+  the remaining omitted rows re-probed. `bash p04/fix-probe.sh` → `failures=0`;
+  `bash p04/checks.sh` → `29 entries checked, 0 bad`, `headings=38 rows=38`, `failures=0`.
+- nit — intro said every pointed-at file "states the rule in full"; `strict-quality.md`
+  enforces without restating — fixed, "states or enforces".
+- nit — G-2.21 omitted `strong-types.md` (cites 2.21 at `strong-types.md:49-50`) — fixed.
+- nit — `SKILL.md` departures parenthetical named 5 of 8 — fixed, names all 8.
+- nit, declined — no committed check guards pointer resolution after this run; plan Risks'
+  "`every_pointer_resolves` catches a rename" holds only during execution. The plan asks for no
+  committed test; review holds it.
+- drift, accepted — omission reason "covered by PEP 8 alone" replaced (below).
+
+## Probe results
+
+- Guide fetched 2026-10-30, `curl -sS -L
+  'https://raw.githubusercontent.com/google/styleguide/gh-pages/pyguide.md'`, 4097 lines,
+  `grep -nE '^### [0-9]'` → 38 headings; spec §1.5 line numbers (:145, :230, :309, :929, :1438,
+  :1519, :2090, :3117, :3408) match the fetched copy.
+- Task 1 checks, red before the file existed (`failures=7`), green after (`failures=0`);
+  mutation run — wrong title, unresolved pointer, code with no heading, dropped table row each
+  turned its check red.
+- `uvx ruff@0.17.3 format|check --isolated` (baseline families), observed: the formatter settles
+  3.1, 3.3, 3.4, 3.5 (top-level blank lines only), 3.6, 3.14; Ruff `I` puts `import x` before
+  `from x import y` (G-3.13 departure); rule firings for 2.5, 2.8, 2.10, 2.14, 3.11 as above;
+  no finding on the omitted sections' examples (table below). Not re-asserted in
+  `fix-probe.sh`: the `len(seq)` no-finding under 2.14, from the all-baseline run only.
+
+## Deviations
+
+- 2026-10-30 — Re-confirmed against spec `fd450d45d88d` on the author's instruction to execute
+  plans 04-06; the amendments do not touch §5's Google row or §1.5. Started while plans 02 and
+  03 are built but not yet `done`.
+- 2026-10-30 — Omission reason changed from "covered by PEP 8 alone" to "no reference applies
+  it and the baseline reports no violation (probed)": 2.6, 2.18, 3.17 and others are not PEP 8
+  topics, so the plan's wording would be false.
+- 2026-10-30 — The decision table the plan puts in the commit body is recorded here as well, so
+  it survives if the commit is squashed. 38 headings, 38 rows: 21 pointer, 8 departure, 9 omitted.
+
+| § | Kind | Pointer / reason |
+|---|---|---|
+| 2.1 | departure | strict-quality — Ruff + mypy, not pylint; every suppression carries a reason |
+| 2.2 | departure | init-export-only — re-export line overrides 2.2; also the caller-side rule |
+| 2.3 | pointer | init-export-only, modularity |
+| 2.4 | departure | errors — stricter than 2.4 (TRY003) |
+| 2.5 | pointer | strict-quality (`PLW0603`) |
+| 2.6 | omitted | nested function/class drew no finding |
+| 2.7 | omitted | the guide's "No:" examples drew no C4 finding |
+| 2.8 | pointer | strict-quality (`SIM118`) |
+| 2.9 | pointer | docstring-discipline (`Yields:`) |
+| 2.10 | pointer | strict-quality (`C417`; `filter`/`reduce` lambdas not caught) |
+| 2.11 | omitted | nested multi-line conditional drew no finding |
+| 2.12 | pointer | idioms |
+| 2.13 | pointer | protocols-and-composition |
+| 2.14 | pointer | strict-quality (`E711`, `E712`) |
+| 2.16 | omitted | "Okay to use"; `B023` fires on a rule the section does not state |
+| 2.17 | omitted | `@staticmethod`/`@classmethod` drew no finding |
+| 2.18 | omitted | shared-dict mutation and bare `Thread` drew no finding |
+| 2.19 | pointer | strong-types (dataclasses/enum carve-out) |
+| 2.20 | departure | typing |
+| 2.21 | pointer | typing, strict-quality, strong-types |
+| 3.1 | pointer | strict-quality (formatter) |
+| 3.2 | departure | strict-quality, docstring-discipline — Ruff 88 vs Google 80 |
+| 3.3 | pointer | strict-quality (formatter) |
+| 3.4 | pointer | strict-quality (formatter) |
+| 3.5 | pointer | strict-quality (formatter; blank line after `def` not settled) |
+| 3.6 | pointer | strict-quality (formatter) |
+| 3.7 | omitted | `EXE001` is not the "main file only" rule |
+| 3.8 | pointer | docstring-discipline, init-export-only |
+| 3.10 | pointer | idioms (log calls), strict-quality (quote style) |
+| 3.11 | pointer | strict-quality (`SIM115`; sockets not caught) |
+| 3.12 | departure | docstring-discipline — `TODO: <what is missing>` |
+| 3.13 | departure | strict-quality, init-export-only — Ruff `I` order |
+| 3.14 | pointer | strict-quality (formatter) |
+| 3.15 | omitted | trivial getter/setter drew no finding |
+| 3.16 | pointer | init-export-only, errors, strict-quality |
+| 3.17 | omitted | no `__main__` guard drew no finding |
+| 3.18 | pointer | modularity |
+| 3.19 | departure | typing |

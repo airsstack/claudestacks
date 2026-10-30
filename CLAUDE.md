@@ -234,6 +234,7 @@ plugin skills and references — invoke the relevant skill rather than expecting
 | `claudestacks` | coder, reviewer, explorer; orchestration driver; process guidelines; project-local snapshot memory; /discuss communication protocol |
 | `claudestacks-sdlc` | AI-native SDLC workflow: committed intent → spec → plan → execute chain with distill/triage loops, artifact sync checks, optional roadmaps and milestones, and optional architecture decision records (`.claudestacks/sdlc/`) |
 | `claudestacks-guideline-rust` | Rust engineering guidelines and the Definition of Done |
+| `claudestacks-guideline-python` | Python engineering guidelines and the Definition of Done |
 | `claudestacks-journal` | Obsidian-compatible journal vault kept outside the repo, written by isolated subagents |
 | `claudestacks-cmux` | native cmux terminal control (control / workspace / browser / config) |
 

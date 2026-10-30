@@ -117,7 +117,7 @@ More: [CLI README](crates/claudevs-cli/README.md) · [docs](crates/claudevs/docs
 
 ## The plugin suite
 
-Five plugins for [Claude Code](https://www.claude.com/product/claude-code), installed from this
+Six plugins for [Claude Code](https://www.claude.com/product/claude-code), installed from this
 repository's marketplace.
 
 | Plugin | What you get |
@@ -125,6 +125,7 @@ repository's marketplace.
 | `claudestacks` | core agents (`coder`, `reviewer`, `explorer`), an `orchestrate` driver, snapshot memory, `/discuss` |
 | `claudestacks-sdlc` | an `intent → spec → plan → execute` workflow under `.claudestacks/sdlc/`, with roadmaps, ADRs and a `status` board |
 | `claudestacks-guideline-rust` | Rust guidelines and a Definition of Done the agents check against |
+| `claudestacks-guideline-python` | Python guidelines and a Definition of Done the agents check against |
 | `claudestacks-journal` | an Obsidian-compatible journal with embedding-free recall |
 | `claudestacks-cmux` | control of the [cmux](https://cmux.com) terminal |
 
@@ -150,7 +151,8 @@ airsl (binary) ◄── hooks/scripts ── claudestacks
                ◄──────────────────── claudestacks-journal ──requires──► claudestacks
                ◄──────────────────── claudestacks-cmux ────requires──► cmux (binary)
 
-claudestacks-guideline-rust ── no runtime needs; read by claudestacks
+claudestacks-guideline-rust ──── no runtime needs; read by claudestacks
+claudestacks-guideline-python ── no runtime needs; read by claudestacks
 ```
 
 ### Install
@@ -166,6 +168,7 @@ cargo install airsl-cli --locked
 /plugin install claudestacks@claudestacks
 /plugin install claudestacks-sdlc@claudestacks
 /plugin install claudestacks-guideline-rust@claudestacks
+/plugin install claudestacks-guideline-python@claudestacks
 /plugin install claudestacks-journal@claudestacks
 /plugin install claudestacks-cmux@claudestacks
 ```

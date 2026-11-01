@@ -1,14 +1,11 @@
 # Review policy
 
-`REVIEW.md` is the consuming repository's own review policy, living at
-`.claudestacks/sdlc/REVIEW.md`. It says what a review of a diff in that repository
-looks at, in what order, and what counts as blocking.
+`REVIEW.md` is the consuming repository's review policy, at `.claudestacks/sdlc/REVIEW.md`:
+what a review of a diff looks at, in what order, and what blocks.
 
-It is provisioned once by `/claudestacks-sdlc:setup`, which creates it only when it is
-absent — an existing `REVIEW.md` is never overwritten. From that point the file belongs
-to the repository, not to this plugin: tune it as the project learns what its reviews
-keep missing, and record each change in the Tuning log so the policy's own history is
-readable.
+`/claudestacks-sdlc:setup` creates it only when absent; an existing file is never
+overwritten. After that it belongs to the repository: tune it and record each change in the
+Tuning log.
 
 The template follows. `setup` writes the body of this fenced block, without the fence.
 
@@ -37,14 +34,8 @@ The template follows. `setup` writes the body of this fenced block, without the 
 
 Every review names its Important set — a count, or `none`. A round closes when that
 set is empty: each Important either fixed or explicitly declined in front of the
-author. It does not close when the report is empty, because the report is not
-expected to come back empty — each round of fixes writes new code, and new code gives
-the next round new nits to find. A non-empty report under `none` Important is a pass,
-not unfinished work, and never on its own justifies another round.
-
-This narrows nothing about what gets reported: a review still writes down everything
-it finds at both severities. The stopping condition governs what blocks a commit, not
-what appears in the report.
+author. A non-empty report under `none` Important is a pass and never on its own
+justifies another round. Everything found is still reported at both severities.
 
 ## Exclusions
 

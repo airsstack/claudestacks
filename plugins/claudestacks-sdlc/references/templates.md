@@ -1,9 +1,7 @@
 # Artifact Templates — body shapes for intent, spec, plan, roadmap, milestone, and ADR
 
-The body-shape authority for the `claudestacks-sdlc` skills. When `intent`, `design`,
-`plan`, `roadmap`, `milestone`, or `adr` writes a new artifact, it reproduces the shape
-shown here: frontmatter plus the body sections below it. Bracketed text is guidance for
-the writing skill, not content to leave in the file.
+Body-shape authority for the `claudestacks-sdlc` skills. A skill writing a new artifact
+reproduces the shape below. Bracketed text is guidance, not content to leave in the file.
 
 ## `intent.md`
 
@@ -44,9 +42,8 @@ solution]
 [explicitly out of scope, so the next stage doesn't drift into it]
 ````
 
-A triage-sourced intent (`source: triage` in frontmatter) adds one more section after
-`## Non-goals`: `## Evidence`, holding the pasted evidence — exact error text, exact
-commands — at full precision.
+A triage-sourced intent (`source: triage`) adds `## Evidence` after `## Non-goals`: the
+pasted evidence, exact error text and commands, at full precision.
 
 ## `spec.md`
 
@@ -142,19 +139,13 @@ introduces by name and one-line purpose]
 - [the plan-wide checks that prove every task's work holds together]
 ````
 
-A plan carries no implementation or test code: no function bodies, no test bodies, no
-diff. A command the implementer runs is fine. The shape follows the `plan.md` in Anthropic's
-AI-native SDLC playbook — files that change, order of work, risks, proof — and `execute`
-writes the code.
+A plan carries no implementation or test code (no function bodies, test bodies or diffs); a
+command to run is fine. Provenance keys per `artifact-chain.md` §6 may also appear in a
+plan's frontmatter.
 
-Provenance keys per `artifact-chain.md` §6 may also appear in a plan's frontmatter.
-
-Once `execute` runs this plan, it appends three more sections directly to the file, in
-this order — `## Review findings` (durable reviewer output), `## Probe results` (each
-throwaway test run to prove a claim the task asserted but did not create: the claim, the
-command, its real output, and whether it came out against the plan), and `## Deviations`
-(departures from the plan) — before flipping it `done`. None is authored by the `plan`
-skill; all three are appended by `execute`.
+`execute` appends two sections to the plan, in this order, before flipping it `done`:
+`## Review findings` and `## Deviations` (departures from the plan, including any claim the
+build showed wrong). The `plan` skill authors neither.
 
 ## `roadmaps/<roadmap>/roadmap.md`
 
@@ -195,8 +186,7 @@ created: <YYYY-MM-DD>
 ````
 
 Both carry `status` and `created` and no other frontmatter key. Neither body lists
-milestones, chains, progress or finished work: `artifact-chain.md` §11 says where
-those come from.
+milestones, chains, progress or finished work (`artifact-chain.md` §11).
 
 ## `adrs/NNNN-<topic>.md`
 
@@ -226,15 +216,15 @@ supersedes: [0003]               # optional — the ADRs this one replaces
 [what follows from the decision, the costs included]
 ````
 
-`sealed` is written by the `adr` skill at approval and never by hand. The body is never
-edited after approval (`artifact-chain.md` §13.2).
+`sealed` is written by the `adr` skill at approval, never by hand. The body is never edited
+after approval (`artifact-chain.md` §13.2).
 
 ## A parked intent
 
 Work planned for a milestone and not yet begun is parked by the `milestone` skill as an
-ordinary `intent.md` with `status: draft` and the `milestone` key. `Problem` holds what
-the author said about that piece of work. `Affected systems`, `Desired outcome`,
-`Constraints` and `Non-goals` each hold exactly this sentence:
+ordinary `intent.md` with `status: draft` and the `milestone` key. `Problem` holds what the
+author said about it. `Affected systems`, `Desired outcome`, `Constraints` and `Non-goals`
+each hold exactly this sentence:
 
 ```
 Not explored yet — parked by milestone <roadmap>/<NN>.
@@ -244,5 +234,5 @@ The author completes it later through the `intent` skill's amend mode.
 
 ---
 
-`references/artifact-chain.md` owns paths, naming, frontmatter key semantics, and the
-state machine; this file owns body shapes — change one, check the other.
+`references/artifact-chain.md` owns paths, naming, frontmatter key semantics and the state
+machine; this file owns body shapes. Change one, check the other.

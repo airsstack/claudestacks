@@ -1,485 +1,91 @@
 ---
 name: execute
-description: Use when a chain has an approved plan to carry out — drives it through parallel claudestacks coder/explorer/reviewer spawns with filesystem context handoff, proves each task's premises with throwaway tests before building on them, and walks chain states up on completion. Invoke by chain/plan reference (e.g. "execute 2026-08-24-webhook-reliability/01") once a plan is approved and before any of its code is written.
+description: Use when a chain has an approved plan to carry out — builds it through parallel claudestacks coder/reviewer spawns, never asks the author anything, re-proves nothing, and reports once at the end. Invoke by chain/plan reference (e.g. "execute 2026-08-24-webhook-reliability/01").
 ---
 
 # Execute
 
-Drive a written plan to a reviewed, presentable state. This skill does not design and does
-not plan — those are the `design` and `plan` skills. It works with any plan in the chain's
-documented on-disk format, whether written by `plan` or by hand.
-
-You are the orchestrator. Agents are leaves: none of them can spawn another, so every
-result routes through you, and the user's commit gate is never bypassed.
-
-Paths, naming, frontmatter, and state transitions all come from
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`; artifact body shapes come from
-`${CLAUDE_PLUGIN_ROOT}/references/templates.md`.
-
-## Input
-
-A chain/plan reference, e.g. `2026-08-24-webhook-reliability/01`, resolving to
-`.claudestacks/sdlc/2026-08-24-webhook-reliability/plans/01-<topic>.md`.
-
-Given a bare chain name with no plan number, read the chain's row on the board first
-(Sync check, below). When the row reads `chain complete`, the chain's plans are finished
-and its intent was never flipped: perform the State walk-up at the end of this file, and
-nothing else — no plan is run. Otherwise ask which plan, offering the chain's `approved`
-plans as choices.
-
-## Sync check
-
-Before acting, render the board and read the chain's row:
-
-    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
-
-When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
-`status` skill's fallback does. Do the same again after every `status` flip this skill
-makes — on a plan or on the intent — and tell the user what the row reads then.
-
-The row's wording comes from the sync rules in
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. A plan's **authority** is the
-chain's `spec.md`, or the chain's `intent.md` when the intent carries `spec: skipped`
-and no `spec.md` exists.
-
-**Refuse to start or resume the plan** — naming the file, the condition exactly as the
-board words it, and what clears it — when the row reads any of:
-
-| The row reads | Cleared by |
-|---|---|
-| `INVALID (spec.md: missing built-on)` | the `design` skill |
-| `INVALID (plans/NN: missing built-on)` | the `plan` skill |
-| any other `INVALID (…)` | the user, in the file the row names |
-| `spec stale (intent changed)` | the `design` skill |
-| `spec stale (ADR …)` | the `design` skill |
-| `spec blocked (ADR …)` | the `adr` skill |
-| `ADR NNNN disproven by <chain>/NN` | the `adr` skill, with no exception |
-| `plan NN <status>: blocked (spec not approved)`, for the plan you were given | the `design` skill |
-| `plan NN <status>: stale (spec changed)` or `plan NN <status>: stale (intent changed)`, for the plan you were given | the `plan` skill |
-
-A `blocked` or `stale` part that names a different plan does not stop this one. These
-are refusals, not warnings: stricter than the unmet-`depends-on` case in the state gate
-below, which stays the user's call.
-
-**While the row reads `spec disproven by plan NN` or `intent disproven by plan NN`**,
-refuse to start or resume every plan of the chain except one: the plan whose own
-`disproves` frontmatter key equals its authority's current fingerprint, which may finish
-the run that raised the condition. Every other plan waits — a `draft` plan you are asked
-to run included — until the `design` skill (for `spec disproven`) or the `intent` skill
-(for `intent disproven`) has brought the text up to date.
-
-**While the row reads `ADR NNNN disproven by plan NN`**, refuse to start or resume every
-plan of the chain except plan `NN` itself, which may finish the run that raised the
-condition. Every other plan waits — a `draft` plan you are asked to run included — until
-the `adr` skill has superseded or deprecated the ADR. A sibling chain's disproof reads
-`ADR NNNN disproven by <chain>/NN` instead, and no plan of this chain is exempt from it
-(the table above).
-
-## State gate
-
-Read the plan's **frontmatter only** — not its body — before anything else:
-
-- `approved` — proceed.
-- `executing` — you are presumably resuming. Continue rather than refuse.
-- `draft` — **the instruction to execute is the approval**, provided nobody has changed
-  what the plan was written against. A user who names a plan and asks for it to run has
-  done the thing the approval gate exists to capture, so do not send them to another
-  skill to say it a second time. First compare the plan's `built-on` with its
-  authority's current fingerprint:
-
-      sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
-
-  When they differ, or the plan has no `built-on`, refuse and name the `plan` skill:
-  either the authority changed after the plan was drafted, or the plan never recorded
-  what it was written against, and in both cases nobody has read the plan against the
-  current text, so running it would approve something no one reviewed. Refuse the same
-  way, naming the `design` skill, when the authority is a `spec.md` that is still
-  `draft` — the plan would read `blocked (spec not approved)` the moment it went live.
-
-  Two further cases where you stop and ask first: the plan carries an unresolved marker
-  its own author left for the reader (a `TODO`, an open question, a `TBD`), or the
-  reference you were given was a whole chain rather than one named plan — a blanket
-  "execute this chain" is not approval of a specific draft nobody has read.
-
-  Only when none of those holds — the two are equal, the authority is not a `draft`
-  `spec.md`, and neither case above applies — flip `draft → approved → executing`
-  yourself and state plainly, in one line, that you did: which plan, that it was
-  `draft`, and that executing it is being recorded as its approval. Then carry on.
-- `done` or `superseded` — do not silently re-run it. The work already happened or was
-  replaced, so re-executing would repeat commits or contradict the plan that replaced it.
-  But do not dead-end either: follow-up work on a finished plan — fixing findings its own
-  review recorded, hardening something it left thin — is genuinely new work rather than a
-  re-execution, and it has a home. Say which of the two you are looking at, and route it:
-  a genuine new round of construction is a new plan through the `plan` skill; ad-hoc
-  follow-up goes to the `claudestacks:orchestrate` skill, which drives the same agents under
-  the same disciplines without requiring a plan file. Naming the destination is part of the
-  refusal; a bare "refused" leaves the work to be orchestrated by hand.
-- `depends-on` names a plan that is not yet `done` — warn and ask before proceeding. The
-  dependency may be irrelevant to the tasks about to run, so this is the user's call, not an
-  automatic block.
-
-## Safety guard
-
-If the current branch is `main` or `master`, stop. Name the branch and get explicit consent
-before any implementation. Never execute a plan on a protected branch without the user
-saying so.
-
-## Load the plan through the briefer, not into your context
-
-A plan names files, behaviour, and tests for every task; it carries no code — writing the
-code is this skill's job, the playbook's "accept the plan and let Claude implement". Reading
-the plan whole still spends the main thread's context on detail only each task's coder needs.
-
-Spawn `claudestacks-sdlc:task-briefer` in `ledger` mode:
-
-```
-mode: ledger
-plan: <chain>/plans/NN-<topic>.md
-handoff: <session-dir>/01-task-briefer-ledger.md
-handoff-protocol: <the path /claudestacks:context-handoff gave you>
-```
-
-It returns one row per task — number, title, files, verification commands — plus the goal,
-`depends-on`, and any checkpoint boundaries the plan marks. That table is your execution
-ledger; write it to `TodoWrite`, one item per task.
-
-Read the plan file directly only for a passage you must personally judge — an ambiguity you
-are about to raise with the user, or a step whose wording decides how you batch. Never read
-it end to end.
-
-If `task-briefer` does not resolve, build the ledger inline with
-`grep -n '^### Task' <plan>` and read only the task headers. Tell the user the agent was
-unavailable. Never fail hard for want of an agent.
-
-Then assess the ledger critically: ambiguous tasks, unclear dependencies, an unspecified
-branch, anything contradicting project conventions. Surface concerns NOW and resolve every
-blocking one — do not guess through an ambiguity and find the mistake three tasks later.
-
-## Mechanical state flip
-
-The instant task 1 begins, flip the plan's frontmatter `status: approved → executing`. This
-is one of the two transitions that fires without a fresh approval question — a consequence
-of the plan approval already earned, not a new decision.
-
-## Context handoff
-
-Subagent detail stays on disk; only summaries reach you. Invoke
-`/claudestacks:context-handoff` once at the top of the run and follow it — it owns the tier
-decision, which session calls to make, and the protocol path every brief carries.
-
-This run holds several agents in flight at once, so it takes the session tier.
-
-What is local to you: the batching rules below, one handoff file per spawn, and never two
-concurrent coders on the same file. When a coder needs a task's verbatim text, pass the
-upstream `handoff:` path plus a `need:` pointer rather than paraphrasing it.
-
-## The agents
-
-| Agent | Use for |
-|---|---|
-| `claudestacks-sdlc:task-briefer` | the ledger, and each task's verbatim brief |
-| `claudestacks:explorer` | locating — where a symbol lives, what calls it, mapping a tree |
-| `claudestacks:coder` | implementing one task, test-first, to the stack's Definition of Done |
-| `claudestacks:reviewer` | one combined report: re-runs the DoD, reviews the diff, checks it against the plan |
-
-If any does not resolve, degrade to inline work on the main thread under the same
-discipline, and say which agent was unavailable.
-
-## Batch the ledger, then run each batch in parallel
-
-Sequential-by-default wastes the plan's own structure: a plan that touches four disjoint
-files in four tasks can build all four at once.
-
-Walk the ledger and cut it into batches. A run of consecutive tasks belongs in one batch
-when **both** hold:
-
-- their file sets are pairwise disjoint — no two tasks in the batch write the same path; and
-- no task in the batch names a type, function, constant, or module that another task in the
-  same batch creates.
-
-The ledger gives you the file sets directly. For the second test, the briefs' **Asserted
-facts** lists give you the named symbols; where the ledger alone cannot settle it, spawn
-`claudestacks:explorer` once over the batch's symbols and let its `file:line` table answer
-whether each already exists.
-
-Anything failing either test starts a new batch. A checkpoint boundary the plan marks always
-ends a batch. A batch of one is normal and fine — most plans are genuinely sequential
-because task N+1 uses what task N defined.
-
-Within a batch, spawn one `coder` per task, all in a single message so they run
-concurrently. Each gets its own handoff file. Never give two concurrent coders the same
-file.
-
-## Per-batch loop
-
-For each batch, in order:
-
-1. Mark its tasks `in_progress`.
-
-2. **Brief.** Spawn `task-briefer` in `brief` mode, once per task in the batch, in one
-   message:
-
-   ```
-   mode: brief
-   plan: <chain>/plans/NN-<topic>.md
-   task: <N>
-   handoff: <session-dir>/<NN>-task-briefer-task<N>.md
-   handoff-protocol: <the path /claudestacks:context-handoff gave you>
-   ```
-
-   You get back each task's files, verifications, and Asserted facts. You do not get the
-   task's prose, and you do not need it.
-
-3. **Prove what the task assumes.** See below. Do this before the coder builds on it, not
-   after.
-
-4. **Implement.** Spawn one `coder` per task, concurrently. Each brief carries:
-   - `handoff: <session-dir>/<NN>-coder-<slug>.md` — its own report path;
-   - `handoff-protocol: <the path /claudestacks:context-handoff gave you>` — the protocol;
-   - `need: <the task-briefer handoff path>` — it reads its task's verbatim `<detail>`
-     itself, and builds from that text, not from your paraphrase;
-   - the instruction that the plan names the change and its proving tests but carries no
-     code: the coder writes the named tests first, sees them fail, then writes the
-     implementation;
-   - the stack guideline to load (e.g. `claudestacks-guideline-rust:rust-guidelines`) and
-     the instruction that its architecture rules bind, not only its Definition of Done;
-   - the exact verification commands the plan names for that task;
-   - the results of step 3, where a probe changed what the task should do.
-
-5. **Verify.** Run the verifications the plan names for this batch, and the stack's
-   Definition of Done once for the batch. Show the output. A task is complete only when its
-   named verification ran and its output is shown — not merely described.
-
-6. **Review — once.** One `reviewer` spawn over the batch's whole diff, with the plan path
-   as the intent authority. See the review budget below.
-
-7. **Present and mark complete.** Surface: files changed and the behaviour they change, each
-   verification's outcome with its evidence, and the reviewer's own report — not your summary
-   of it. Only then mark the tasks `completed`.
-
-A task that fails verification is not complete; do not start the next batch. Where the plan
-marks a checkpoint, that is a hard stop: present the batch and wait for "continue".
-
-## Prove what the task assumes, with a throwaway test
-
-The spec's claims were proven before the plan was written, so this step is a cheap
-confirmation, not first-time discovery: the plan is not evidence for itself, and the world
-may have moved since the spec's probes ran. Every fact a task asserts about something it
-does not create is still a place the plan can be wrong. The `task-briefer` hands you that
-list — work it before the coder starts. A check that fails is handled by *When execution
-disproves the plan, the spec or an ADR*, below, without asking the author.
-
-Sort each asserted fact into one of three:
-
-| Kind | What settles it |
-|---|---|
-| **The task creates it** | nothing to prove — it does not exist yet by design. |
-| **Structural — a symbol, path, or signature the task says already exists** | one `explorer` spawn over the whole batch's symbols, returning `file:line` or NOT FOUND. Cheap; batch them. |
-| **Behavioural, or a fact about an outside system** | a **throwaway test you actually run**. Write the smallest probe that would come out differently if the claim were false, run it, keep the real output, delete the probe. |
-
-Reading the source is not proof of behaviour. Neither is the plan saying so, nor the spec it
-came from, nor your own recollection — those are precisely the paths that put the wrong fact
-there. Run it.
-
-For a claim about a documented external system, the artifact is the authority: fetch the raw
-source to a local file and grep it —
-`curl -sS -L '<doc-url>.md' -o "$TMPDIR/<name>.md"` — never through a summarizing fetch
-tool, which truncates a long page and hands the remainder to a small model that emits
-plausible invented content instead of an error.
-
-**Where a test the task names under Proof already exercises the claim, the coder's red-green
-run of it IS the probe — do not write a second one.** Only claims the plan never puts under a
-test of its own need one of yours; where the spec records a probe for the claim, re-running
-that probe is the cheapest one. Probes are for the load-bearing, not for every literal in
-the file.
-
-## Verification budget — do not over-verify
-
-Run each verification exactly once, at the point it is meaningful, and then trust it:
-
-- The stack's Definition of Done runs **once per batch**, not once per task. A green gate is
-  not re-run to confirm it is still green.
-- A file you just wrote through `Edit` or `Write` is not read back to confirm the write
-  landed — the tool would have failed.
-- The reviewer re-runs the DoD as its independent check. That is the one deliberate
-  duplication in the flow, and it replaces any auditing pass of your own over the coder's
-  receipt. Do not add a third run.
-- Scope the gate to the touched crate or package while a plan is mid-flight; run the
-  workspace-wide form once, at completion.
-
-A verification that cannot change what you do next is not a verification. Skip it.
-
-## Review budget — do not over-review
-
-**One `reviewer` spawn per batch. One fix round. Then you are done.**
-
-- Route the reviewer's findings to a **fresh** `coder` spawn — the reviewer never edits and
-  never calls the coder.
-- After that fix round, re-run only the specific verification the fix touches. **Do not
-  re-spawn the reviewer over the fixed diff.**
-- If the fix round leaves something genuinely unresolved, that is an escalation to the user,
-  not a second review. Say what is unresolved and ask.
-
-What closes the batch is the **blocking set** being empty — each finding that must be
-addressed before commit either fixed or put to the user — not the report being empty. The
-report is not expected to come back empty, and a reviewer that keeps reporting nits after
-the blocking findings are gone is doing its job, not signalling that work remains. Read the
-verdict, not the length. Close on the set the reviewer itself names as blocking; if its
-report does not name one, ask for it explicitly rather than inferring the boundary from the
-finding list.
-
-Rounds beyond the first return progressively smaller findings about code the compiler has
-already accepted, while the defects that actually matter are wrong premises — which no
-review round can catch, because a reviewer checks the diff against the plan and a wrong plan
-is exactly what it will confirm. The probe step above is what replaces the extra rounds.
-
-## When execution disproves the plan, the spec or an ADR
-
-Execution is the first time a plan's claims meet the artifact they describe, so a wrong
-premise can still surface here. It is a defect of an earlier stage, not a question for the
-author: `design` was to prove every claim of the spec before it was approved, and `plan` to
-refuse a spec that did not. By now the author has settled the design, so **do not stop to ask
-about it.** The code fix is only half the work — the other half is that the chain now lies to
-whoever executes the next plan — and both halves are done without a pause. When a check comes
-back against the plan:
-
-1. **Fix what the task needs.** Build to what the check showed, and give the coder the
-   result (step 4 of the loop). Carry on with the run.
-2. **Record it as a defect of the stage that let it through.** In `## Deviations`, a dated
-   entry naming the claim, the stage it belongs to — the spec's, the plan's, a cited ADR's —
-   the command and its real output, and what was built instead. The check itself goes in
-   `## Probe results`, marked as against the plan.
-3. **Record the debt on the board**, below, when the claim was the spec's or an ADR's.
-4. **Report it once**, in the completion report. That is the author's first sight of it, and
-   it names the skill that clears the board's condition.
-
-Do not edit the approved `spec.md` yourself. Any change to its text moves its fingerprint,
-every plan of the chain then reads `stale (spec changed)`, and re-confirming a plan is never
-`execute`'s to do (`artifact-chain.md` §10.2). The marker below is the record, and `design`
-corrects the text after the run. An ADR is superseded or deprecated through the `adr` skill,
-not amended.
-
-**Record the debt before you continue.** When what the check disproved is a claim of the
-plan's authority — the chain's `spec.md`, or its `intent.md` on the spec-skip path —
-write `disproves` into the frontmatter of the plan you are running, holding that
-authority's current fingerprint:
-
-    sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
-
-Write it before any further task runs, without asking. The key
-holds one fingerprint: a later disproof by the same plan overwrites it, and it is never
-removed. From then on the board reads `spec disproven by plan NN` (or
-`intent disproven by plan NN`), no sibling plan can start, and the chain cannot
-complete, until the authority's text changes — at which point the marker matches
-nothing and stops having any effect. A disproven claim that belongs to the plan alone,
-not to its authority, writes no marker.
-
-When what the check disproved is a claim of an ADR the spec cites, write that ADR's
-number into the running plan's `disproves-adr` frontmatter key, a list such as `[0003]`,
-before any further task, without asking. Numbers are added, never
-removed, and the key stays after the ADR is superseded or deprecated: the board stops
-reading it then. Name only an ADR the spec's `adrs` cites — the board reads any other as
-`INVALID (plans/NN: disproves uncited ADR NNNN)`, which replaces the chain's whole row.
-From then on the board reads `ADR NNNN disproven by plan NN` on this chain and
-`ADR NNNN disproven by <chain>/NN` on every other open chain whose approved spec cites
-the ADR; this plan may finish its run, no other plan starts, and the chain cannot
-complete until the `adr` skill supersedes or deprecates the ADR. Superseding it is the
-`adr` skill's, and the author authorizes it.
-
-Writing either key is not a `status` flip, so render the board again afterwards and note
-what the row reads for the completion report: an `INVALID` result replaces the whole row, so
-the condition you just recorded may not show until it is cleared.
-
-Sibling plans were written against the old text and cannot see the commit that corrected it.
-A commit body is not where the next plan's author looks. Amending a `draft` plan is the `plan`
-skill's; superseding an approved `spec.md` is the `design` skill's, and amending the intent
-on the spec-skip path is the `intent` skill's. Those happen after the run, on the author's
-word, once the completion report has named the defect.
-
-## When to stop and ask
-
-A premise that failed a check is not a reason to stop; it is recorded and the run carries on
-(above). Stop only for a genuine blocker:
-
-- a dependency is missing or ambiguous;
-- a verification fails repeatedly in a way nothing recorded explains;
-- the next step is destructive or irreversible — deleting data, a force push, a
-  migration that cannot be rolled back — and the plan does not name it;
-- the branch is protected (*Safety guard*, above).
-
-Ask the one focused question that unblocks you, not every concern at once. It is never a
-question about whether the spec is right.
-
-## Completion
-
-Present the whole run: what was built batch by batch, the verifications and their evidence,
-the reviewer reports, every probe whose result contradicted the plan, and any deviation from
-the plan and how it was resolved. Defects of earlier stages come first, each with its
-evidence and the skill that clears it: this report is the one place the author sees them,
-because the run did not stop to ask.
-
-Before flipping the plan to `done`, append three sections to the plan file, in this order:
-
-1. **`## Review findings`** — one line per reviewer finding, `category — description —
-   where`. On the inline-degraded path, write `inline execution, no independent reviewer`
-   plus anything the verifications surfaced. This is what keeps findings durable past the
-   session; `distill` reads it later, across chains, to catch a mistake recurring.
-
-   Where a line records a finding as fixed *and verified*, it carries the command that
-   showed it and that command's real output, from the run that happened. A stated result
-   that does not reproduce is a false green — it reads as evidence and is not — so a fix
-   whose verification you cannot reproduce goes into the record as unverified, named as
-   such, rather than as fixed.
-2. **`## Probe results`** — one line per throwaway test that was run: the claim, the command,
-   and the real output, at full precision. Mark any that came out against the plan. This is
-   the record that a premise was checked rather than assumed, and it is what a later reader
-   needs to know which claims are still only plausible.
-3. **`## Deviations`** — a dated entry for every departure from the plan as written, what
-   changed and why; an entry for a disproven claim is marked as a defect of the stage it
-   came from (spec, plan, or ADR). Omit only if execution followed the plan exactly.
-
-Those three sections are where the run's *reasoning* goes: why a premise turned out wrong,
-what was weighed and rejected, what a deviation cost. Not into source comments. A comment
-explains the code beside it; reasoning parked there ships to every future reader and is
-wrong the first time the code moves, while the same sentence in the record is cheap to
-correct and reaches exactly the person who needs it. When a coder returns a fix wrapped in
-a paragraph of justification, that paragraph belongs here.
-
-Then wait. The user decides whether to commit, merge, or open a pull request. Do not
-auto-commit, do not auto-merge, do not auto-push — the commit gate belongs to the user, and
-no agent in this flow runs `git commit` either.
-
-Only once the user accepts the completion report, flip the plan's frontmatter
-`status: executing → done`.
-
-## State walk-up
-
-After a plan flips to `done` — or when you were given a bare chain name whose row reads
-`chain complete` — render the board (Sync check) and read the chain's row.
-
-- **The row reads `chain complete`.** Every plan is `done` or `superseded`, with at least
-  one `done`, and none of the conditions in the next bullet holds: neither the chain's
-  text nor an ADR its spec cites is holding it open. Flip the chain's `intent.md`
-  `status: approved → done` and tell the user the chain is complete — the second
-  transition that fires without a fresh approval question, a consequence of state already
-  earned on the individual plans.
-- **Every plan is settled, but the row reads `spec stale (intent changed)`,
-  `spec disproven by plan NN`, `intent disproven by plan NN`, `ADR NNNN disproven by …`,
-  `spec stale (ADR …)` or `spec blocked (ADR …)`.** The chain is not complete. Leave the
-  intent `approved`, and say which condition holds it open and which skill clears it:
-  `design` for `spec stale` (either form) and `spec disproven`, `intent` for
-  `intent disproven`, the `adr` skill for `ADR NNNN disproven by …` and
-  `spec blocked (ADR …)`. The walk-up fires on a later run, once the text is up to date
-  and the ADRs are settled.
-- **Other plans remain `draft`, `approved`, or `executing`.** Leave the intent as is and
-  say what is still open.
-
-**Then the roll-up.** When the walk-up flipped the intent to `done` and that intent
-carries a `milestone` key, run the roll-up for the milestone's roadmap as the last step.
-Its procedure is defined once, in `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`:
-it closes each `approved` milestone whose chains are all finished, with at least one
-`done`, then the roadmap once its milestones are, again with at least one `done`. It is
-idempotent, and it flips without a fresh approval question — a consequence of state
-already earned on the chains. Tell the user each thing it closed, then render the board
-again and tell the user what the milestone's and the roadmap's rows read. An intent with
-no `milestone` key is a simple chain: there is nothing to roll up.
+## The rule
+
+An accepted plan is ready to build. All discussion and all proof happened at intent and
+spec. The author is not watching this run.
+
+- **Never ask.** No questions, no "accept?", no "open decisions", no waiting — not mid-run,
+  not at the end.
+- **Never re-prove.** No probes, doc fetches or assumption checks. Run only the tests the
+  plan names and the stack's Definition of Done.
+- **Never refuse.** Board conditions, draft status, TODOs, fingerprint mismatches: note them
+  and run.
+- **Say nothing until the end.** One completion report is the only message.
+
+When something is unclear or the spec is silent, decide — pick what is closest to the
+spec's stated intent — and write the call in the plan's `## Deviations`. That is never a
+question.
+
+Paths, frontmatter and states: `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`.
+
+## Start
+
+1. **Which plans.** A plan reference runs that plan. A bare chain name runs every plan not
+   `done`/`superseded`, in `depends-on` order. A plan whose `depends-on` is not `done` runs
+   after that dependency. A `done`/`superseded` plan: say so in one line, run nothing.
+2. **Board.** `sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"`. Whatever the row says, copy
+   it into `## Deviations` if it is not clean, and carry on.
+3. **Branch.** On `main`/`master`, create `sdlc/<chain>-<NN>` and work there.
+4. **Status.** Flip the plan to `executing` (a `draft` plan goes `draft → approved →
+   executing`; running it is its approval).
+5. **Handoff.** Invoke `/claudestacks:context-handoff` once; use the session tier.
+6. **Ledger.** Spawn `claudestacks-sdlc:task-briefer` with `mode: ledger`, `plan: <path>`,
+   `handoff: <session-dir>/01-task-briefer-ledger.md`, `handoff-protocol: <path>`. Put one
+   TodoWrite item per task. Never read the plan end to end. If the agent is missing, use
+   `grep -n '^### Task' <plan>`.
+
+## Build, batch by batch
+
+Batch consecutive tasks whose file sets are disjoint and that do not use a symbol another
+task in the batch creates. A plan checkpoint just ends a batch.
+
+Per batch:
+
+1. **Brief** — one `task-briefer` (`mode: brief`, `task: <N>`) per task, in one message.
+2. **Implement** — one `claudestacks:coder` per task, in one message. Each gets its own
+   `handoff:` path, the `handoff-protocol:` path, `need: <briefer handoff>`, the stack
+   guideline skill to load, the plan's verification commands, and: write the named tests
+   first, see them fail, then implement. Never two coders on one file.
+3. **Verify** — run the plan's verifications and the Definition of Done once for the batch
+   (scoped to the touched crate/package; workspace-wide once at the end).
+4. **Review once** — one `claudestacks:reviewer` over the batch diff. Brief: judge the diff
+   against this plan only; do not open or compare with the spec. Drop any plan-vs-spec
+   finding.
+5. **Fix once** — send the reviewer's `blocking:` set (or every 🔴 if none is named) to a
+   fresh `coder`, re-run only the verification it touches. No second review. Anything still
+   unresolved goes to `## Review findings` as open.
+6. Mark the tasks `completed`, keep the evidence for the report, start the next batch.
+
+A task whose verification fails is incomplete; skip only batches that depend on it.
+
+**When the build contradicts the plan, spec or an ADR** (a named test, the compiler or the
+DoD shows a claim wrong): build to what the code showed, add a `## Deviations` entry (claim,
+stage it came from, command + real output, what was built instead), and continue. If the
+claim was the spec's or intent's, set `disproves: <fingerprint>` in this plan's frontmatter
+(`sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority>`); if a cited ADR's, add its
+number to `disproves-adr: [NNNN]`. Never edit `spec.md`, `intent.md` or an ADR.
+
+**When a task is blocked** (missing dependency, a failure nothing explains, a destructive
+step the plan does not name): do not run it, record it in `## Deviations`, keep running
+everything that does not depend on it.
+
+## Finish
+
+1. Append to the plan: `## Review findings` (one line per finding; a "fixed" line carries
+   its command and real output) and `## Deviations` (dated entries; omit if none).
+2. Flip the plan to `done` if every task completed; otherwise leave it `executing`.
+3. Render the board. If the row reads `chain complete`, flip the chain's `intent.md` to
+   `done`; if that intent has a `milestone` key, run the roll-up from `artifact-chain.md`.
+4. Send the **completion report** — the one message of the run:
+   - blocked tasks and contradicted claims first, each with the skill that clears it;
+   - what was built, verification results, reviewer verdicts;
+   - the board row.
+   No questions, no open decisions, no "accept?".
+
+Do not commit, merge or push unless the instruction to execute said to.

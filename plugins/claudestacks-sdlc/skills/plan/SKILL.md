@@ -1,370 +1,123 @@
 ---
 name: plan
-description: Use when a chain's spec is approved (or its intent carries spec: skipped) and implementation plans are needed — decomposes the objective into plans naming the files that change, the order of the work, the risks, and the tests that prove it, without writing any code; derives the plan fan-out and dependencies from the spec without asking, writes them to the chain's plans directory, and asks once for the whole set to be accepted. Invoke once a spec is approved (or skipped) and before any code is written.
+description: Use when a chain's spec is approved (or its intent carries spec: skipped) — refuses a spec with unproven claims, derives a plan set covering every spec requirement (files, order of work, risks, named tests) without asking or writing code, and asks once for the whole set to be accepted.
 ---
 
 # Plan
 
-Turn an approved spec (or a spec-skipped intent) into one or more implementation plans, in the
-shape of the `plan.md` from Anthropic's AI-native SDLC playbook (Stage 3, the plan mode play):
-**the files that change, the order of the work, the risks, and the tests that prove it.**
+## The rule
 
-A plan stands alone. Iterate until an engineer who has never seen the conversation could
-implement the change from the plan alone — whoever picks it up may not know the codebase, may
-not have read the spec, and shares no context with you.
+All discussion and all proof happened at intent and spec. An accepted plan is ready to build,
+and `execute` builds it without asking or re-proving.
 
-## Hard gate — a plan carries no code
+- **Ask nothing** but the one acceptance question for the whole set.
+- **Write no code** — no implementation, no test bodies, no diff, no prototype. `execute`'s coder
+  writes tests and code, test-first.
+- **Run nothing new** — no probe, fetch or verification. Read files, `grep`, `git log`: to map
+  files and name work, not to check the spec.
+- **Refuse an unproven spec.** **Cover every spec requirement** across the set.
 
-This stage is plan mode: read the codebase, change nothing. The playbook puts design review
-"before any code is generated, when changing course is still a matter of editing a document",
-and implementation starts only once the plan is accepted. Writing the code here means
-`execute` writes it a second time.
+Paths, frontmatter, states: `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Body shapes:
+`${CLAUDE_PLUGIN_ROOT}/references/templates.md`. Lazy-create `plans/`.
 
-So, in this skill:
+## Gates
 
-- **Write no implementation code and no test code** — not in the plan, not in a scratch file,
-  not as a prototype to check the plan works. No function bodies, no test bodies, no diff.
-  `execute`'s coder writes the tests and the implementation, test-first.
-- **Run no probe and no new verification.** Proving the spec's claims was `design`'s job,
-  and it finished before the spec was approved. Reading files, `grep` and `git log` are the
-  whole toolset here, used to map the files and name the work, not to check the spec.
-- **Name, don't write.** A task names the files, the types or functions it introduces (by
-  name and one-line purpose; their shape belongs to the spec), the behaviour that changes,
-  and each test by name with what it asserts in prose.
+**State.** Proceed only with `spec.md` `approved`, or no `spec.md` and an `approved` `intent.md`
+carrying `spec: skipped`. Otherwise refuse, naming file, state and what advances it: spec
+`draft` → `design`; no spec, no flag → `design`, or the author sets the flag via `intent`;
+intent not `approved` → `intent`. Never set `spec: skipped` yourself.
 
-A question that only running new code could answer does not become a risk for `execute` to
-settle. The spec has to stop depending on it; see *The spec must be verified before it is
-planned*, below.
-
-Three principles bind the content:
-
-- **Test-first, named here, written in `execute`.** Every behavioural change has its proving
-  tests named in the task that makes it — what each asserts, and the command that runs them.
-  The coder writes them first, watches them fail, then writes the code.
-- **Honor the active stack's guidelines.** Detect the stack from repo markers (`Cargo.toml` →
-  Rust) and load the matching guideline skill (`claudestacks-guideline-rust:rust-guidelines`).
-  Every file placement, module boundary, and named interface must already conform to its
-  architecture rules, and each task's done-check must include its Definition of Done.
-- **DRY / YAGNI.** No abstraction the objective does not require.
-
-Paths, naming, frontmatter, and state transitions all come from
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`; artifact body shapes come from
-`${CLAUDE_PLUGIN_ROOT}/references/templates.md`. Lazy-create the chain's `plans/` directory
-before first write — never assume `/claudestacks-sdlc:setup` ran.
-
-## State gate
-
-This skill requires one of:
-
-- a chain whose `spec.md` is `status: approved`; or
-- a chain with no `spec.md`, whose `intent.md` is `status: approved` and carries
-  `spec: skipped` in its frontmatter.
-
-Anything else is refused, naming the file, its current state, and the command that advances it:
-
-- `spec.md` is `draft` — refuse; the `design` skill's review gate is what flips it to
-  `approved`.
-- no `spec.md` and the intent has no `spec: skipped` flag — refuse; either the `design` skill
-  runs first, or the user sets the skip flag by re-invoking the `intent` skill.
-- `intent.md` is not `approved` — refuse; the `intent` skill is what advances it.
-
-This skill never sets `spec: skipped` itself — it only reads the flag.
-
-## Sync check
-
-Before acting, render the board and read this chain's row:
-
-    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
-
-When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
-`status` skill's fallback does. Do the same again after every `status` flip this skill
-makes, and tell the user what the row reads then.
-
-The row's wording comes from the sync rules in
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. A plan's **authority** is the
-chain's `spec.md`, or the chain's `intent.md` when the intent carries `spec: skipped`
-and no `spec.md` exists.
-
-Refuse — naming the file, the condition exactly as the board words it, and what clears
-it — when the row reads any of:
+**Board.** `sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"`, read the chain's row; empty output
+means no `airsl` — derive it as the `status` skill's fallback does. Repeat after every `status`
+flip and tell the author the row. The **authority** is `spec.md`, or `intent.md` on the
+spec-skip path. Refuse, naming the file, the condition in the board's words, and what clears it:
 
 | The row reads | Cleared by |
 |---|---|
-| `spec stale (intent changed)` | the `design` skill |
-| `spec disproven by plan NN` | the `design` skill |
-| `intent disproven by plan NN` | the `intent` skill |
-| `ADR NNNN disproven by plan NN` or `ADR NNNN disproven by <chain>/NN` | the `adr` skill |
-| `spec stale (ADR NNNN superseded by MMMM)` or `spec stale (ADR NNNN deprecated)` | the `design` skill |
-| `spec blocked (ADR NNNN not approved)` | the `adr` skill |
-| `plan NN <status>: blocked (spec not approved)` | the `design` skill |
-| `INVALID (spec.md: missing built-on)` | the `design` skill |
-| any other `INVALID (…)`, except `INVALID (plans/NN: missing built-on)` | the user, in the file the row names |
+| `spec stale (intent changed)`, `spec disproven by plan NN`, `spec stale (ADR NNNN superseded by MMMM)`, `spec stale (ADR NNNN deprecated)`, `plan NN <status>: blocked (spec not approved)`, `INVALID (spec.md: missing built-on)` | `design` |
+| `intent disproven by plan NN` | `intent` |
+| `ADR NNNN disproven by plan NN`, `ADR NNNN disproven by <chain>/NN`, `spec blocked (ADR NNNN not approved)` | `adr` |
+| any other `INVALID (…)` except `INVALID (plans/NN: missing built-on)` | the author, in the named file |
 
-Two conditions are this skill's own to clear. When the row reads
-`plan NN <status>: stale (spec changed)`, `plan NN <status>: stale (intent changed)`, or
-`INVALID (plans/NN: missing built-on)`, take each such plan in number order and offer
-the user two ways out:
+**Own conditions** — `plan NN <status>: stale (spec changed)`, `… stale (intent changed)`,
+`INVALID (plans/NN: missing built-on)`. Per plan, in number order, offer: **re-confirm** (*does
+plan `NN` still hold against its authority as it now reads?* — on explicit yes write the 12
+characters of `sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>` as its
+`built-on`, nothing else, status kept) or **supersede** (flip `superseded`; the replacement takes
+the next free `NN`). Never inferred; one plan's yes covers no other. Re-render after clearing.
 
-- **Re-confirm it.** Ask one question: *does plan `NN` still hold against its authority
-  as that authority now reads?* On an explicit yes, compute the authority's current
-  fingerprint,
+**Proven spec.** List every spec claim a task depends on; each must carry its recorded proof
+beside it (probe command + real output, `<file>:<line>`, or the command behind a count). Check
+presence only. If a claim lacks proof, or the spec leaves open what a plan must decide (an edge
+case, an error path, which file owns a behaviour, where a boundary falls, which of two readings),
+write no plan: name the gap in one line and send the spec back to `design`. Never plan around it,
+park it in `## Risks`, assume it, or ask the author. Spec-skip: tasks encode only what the intent
+states; anything more means run `design`.
 
-      sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
+## Derive the set
 
-  write the 12 characters it prints as `built-on` in that plan's frontmatter, and
-  change nothing else in the file. The plan keeps its status.
-- **Supersede it.** Flip it `superseded` and write its replacement under the next free
-  `NN` (Lifecycle, below).
+- **Fan-out:** derive the plans and their `depends-on` yourself; do not propose first. One
+  objective per plan — a Goal needing "and" means split. Tasks are not objectives.
+- **Coverage:** map every spec requirement, edge case and error rule to a plan and task. One in
+  no plan is a defect.
+- **Files first:** one line of responsibility per changed file (prefer a new focused file); each
+  file in exactly the tasks touching it. `claudestacks:explorer` locates what exists (unresolved:
+  inline, say so); deciding what changes stays here.
+- **Tasks** are the order of work: one sitting, a handful of named tests, ends in a commit.
+- **Guideline:** detect the stack (`Cargo.toml` → Rust), load its skill
+  (`claudestacks-guideline-rust:rust-guidelines`), conform to its architecture rules, put its
+  Definition of Done in every done-check. DRY / YAGNI.
+- **Checkpoints** only where the spec asks; `execute` ends a batch there and never stops.
+- A fact living in a type being built is read from there, never copied into a task.
 
-Re-confirmation is never inferred, and one plan's yes does not cover another. After
-clearing a condition, render the board again: an `INVALID` result replaces the whole
-row, so another condition may have been standing behind it.
-
-## No dialogue — the questions were answered upstream
-
-By the time this skill runs, the intent and the spec have been discussed and approved, open
-questions included. Planning asks the author nothing more. The plan set, its dependency
-shape, the order of work and the risks are all derived from the spec, the repo and the
-loaded guideline, and the author sees them once, at the acceptance gate below.
-
-The one exception is a spec that cannot be planned as written: a claim a task depends on
-carries no recorded proof (see *The spec must be verified before it is planned*, below), or it leaves open
-something a plan must decide — which file owns a behaviour, where a boundary falls, which of
-two readings it means. That is a defect in the spec, not a planning question. Do not resolve it as an assumption, and do not ask the author
-to settle it here. Stop before writing any plan, name the gap in one line, and send it back to
-the `design` skill, which owns the spec.
-
-## Fan-out is first-class
-
-A spec usually yields several plans, not one. Derive the plan set and its dependency shape
-yourself and write it; do not propose it first. Mark a checkpoint inside a plan only where
-the spec asks for one — `execute` treats each as a hard stop, so a checkpoint nobody asked for
-is a question in disguise.
-
-Plans live at `plans/NN-<kebab-topic>.md` inside the chain directory — the `NN` prefix orders
-plans within the chain, and sibling plans are disambiguated by topic, not renumbering. Each
-plan's frontmatter carries `status`, `created`, `built-on`, and `depends-on` (a list of plan
-numbers this plan needs `done` first; absent or empty means independent — visibly
-parallelizable across worktrees).
-
-`built-on` is the fingerprint of the plan's authority (Sync check, above)
-as it reads when the plan is written. Run
-
-    sh "${CLAUDE_PLUGIN_ROOT}/scripts/fingerprint.sh" <authority file>
-
-and write the 12 characters it prints into every plan of the set. If it prints nothing, the
-authority has no fingerprint: stop and name the file rather than write a plan against it.
-
-## Scope check — one objective per plan
-
-Each individual plan covers **exactly one objective**: one outcome stateable in a single
-sentence without an "and". If a plan's goal sentence needs an "and", split it into sibling
-plans. Tasks are not objectives — three tasks implementing parts of one feature belong in one
-plan.
-
-## The spec must be verified before it is planned
-
-A plan turns the spec's prose into the facts a test will assert — values, exhaustive lists, field
-names, how existing code behaves — the exact forms that are painful to correct once written. **A
-stored plan means ready to execute, so this is a gate, not a check:** `design` proved every claim
-of the spec with a run or a citation before the author approved it, and this skill refuses to
-write plans over a spec where that did not happen.
-
-Before writing any plan, walk the spec and list every claim a task will depend on. Each one must
-carry its recorded proof in the spec, beside the claim: a probe's command with its real output, a
-`<file>:<line>` citation, or the command behind a count. Presence is what you check. You run no
-probe of your own and fetch nothing to confirm — a plan that quietly re-verifies is a plan that
-quietly decides, and a fact proved only here is a fact the spec still lies about.
-
-When any such claim has no recorded proof, write no plan at all. Name the claim in one line, say
-that its spec carries no run for it, and send the spec back to the `design` skill, which owns the
-spec and its probes. Do not plan around the gap, do not carry the claim into `## Risks` for
-`execute` to settle, and do not ask the author to wave it through. Sibling plans written over the
-same spec would all quote the unproven text.
-
-Where a fact already lives in a type the plan is building, have the task read it from there rather
-than restating it; a second copy in a task is a copy that drifts. On the spec-skip path there is no
-spec to carry proofs: a task encodes only what the intent states, and a fact beyond it that a task
-would depend on is a reason to run `design`, not to assume.
-
-## File structure first
-
-Before defining tasks, map the file changes, one sentence of responsibility each. Prefer a new
-focused file over expanding an existing one.
-
-```
-src/auth/token.rs          — [create] token validation logic and unit tests
-src/auth/mod.rs            — [modify] re-export the new token module
-tests/auth_integration.rs  — [create] integration test for the token round-trip
-```
-
-Then assign each file to exactly the tasks that touch it. A task listing files it does not
-touch is a defect; a file in no task is a dangling artefact.
-
-Delegate the locating. Working out which files exist, what they export, and which one
-owns the behavior the spec describes is exactly `claudestacks:explorer`'s job — spawn it
-and build the file map from the `file:line` tables it returns, rather than reading the
-tree into this thread. Deciding what *should* change stays here; the agent only reports
-what is there, and refuses judgment if you ask for more. If `claudestacks:explorer` does
-not resolve — the `claudestacks` main plugin is not installed — map the files inline here
-and tell the user the agent was unavailable. Never fail hard for want of the main plugin.
-
-## Order of work — task granularity
-
-The tasks are the plan's order of work. Each is one step of it — doable, testable, and
-committable in one sitting, ending in a commit. A task too large to prove with a handful of
-named tests is too coarse; break it down.
-
-## Header template
-
-Frontmatter and header follow the body shape in
-`${CLAUDE_PLUGIN_ROOT}/references/templates.md`:
+Write `plans/NN-<kebab-topic>.md` (siblings differ by topic; never renumber) in the templates.md
+plan shape (Goal, Architecture, Tech Stack each on its own line):
 
 ```markdown
 ---
 status: draft
 created: <YYYY-MM-DD>
-depends-on: [01]                 # optional
-built-on: <fingerprint>          # the authority's fingerprint when written
+depends-on: [01]          # optional; absent/empty = independent
+built-on: <fingerprint>   # 12 chars of fingerprint.sh <authority>; empty → stop, name the file
 ---
-
 # [Feature Name] Implementation Plan
+**Goal:** [one sentence, no "and"] · **Architecture:** · **Tech Stack:** (see templates.md)
 
-**Goal:** [one sentence — no "and" joining two distinct objectives]
-
-**Architecture:** [2-3 sentences on the structural decisions this plan makes]
-
-**Tech Stack:** [key technologies, libraries, frameworks]
-
----
-```
-
-The Goal line is the scope guard. If you cannot write it without "and", stop and split.
-
-## Task template
-
-Each task names its files, the change in behaviour, and the proof. Substitute your actual
-language and names:
-
-````markdown
 ### Task N — [Short imperative title]
-
-**Files:**
-- Create `src/math/add.py` — integer addition
-- Modify `src/math/__init__.py` — export `add`
-- Test `tests/test_add.py`
-
-**Change:** add `add(a, b)`, returning the sum of two integers, exported from `src.math`.
-
-**Proof:** written first, seen failing, then passing —
-- `test_add_two_positive_integers` — `add(2, 3)` is `5`
-- `test_add_negative_and_positive` — `add(-2, 3)` is `1`
-
-**Done when:** `pytest tests/test_add.py` passes and the stack's Definition of Done is green.
-Commit `feat(math): add integer addition function`.
-````
-
-No code block in a task holds implementation or test code. A command line the implementer
-runs is fine; a function body is not. Where two tasks touch the same structure, say so in
-both — a plan that says only "similar to Task N" is no longer standalone.
-
-After the last task, the plan closes with the playbook's two plan-wide sections:
-
-- **`## Risks`** — what the change could break, which step is most risky, and what the plan
-  chose not to do. It holds no unproven premise for `execute` to settle: a plan that needs
-  one is not ready to execute, and the spec it came from goes back to `design`.
-- **`## Proof`** — the plan-wide checks that show every task's work holds together.
-
-## Before saving — review by an agent
-
-You wrote these plans, so you are the weakest available reader of them. Spawn
-`claudestacks-sdlc:artifact-reviewer` over the whole draft set:
-
-```
-kind: plan-set
-draft: <chain>/plans/NN-*.md      — every draft plan in the set
-authority: <chain>/spec.md        — or <chain>/intent.md on the spec-skip path
-handoff: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-<NN>.md
-handoff-protocol: <the path /claudestacks:context-handoff gave you>
+**Files:** Create/Modify/Test `<path>` — <purpose>
+**Change:** <behaviour; new types/functions by name and one-line purpose>
+**Proof:** written first, seen failing, then passing — `<test_name>` — <assertion in prose>
+**Done when:** `<command>` passes and the Definition of Done is green. Commit `<message>`.
 ```
 
-Invoke `/claudestacks:context-handoff` for the tier rules and the protocol path. This flow
-spawns exactly one subagent, so it takes a literal temp path and mints no session. Expand
-`${TMPDIR:-/tmp}` yourself before the path enters the brief. The report is always `01`.
+No code block holds implementation or test code; command lines are fine. Tasks sharing a
+structure each say so — never "similar to Task N". Close with **`## Risks`** (what could break,
+riskiest step, what was not done — never an unproven premise) and **`## Proof`** (plan-wide checks).
 
-**Exactly one review round over the set. Never a second.** Fix the findings and take the
-plans to the author. Do not re-spawn the reviewer over the revised set, and do not spawn
-it again when the author asks for changes — revise and present.
+## Review — one agent, one round, the whole set
 
-Rounds beyond the first return progressively smaller findings about the plan's internal
-reasoning, while the defects that actually reach code are wrong facts. No round can catch
-those, because every criterion but the grounding ones compares documents to each other —
-the proofs the spec recorded, and the gate above that demands them, are what replace
-rounds. A plan set that would need a second round needs rewriting, not re-reviewing.
+`/claudestacks:context-handoff` for the protocol path (one subagent: literal temp path, no
+session, expand `${TMPDIR:-/tmp}` yourself). Spawn `claudestacks-sdlc:artifact-reviewer` once for
+the set, never per plan: `kind: plan-set`, `draft: <chain>/plans/NN-*.md` (every draft),
+`authority: <chain>/spec.md` (or `intent.md` on spec-skip),
+`handoff: <TMPDIR>/claudestacks-sdlc-<chain>-plan-set-01.md`, `handoff-protocol: <path>`.
 
-One spawn for the set, never one per plan. Spec coverage is a property of the *set*: a
-requirement satisfied in plan `03` is covered even though plan `01` says nothing about
-it, and a reviewer shown one plan at a time cannot see that. The acceptance gate below
-takes the set the same way: once, as a whole.
+- One round; never re-spawn after fixes or author changes. Route off the summary; read
+  `<detail>` only to act. You fix every finding; the agent never edits, flips or commits.
+- Criteria: `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md` § *Reviewing a draft plan set*;
+  meet its no-placeholder list while drafting. Agent fails: apply inline, say so.
+- Every finding at every tier (not only 🔴) gets a row:
+  `| # | Plan | Tier | Finding | Disposition (applied / declined — reason) |`. A plan whose mtime
+  predates the report was not revisited.
 
-The agent returns a verdict summary plus that path. Route off the summary; read the
-`<detail>` only when you must act on a finding. Fix every finding in the drafts
-yourself. The agent never edits a plan, never flips a `status`, and never commits.
+## Acceptance — one question
 
-**Every finding gets a disposition, and the author sees it.** Not only the blocking ones.
-Build a table as you work the report — one row per finding, at every tier, naming which
-plan it lands in:
+Recompute the authority fingerprint; if it differs from the plans' `built-on`, say so and ask
+whether the set holds against the authority as it now reads. In one message show each plan's
+path, Goal and `depends-on`, and the full disposition table, declined rows included. Ask once:
+*accept the plan set?* Yes → flip every plan `draft → approved` and write the current fingerprint
+as `built-on`, one edit per file; re-render, report the row. Changes → revise, present the set
+again, no new review.
 
-| # | Plan | Tier | Finding | Disposition |
-|---|---|---|---|---|
-| 1 | 03 | 🔴 | <one line> | applied |
-| 2 | 02 | 🟡 | <one line> | declined — <reason> |
-
-Carry it to the approval gate below. A finding you decided not to act on is the author's
-call to confirm, not yours to make silently — `artifact-review.md` assigns completeness to
-the reviewer and the decision to this skill *and the user*.
-
-Work the tiers in order but do not stop at the end of 🔴. The risk tier is where a dropped
-finding hides: nothing about the plan looks unfinished afterwards, and a plan whose only
-findings were non-blocking never gets reopened at all. Check the file mtimes against the
-report's if you are unsure whether a plan was revisited after the review — a plan older
-than the report that reviewed it was not.
-
-The criteria it applies live in `${CLAUDE_PLUGIN_ROOT}/references/artifact-review.md`
-§ *Reviewing a draft plan set*: spec coverage, type consistency, guideline conformance,
-the two that hold the set's claims to the proofs the spec recorded, no implementation code, and the
-no-placeholder list. Hold yourself to that no-placeholder list while drafting
-rather than waiting for the agent to find them — a plan that reaches the reviewer full
-of `TBD` has wasted the spawn. If the agent does not resolve, or returns nothing you can
-act on, apply that same file's criteria inline yourself and tell the user the review ran
-inline; never skip the review for want of the agent.
-
-## Acceptance gate — one question for the whole set
-
-This is the only question this skill asks. Present the set in one message: each plan's path
-and Goal line, its `depends-on`, and the whole disposition table, declined rows included. An
-acceptance given without sight of them is not an acceptance of them. Then ask once: *accept
-the plan set?*
-
-Before you ask, compute the authority's fingerprint again and compare it with the plans'
-`built-on`. If they differ, the authority changed while the set was a draft: say so, and the
-question becomes whether the set still holds against the authority as it now reads.
-
-On an explicit yes, flip every plan in the set `status: draft → approved` and write the
-authority's current fingerprint as each plan's `built-on`, in the same edit per file, as the
-last step of this interaction. If the author asks for changes instead, revise and present the
-set again — still one question, not one per plan. Then render the board again (Sync check) and
-tell the user what the chain's row reads.
-
-## Lifecycle
-
-Plans are never deleted. A superseded plan keeps its original file and `NN-<topic>.md` name and
-flips `status: superseded` in its frontmatter; a replacement plan does not reuse that number — it
-takes the next free `NN` in the chain. Nothing is ever removed from the chain: git history plus
-the `status` field is the complete record.
-
-## Execution handoff
-
-Recommend committing approved plans before execution starts, so a worktree picking up a plan
-reads it from git rather than an uncommitted working tree — committing remains the user's act.
-The `execute` skill is the next step once a plan is `approved`.
+Plans are never deleted; a superseded plan keeps its file and flips `status: superseded`.
+Recommend committing approved plans before execution (the author's act). Next: `execute`.

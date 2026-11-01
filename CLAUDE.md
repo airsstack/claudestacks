@@ -251,15 +251,15 @@ Executing a plan is the first time a spec's claims meet the artifact they descri
 a wrong premise surfaces. When it does, the code fix is only half the work — the other half is that
 the chain now lies to whoever executes the next plan.
 
-Stop and put it to the author as its own question: *the spec's premise is disproven, amend now or
-after this plan?* Do not fold it into a question about the implementation and read the answer as
-covering both — approving a code change is not approving the record. Sibling plans were written
-against the old text and cannot see the commit that corrected it; a commit body is not where the next
-plan's author looks.
+**Do not ask during execution — about this or anything else.** An approved plan is ready to execute;
+all discussion and verification belong to intent and spec. A disproven premise is a defect of the
+spec stage: build to what the check showed, record it in the plan's `## Deviations` and its
+`disproves` marker, and lead the completion report with it. Sibling plans were written against the
+old text and cannot see the commit that corrected it, so the board marker — not a commit body — is
+the record.
 
 Superseding an approved spec belongs to the `design` skill (rename to `spec-superseded-YYYY-MM-DD.md`,
-flip its status, write a fresh draft), and the author authorizes it. "Not without asking" means
-*asking*, not carrying on quietly.
+flip its status, write a fresh draft), after the run, on the author's word.
 
 ## Before re-deriving, query the stores
 

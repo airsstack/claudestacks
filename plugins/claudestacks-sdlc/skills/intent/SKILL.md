@@ -1,170 +1,93 @@
 ---
 name: intent
-description: Use before designing or building anything new — captures a problem, converts an existing PRD or RFC, or revisits a parked intent to approve, amend, drop, or un-drop it. Also for parking an idea without committing to build it yet.
+description: Use before designing or building anything new — captures a problem, converts a PRD or RFC, or revisits an intent to approve, amend, drop or un-drop it.
 ---
 
 # Intent
 
-Turn a problem into a chain. `intent` is the entry point of the `claudestacks-sdlc` pipeline: every
-chain under `.claudestacks/sdlc/` starts as one `intent.md`, and everything downstream — spec, plans,
-execution — hangs off it. Writing an intent is not a commitment. It parks an idea; nothing pushes it
-toward design or execution until the user approves it, and an approved intent can sit for months before
-anyone runs `design` against it.
+## The rule
 
-## Shared contract
+An intent parks a problem as `.claudestacks/sdlc/<YYYY-MM-DD>-<kebab-topic>/intent.md`. It is
+the first stage with discussion; it states the problem, never the solution. Writing it commits
+to nothing.
 
-Resolve every path, frontmatter key, and state transition from
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md` — do not re-derive naming or the state model from
-memory. Write the file itself in the body shape `${CLAUDE_PLUGIN_ROOT}/references/templates.md` defines
-for `intent.md`. Lazy-create `.claudestacks/sdlc/` and the new chain directory before the first write;
-never assume `/claudestacks-sdlc:setup` ran — an absent tree is not an error, it is the common case on a
-fresh repo. Never commit the file; that stays the user's separate act. Flip `status` in frontmatter only
-per the transitions table in `artifact-chain.md` §7.2, only as the last step of the interaction that
-earns it, only after the user gives explicit in-dialogue approval — never flip on inference, and never
-flip mid-dialogue before the question that earns it has actually been asked.
+Paths, keys, states: `${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md` (transitions §7.2).
+Body shape: `${CLAUDE_PLUGIN_ROOT}/references/templates.md`. Lazy-create the tree and chain
+directory; never assume `setup` ran. Never commit. Flip `status` only as the last step of the
+interaction, on an explicit yes.
 
-## Input modes
+## Modes
 
-Three ways into this skill:
+- **Rough idea:** go to the dialogue.
+- **Existing PRD/RFC:** load it as the seed and still run the dialogue.
+- **Existing intent:** approve (`draft → approved`), drop (any state `→ dropped`), un-drop
+  (back to the prior state, usually `draft`), amend (rewrite body in place; touch `status` only
+  if it earns a fresh approval). A request the current state cannot satisfy is refused, naming
+  the file, its state, and the command that advances it.
 
-- **A rough idea in the user's words.** The common path — go straight to the dialogue below.
-- **Conversion of an existing file.** "Turn this RFC into an intent," or a PRD the user names directly.
-  Load it as primary input and treat its content as the seed for the same dialogue, not a shortcut past
-  it — a converted file still needs the problem/outcome/constraints pass, because a PRD or RFC is
-  written for a different audience and rarely maps cleanly onto intent's sections.
-- **Re-invocation on an existing intent.** The user wants to approve, amend, drop, or un-drop a chain
-  that already exists. Locate the chain, read its current `status`, and act on it directly: approve
-  flips `draft → approved`; drop flips any state to `dropped`; un-drop reverses a prior drop back to
-  whatever state preceded it (usually `draft`); amend rewrites body sections in place and only touches
-  `status` if the amendment itself earns a fresh approval. A request this skill cannot satisfy from the
-  current state — approving a `dropped` intent without first un-dropping it, for instance — is refused by
-  name: the file, its current state, and that un-dropping is the command that advances it.
+## Re-invocation: sync check
 
-## Sync check on re-invocation
-
-When re-invoked on an existing chain, render the board before acting and read that
-chain's row:
+Before acting, and after every `status` flip, render the board and read the chain's row (no
+output means `airsl` is missing: derive it as the `status` skill does); tell the user what it
+reads:
 
     sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
 
-When that prints nothing, `airsl` is not installed: derive the row by hand, the way the
-`status` skill's fallback does. Do the same again after every `status` flip this skill
-makes, and tell the user what the row reads then. A chain being created has no row yet
-and needs no check before it is written.
+- **Amending the body marks downstream stale.** Before amending an intent whose chain has an
+  `approved` spec (or, with `spec: skipped`, an `approved`/`executing` plan), say the board will
+  read `spec stale (intent changed)` (or `plan NN <status>: stale (intent changed)`) and that
+  `design` (or `plan`) clears it. Proceed on the user's word. Only body edits count.
+- **`intent disproven by plan NN`** is cleared by amending the body to correct the disproven
+  claim; the chain's `approved`/`executing` plans then read stale and go to `plan`.
+- Re-render after an amend; an `INVALID` result replaces the row.
+- Any other condition is not this skill's: say what the row reads and continue.
+- With a `milestone` key, read that milestone's row too. `⤷ milestone <roadmap>/<NN> is dropped
+  — release this chain`: say so and name `milestone` `release`. `INVALID (intent.md: unknown
+  milestone <value>)` or `ambiguous milestone <value>`: name file and value; the user corrects.
 
-The row's wording comes from the sync rules in
-`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`. Two of them touch this skill:
+## Before the dialogue
 
-- **Amending marks what was built on the intent stale.** A spec records the fingerprint
-  of the intent's body it was written against, and on the spec-skip path each plan does.
-  Before amending the body of an intent whose chain has an `approved` spec — or, with
-  `spec: skipped`, a plan that is `approved` or `executing` — tell the user the amendment
-  will make the board read `spec stale (intent changed)` (or
-  `plan NN <status>: stale (intent changed)`), and that the `design` skill (or the `plan`
-  skill) is what clears it afterwards. Then proceed on their word. Only the body counts:
-  a `status` flip or a frontmatter key never changes a fingerprint.
-- **`intent disproven by plan NN` is cleared here.** On the spec-skip path the intent is
-  the plans' authority, and this row means executing plan `NN` disproved one of its
-  claims. It ends when the intent's body is amended to correct what was disproven — this
-  skill's amend mode. Afterwards the chain's `approved` and `executing` plans read
-  `plan NN <status>: stale (intent changed)` and go to the `plan` skill.
-
-An amendment is not a `status` flip, so render the board again after making one, and
-tell the user what the row reads: an `INVALID` result replaces the whole row, so another
-condition may have been standing behind it.
-
-Any other condition on the row is not this skill's to clear. Say what the row reads and
-carry on with what the user asked.
-
-When the intent carries `milestone`, read that milestone's row as well. A line under the
-chain's row reading `⤷ milestone <roadmap>/<NN> is dropped — release this chain` means
-the chain still names a dropped milestone: say so, and name the `milestone` skill's
-`release` as what clears it. A row reading
-`INVALID (intent.md: unknown milestone <value>)` or
-`INVALID (intent.md: ambiguous milestone <value>)` means the key resolves to no single
-milestone: name the file and the value, and leave the correction to the user.
-
-## Input-doc scan
-
-Before the dialogue, list `prds/` and `rfcs/` under `.claudestacks/sdlc/`. Both are optional and often
-empty — an absent or empty directory prompts nothing. When either holds files, surface the ones that look
-relevant to what the user described and ask, as a question, whether any should seed this intent; do not
-silently fold one in. If the user names a specific file and it does not exist at that path, report the
-path you looked for and ask for a correction — never guess a nearby file instead. Every doc actually used
-is recorded in the list-valued `derived-from-prd:` / `derived-from-rfc:` frontmatter keys; a doc merely
-skimmed and rejected is not recorded.
+List `prds/` and `rfcs/` under `.claudestacks/sdlc/` (absent or empty prompts nothing). If files
+look relevant, ask whether any should seed this intent. A user-named file that does not exist:
+report the path and ask. Record docs used in list keys `derived-from-prd:` / `derived-from-rfc:`.
 
 ## Dialogue
 
-Ask 3–5 questions, one at a time, never a battery: problem, affected systems, desired outcome,
-constraints, why-now. Prefer multiple-choice phrasing where a question has a natural small set of
-answers. Ask only when the answer changes what gets written — anything derivable from the repo, an input
-doc already loaded, or the shape of the conversation so far is derived instead and stated as an
-overridable assumption ("I'm assuming this affects only `airsclaude::transport` — correct?").
+3–5 questions, one at a time: problem, affected systems, desired outcome, constraints, why-now.
+Prefer multiple choice. Ask only when the answer changes what is written; state derivable things
+as overridable assumptions.
 
-## Hard gate — no solution content
-
-If the dialogue drifts into "how" — architecture, tech choices, file layouts, which crate owns what —
-that is design work, and design work belongs to the `design` skill, once this intent and its spec exist.
-Cut the drift to at most a one-line "candidate direction" note in the body and steer the conversation back
-to the problem: what is broken or missing, not what would fix it. An intent full of solution detail is
-scope creep on its own future spec — it locks in an approach before the problem is even agreed on.
-
-## Multi-scope check
-
-If the problem as described spans independent subsystems — two crates with no shared dependency, or two
-concerns that could ship on entirely separate timelines — propose splitting it into sibling chains before
-anything is written. Each sibling gets its own `intent.md`, its own topic, its own pace through the
-pipeline. Do not write one intent that quietly covers two problems.
-
-## Spec-skip
-
-When the chain is small and mechanical enough that a full design pass would be ceremony, offer the
-spec-skip path: set `spec: skipped` in frontmatter plus a one-line reason recorded next to it in the body
-("skip: single-file config change, no design ambiguity"). This is always the user's choice to take, never
-this skill's to propose for a problem that plainly needs design — a multi-system change, an ambiguous
-approach, or anything the multi-scope check flagged is not offered the skip.
+- **No solution content.** Cut "how" drift to a one-line candidate direction; it belongs to
+  `design`.
+- **Multi-scope.** If the problem spans independent subsystems, propose sibling chains before
+  writing.
+- **Spec-skip.** For a small mechanical change, offer `spec: skipped` plus a one-line reason in
+  the body. Never offer it for a multi-system, ambiguous, or multi-scope problem.
 
 ## Milestones
 
-A chain may belong to one milestone, recorded as `milestone: <roadmap>/<NN>` in the
-intent's frontmatter — for example `milestone: platform/01`. Roadmaps and milestones are
-optional (`${CLAUDE_PLUGIN_ROOT}/references/artifact-chain.md`), and most chains have
-none: a chain with no `milestone` key is a simple chain.
+Optional `milestone: <roadmap>/<NN>` in frontmatter.
 
-- **Never ask.** Write the key only when the user names a milestone for this chain. When
-  they name none, write no key and ask no question about milestones — not even in a
-  repository that has roadmaps. Never infer membership from a topic or a name.
-- **Check it before writing it.** When the user names one, find the milestone file
-  `.claudestacks/sdlc/roadmaps/<roadmap>/<NN>-<topic>.md` and read its `status`. Write
-  the key only when exactly one file matches and its status is `draft` or `approved`.
-  Otherwise write no key: report the path you looked for, the status you found, or the
-  two files sharing the number, and ask the user how to proceed. A `done` milestone takes
-  no new work.
-- **Dropping a member.** After dropping an intent that carries `milestone`, run the
-  roll-up for that milestone's roadmap as the last step. The procedure is defined in
-  `artifact-chain.md`; dropping a milestone's last open chain can close the milestone.
-- **Un-dropping a member of a closed milestone.** When the intent being un-dropped names
-  a milestone whose status is `done`, remove the `milestone` key in the same edit and
-  tell the user the revived chain is now a simple chain: a closed milestone takes no new
-  work.
+- Write the key only when the user names a milestone; otherwise write none and ask nothing about
+  milestones. Never infer membership.
+- Find `.claudestacks/sdlc/roadmaps/<roadmap>/<NN>-<topic>.md`; write the key only if exactly one
+  file matches and its status is `draft` or `approved`. Otherwise write no key, report the path,
+  status or duplicate files, and ask.
+- After dropping an intent with `milestone`, run the roll-up from `artifact-chain.md` for its
+  roadmap as the last step.
+- Un-dropping a member of a `done` milestone: remove the key in the same edit and say the chain
+  is now simple.
 
-Adopting an existing chain into a milestone, releasing one, and parking a milestone's
-unstarted work are the `milestone` skill's.
+Adopt, release and park are the `milestone` skill's.
 
 ## Output
 
-Write `<date>-<topic>/intent.md` (chain directory named `YYYY-MM-DD-<kebab-topic>`, the date the intent
-is created) in the frontmatter and body shape from `templates.md`: `status`, `created`, the optional
-provenance lists, optional `source`, optional `spec: skipped`, optional `milestone` (Milestones, above),
-and body sections Problem, Affected
-systems, Desired outcome, Constraints, Non-goals, in that order. A triage-sourced intent (`source:
-triage`) additionally carries an Evidence section — that shape is `triage`'s to write, not this skill's,
-but this skill reads and amends such an intent the same as any other on re-invocation.
+`<date>-<topic>/intent.md`: frontmatter `status`, `created`, optional `derived-from-*`, `source`,
+`spec: skipped`, `milestone`; body Problem, Affected systems, Desired outcome, Constraints,
+Non-goals. A `source: triage` intent also has `## Evidence` (written by `triage`; amended here
+like any other).
 
-## Approval gate
+## Approval
 
-Once the body is written, ask the user directly whether to approve it now or leave it `draft`. `draft →
-approved` happens only on an explicit yes — never on silence, never on "looks good" read as consent to
-more than it said. Committing the file to git is the user's separate call; this skill never runs `git
-add` or `git commit`.
+Ask whether to approve now or leave `draft`. `draft → approved` only on an explicit yes. Never
+`git add` or commit.

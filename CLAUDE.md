@@ -179,14 +179,15 @@ individual steps. `.github/workflows/ci.yml` runs `cargo make dod` on push to `m
 pull request, so CI and a local run are the same command. The plugin skill stays the source of
 truth: if the two disagree, the skill is right and `Makefile.toml` needs fixing.
 
-That same workflow carries two jobs the gate deliberately excludes. `cargo make claudevs-check` runs
+That same workflow carries three jobs the gate deliberately excludes. `cargo make claudevs-check` runs
 `claudevs check` over the fixture plugin corpus in `crates/claudevs/tests/fixtures/` in both
 directions — fixtures that must pass and fixtures that must fail at a named stage — because a corpus
 of only-passing fixtures would go green the day the checkers stopped reporting. `cargo make deny`
 runs cargo-deny over security advisories, licenses, duplicate versions and source registries, with
 the policy and every suppression in `deny.toml`. It is its own job — invoking `cargo deny check`
 directly, without cargo-make — because it compiles nothing and answers to a moving advisory
-database, so it can fail on a commit that changed nothing.
+database, so it can fail on a commit that changed nothing. The third, `install-pointer`, runs
+`cargo make install-check`: it installs `shellcheck`, which no gate step has, and compiles nothing.
 
 The third-party corpus lanes — `cargo make corpus-fetch` and `cargo make corpus-check`, which run
 `claudevs check` over 156 plugin roots in 13 pinned repositories nobody here controls — are the
@@ -204,23 +205,51 @@ then `airsl test` over the Lua scripts in `plugins/`, and needs the `airsl` bina
 (`cargo make install-airsl`) rather than only the workspace built. The two answer different
 questions — `check` compiles every file including the drivers no test loads, `test` runs the
 630 tests across 23 files — and either can be run alone as `cargo make plugins-check` /
-`cargo make plugins-test`. They are separate jobs in `.github/workflows/lua.yml`, a workflow of its
-own filtered to `plugins/**`, because it gates the Lua rather than the Rust workspace. If either
-workflow file is missing, add it by hand: a session whose GitHub token lacks the `workflow` scope
+`cargo make plugins-test`. They are two of three jobs in `.github/workflows/lua.yml`, a workflow of
+its own, because it gates the Lua rather than the Rust workspace. The third, `plugins-install`,
+shellchecks the installer, runs `cargo make plugins-install` (offline cases for how the hooks find
+`airsl`, run against stubs by `scripts/test-plugins-install.sh`), then installs `airsl` for real with
+`install-airsl.sh` under a throwaway `HOME`. The workflow is filtered to `plugins/**` plus
+`.github/workflows/lua.yml`, `Makefile.toml` and `scripts/test-plugins-install.sh`, so a change to the
+gate re-runs the gate. If any workflow file is missing, add it by hand: a session whose GitHub token lacks the `workflow` scope
 cannot push anything under `.github/workflows/`, and the rejection names neither the file nor the
 scope. An SSH remote authenticates with the key rather than that token, so it sidesteps the
 restriction — but only an SSH remote does.
 
-Both `cargo make install-airsl` and `plugins/claudestacks/scripts/install-airsl.sh` install the crate
-unpinned (`cargo install airsl-cli --locked`), so the suite always runs on the latest published
-runtime. `--locked` is a separate axis from the version: it builds that release against its own
-`Cargo.lock`, which keeps the vendored Lua C sources from drifting between two installs of the same
-version. The cost of leaving the version unpinned is that a runtime change can break the suite with
+`airsl` has two install routes, and neither pins a version, so the suite always runs on the latest
+published runtime. `plugins/claudestacks/scripts/install-airsl.sh` is the one users are pointed at: it
+runs `airsl`'s prebuilt-binary installer (into `~/.local/bin`) and builds from source only if that
+cannot run or does not complete. `cargo make install-airsl` is the cargo route alone
+(`cargo install airsl-cli --locked`), and is what the `plugins-check` and `plugins-test` CI jobs use,
+because their cache is keyed to a `cargo install` build. `--locked` is a separate axis from the
+version: it builds that release against its own `Cargo.lock`, which keeps the vendored Lua C sources
+from drifting between two installs of the same version. The cost of leaving the version unpinned is that a runtime change can break the suite with
 no commit here, and no `paths:` filter can catch it because nothing in this repository changes when
 `airsl` is published. It surfaces on the next push to `plugins/`, attributed to whatever unrelated
 change triggered the run, so read a sudden Lua failure as a possible upstream release before hunting
 the diff. Publishing a new `airsl` without a matching `airsl-cli` is the other half of the trap: the
 binary's lockfile pins the library, so a library-only release reaches nobody.
+
+The `claudevs` binary ships prebuilt too, built by `dist` from `dist-workspace.toml`. A `claudevs-cli`
+tag (the `tag-namespace`; `airsclaude` and `claudevs` tags start nothing, since the workflow's tag
+filter, `claudevs-cli**[0-9]+.[0-9]+.[0-9]+*`, never matches them) runs
+`.github/workflows/claudevs-cli-release.yml`, which also runs on every pull request to build and
+smoke-test the archives without publishing. That file is generated: change
+`dist-workspace.toml` and run `dist generate`, never edit the workflow by hand. The one hand-written
+piece is `.github/workflows/claudevs-cli-smoke.yml`, which the release calls through
+`global-artifacts-jobs` and which `host` waits on. It runs each archive on the platform it was built
+for (the musl ones in Alpine) against the fixture plugins, and an archive that fails it is never
+published. `.github/workflows/pages.yml` publishes `install/install.sh` to
+`https://airsstack.github.io/claudestacks/install.sh`, a pointer that fetches the latest release's
+installer; the repository's Pages source must be set to "GitHub Actions" or its deploy job fails.
+
+`aarch64-apple-darwin` builds and smoke-tests on `macos-15`, set in `dist-workspace.toml`'s
+`github-custom-runners` and again in the smoke workflow. The sibling `airsl` and `buildl` repositories
+stay on dist's default `macos-14`, which GitHub retires on November 2, 2026, so copying either file
+over from them brings that runner back; do not restore `macos-14`. Two more tasks sit outside `dod`:
+`cargo make install-check` shellchecks `install/install.sh` and proves it refuses a bad
+`CLAUDEVS_VERSION` before any download (it needs `shellcheck`), and `cargo make plugins-install` runs
+the offline hook-lookup cases against stubs, needing neither `airsl` nor the network.
 
 ## AI methodology — the claudestacks plugin suite
 

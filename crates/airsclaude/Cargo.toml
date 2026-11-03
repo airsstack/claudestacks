@@ -20,6 +20,11 @@ exclude     = ["CLAUDE.md", ".claude/", "src/bin/airsclaude-agent-testchild.rs"]
 [lints]
 workspace = true
 
+# The crate's only binary is a test helper. Without this, `dist` plans a release of
+# `airsclaude` shipping that helper for every target.
+[package.metadata.dist]
+dist = false
+
 [dependencies]
 serde          = { workspace = true }
 serde_json     = { workspace = true }

@@ -1,7 +1,7 @@
 [package]
 name        = "claudevs-cli"
 description = "Command-line interface for claudevs, the Claude Code plugin lifecycle tool"
-version     = "0.1.0"
+version     = "0.1.1"
 
 edition.workspace      = true
 rust-version.workspace = true

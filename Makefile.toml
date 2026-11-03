@@ -140,6 +140,16 @@ set -x
 airsl check plugins
 '''
 
+[tasks.plugins-install]
+category = "Plugin suite"
+description = "Offline cases for how the plugin hooks find the airsl runtime"
+# Run through cargo-make rather than by hand: the script sets HOME for each case,
+# and this repository's worktree guard refuses a hand-typed command that does.
+# Needs neither the `airsl` binary nor the network; every case runs against stubs
+# under a temporary HOME.
+command = "sh"
+args = ["scripts/test-plugins-install.sh"]
+
 [tasks.plugins-test]
 category = "Plugin suite"
 description = "airsl test over the Lua plugin scripts"
@@ -459,6 +469,56 @@ description = "Install the airsl binary the plugin hooks and tests need"
 # installs of the same version.
 command = "cargo"
 args = ["install", "airsl-cli", "--locked", "--force"]
+
+# ---------------------------------------------------------------------------
+# The install pointer
+# ---------------------------------------------------------------------------
+
+[tasks.install-check]
+category = "Install"
+description = "shellcheck install/install.sh and prove it refuses a bad version before any download"
+# Deliberately not a dependency of `dod`, for the same reason `plugins` is not:
+# it needs `shellcheck` installed, a prerequisite no gate step has.
+#
+# Each value runs twice, once as a path and once piped on stdin, because the
+# published use is `curl ... | sh`. A refusal is two assertions, not one: exit 1
+# AND the `is not a version` text. A failed download exits 1 as well, so the
+# status alone could not show the refusal came before any fetch. Nothing here
+# reaches the network: every run must stop at the version check.
+script_runner = "@shell"
+script = '''
+set -e
+if ! command -v shellcheck >/dev/null 2>&1; then
+    echo "shellcheck is not installed" >&2
+    exit 1
+fi
+set -x
+shellcheck --shell=sh install/install.sh
+set +x
+
+failed=0
+for version in '1;2' ' ' '../x'; do
+    for mode in path stdin; do
+        if [ "$mode" = path ]; then
+            out=$(CLAUDEVS_VERSION="$version" sh install/install.sh </dev/null 2>&1) && status=0 || status=$?
+        else
+            out=$(CLAUDEVS_VERSION="$version" sh <install/install.sh 2>&1) && status=0 || status=$?
+        fi
+        case "$out" in
+            *"is not a version"*) text=yes ;;
+            *) text=no ;;
+        esac
+        if [ "$status" = 1 ] && [ "$text" = yes ]; then
+            echo "ok   CLAUDEVS_VERSION='$version' via $mode: exit 1, refused"
+        else
+            echo "FAIL CLAUDEVS_VERSION='$version' via $mode: exit $status, 'is not a version' printed: $text" >&2
+            echo "$out" >&2
+            failed=1
+        fi
+    done
+done
+exit "$failed"
+'''
 
 # ---------------------------------------------------------------------------
 # Development helpers

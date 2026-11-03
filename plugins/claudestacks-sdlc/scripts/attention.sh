@@ -1,10 +1,10 @@
 #!/bin/sh
 # claudestacks-sdlc SessionStart launcher. Resolves airsl without relying on
-# PATH (hooks are spawned by the CLI, not a login shell, so a cargo-installed
-# binary under ~/.cargo/bin can be present but invisible). Every path exits
-# 0 and prints nothing when airsl is missing: a hook must never break a
-# session, and deliberately no `exec` — that would hand airsl's status back
-# to Claude Code.
+# PATH (hooks are spawned by the CLI, not a login shell, so an installed
+# binary under ~/.local/bin or ~/.cargo/bin can be present but invisible).
+# Every path exits 0 and prints nothing when airsl is missing: a hook must
+# never break a session, and deliberately no `exec` — that would hand airsl's
+# status back to Claude Code.
 
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || exit 0
 [ -n "$DIR" ] || exit 0
@@ -14,7 +14,7 @@ if [ -n "${AIRSL_BIN:-}" ] && [ -x "${AIRSL_BIN:-}" ]; then
 elif command -v airsl >/dev/null 2>&1; then
   AIRSL=airsl
 else
-  for candidate in "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
+  for candidate in "$HOME/.local/bin/airsl" "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
     if [ -x "$candidate" ]; then
       AIRSL="$candidate"
       break

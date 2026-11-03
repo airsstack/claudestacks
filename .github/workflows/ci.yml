@@ -90,6 +90,30 @@ jobs:
       - name: cargo make claudevs-check
         run: cargo make claudevs-check
 
+  install-pointer:
+    name: Install pointer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Outside `dod` on purpose: the task needs `shellcheck`, which no gate step
+    # has. It compiles nothing, so it does not share the workspace cache.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      # shellcheck on install/install.sh, then the refusal of a bad version,
+      # run as a path and piped on stdin.
+      - name: cargo make install-check
+        run: cargo make install-check
+
   deny:
     name: Supply chain
     runs-on: ubuntu-latest

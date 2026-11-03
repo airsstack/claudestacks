@@ -66,7 +66,7 @@ invocations or the `--project` ones — never mix them within one run.
    command -v airsl
    ```
 
-   If it is absent, stop. Tell the user to run `cargo make install-airsl`, and install nothing.
+   If it is absent, stop. Tell the user to run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/install-airsl.sh"`, and install nothing.
 
 2. Show what would change, without changing it. No write grant: the whole point of the
    read-only mode is that it *cannot* write, and granting write erases that guarantee. It does

@@ -5,7 +5,13 @@ run against the installed layout.
 
 ## Install claudevs
 
-From crates.io:
+A prebuilt binary, which needs no Rust toolchain:
+
+```console
+$ curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh
+```
+
+Or build from crates.io:
 
 ```console
 $ cargo install --locked claudevs-cli

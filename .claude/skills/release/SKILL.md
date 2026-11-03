@@ -119,3 +119,8 @@ git push origin "$0-vV"
 
 One line per outcome: published `$0 V` (crates.io URL), tag `$0-vV` pushed. If the release is part
 of a set, name the crate to release next — `claudevs-cli` after `claudevs`.
+
+For `claudevs-cli`, the pushed tag also starts `.github/workflows/claudevs-cli-release.yml`. Name that
+run as the one to watch (`gh run list --workflow claudevs-cli-release.yml`) and say that if it fails,
+`RELEASING.md` has the recovery: `gh run rerun <run-id> --failed` first, then a new patch version.
+This only reports; it starts and changes nothing.

@@ -1,0 +1,62 @@
+name: Pages
+
+# Publishes https://airsstack.github.io/claudestacks/install.sh, the pointer
+# that installs the latest claudevs release. It is copied from install/ into a
+# directory that holds nothing else, so install.sh is the only file served.
+#
+# Deployed from an Actions artifact rather than a branch, so the published
+# directory is never committed and nothing but this workflow can change what is
+# served. The repository's Pages source must be set to "GitHub Actions" for the
+# deploy job to succeed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - install/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancel one halfway: a cancelled deploy can
+# leave the previous site half-replaced.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Add the install pointer
+        run: |
+          mkdir site
+          cp install/install.sh site/
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only this job can publish, and only through the OIDC token deploy-pages
+    # exchanges; the build job never holds either permission.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -9,10 +9,12 @@ This crate is the `claudevs` binary. The engine it calls is the
 ## Install
 
 ```bash
-cargo install claudevs-cli
+curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh   # prebuilt binary, no Rust needed
+cargo install claudevs-cli                                            # or build from source
 ```
 
-The installed binary is named `claudevs`.
+The installed binary is named `claudevs`. It needs `git` on `PATH`: it git-initialises the project
+each case runs against.
 
 ## Commands
 

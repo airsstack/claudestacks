@@ -98,8 +98,11 @@ claude plugin eval                model-driven, so results vary run to run
 **Install:**
 
 ```bash
-cargo install claudevs-cli     # installs a binary named `claudevs`
+curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh   # prebuilt binary, no Rust needed
+cargo install claudevs-cli     # or build from source; installs a binary named `claudevs`
 ```
+
+`claudevs` needs `git` on `PATH`: it git-initialises the project each case runs against.
 
 **Use:**
 
@@ -158,7 +161,9 @@ claudestacks-guideline-python ── no runtime needs; read by claudestacks
 ### Install
 
 ```bash
-# 1. the Lua runtime (needs a Rust toolchain)
+# 1. the Lua runtime: a prebuilt binary, no Rust needed
+curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
+# or build it from source
 cargo install airsl-cli --locked
 ```
 

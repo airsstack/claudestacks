@@ -1,0 +1,272 @@
+name: Smoke
+
+# Runs every archive a release is about to publish, on the platform it was built for.
+#
+# Not triggered on its own: the release workflow calls it through dist's
+# `global-artifacts-jobs` hook, after every archive is built and before the
+# GitHub Release exists. dist makes `host` wait for this workflow to succeed, so
+# an archive that fails here is never published, and on a pull request in
+# `pr-run-mode = "upload"` the same checks run against the PR's own builds.
+#
+# This file is written by hand, unlike the release workflow, so `dist generate`
+# never touches it.
+#
+# `aarch64-apple-darwin` runs on `macos-15` here and in `dist-workspace.toml`'s
+# `github-custom-runners`, unlike the sibling `airsl` and `buildl` repositories,
+# which stay on dist's default `macos-14`. GitHub retires all macOS 14 images on
+# November 2, 2026 (actions/runner-images issue 13518), so copying their file
+# over this one would bring that runner back.
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: The dist manifest the release's plan step produced
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  targets:
+    name: Match archives to runners
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.match.outputs.matrix }}
+      version: ${{ steps.match.outputs.version }}
+    steps:
+      # The matrix is derived from the plan, not written out, so the coverage
+      # promise holds by construction: every archive the release will publish
+      # gets a smoke job, and a target added to dist-workspace.toml without a
+      # runner below fails here instead of shipping untested.
+      #
+      # musl archives run inside Alpine, which has no glibc at all, so a musl
+      # binary that passes there needs no glibc.
+      - name: Match every archive in the plan to a runner
+        id: match
+        env:
+          PLAN: ${{ inputs.plan }}
+        run: |
+          runners='{
+            "aarch64-apple-darwin":       {"runner": "macos-15"},
+            "x86_64-apple-darwin":        {"runner": "macos-15-intel"},
+            "x86_64-unknown-linux-gnu":   {"runner": "ubuntu-22.04"},
+            "aarch64-unknown-linux-gnu":  {"runner": "ubuntu-22.04-arm"},
+            "x86_64-unknown-linux-musl":  {"runner": "ubuntu-22.04",     "alpine": true},
+            "aarch64-unknown-linux-musl": {"runner": "ubuntu-22.04-arm", "alpine": true}
+          }'
+          matrix=$(jq -c --argjson runners "$runners" '
+            [.artifacts[]
+             | select(.kind == "executable-zip")
+             | {archive: .name, target: .target_triples[0], alpine: false}
+               + ($runners[.target_triples[0]] // {})]' <<<"$PLAN")
+
+          if [ "$(jq length <<<"$matrix")" -eq 0 ]; then
+            echo "::error::the plan lists no archives to smoke-test"
+            exit 1
+          fi
+          missing=$(jq -r '[.[] | select(.runner == null) | .target] | join(" ")' <<<"$matrix")
+          if [ -n "$missing" ]; then
+            echo "::error::no smoke runner for: $missing"
+            exit 1
+          fi
+
+          jq . <<<"$matrix"
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r '.releases[0].app_version' <<<"$PLAN")" >> "$GITHUB_OUTPUT"
+
+  smoke:
+    name: ${{ matrix.target }}
+    needs: targets
+    # One broken platform should not hide whether the others work.
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.targets.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      ARCHIVE: ${{ matrix.archive }}
+      VERSION: ${{ needs.targets.outputs.version }}
+    steps:
+      # The checkout supplies the fixture plugins the checks run, not a build:
+      # the binary under test is the downloaded archive.
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      # The same workflow artifacts `host` uploads to the Release, so the bytes
+      # tested are the bytes published.
+      - name: Fetch the built archives
+        uses: actions/download-artifact@v8
+        with:
+          pattern: artifacts-build-local-*
+          path: .smoke/artifacts
+          merge-multiple: true
+
+      - name: Archive matches its checksum
+        working-directory: .smoke/artifacts
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c "$ARCHIVE.sha256"
+          else
+            shasum -a 256 -c "$ARCHIVE.sha256"
+          fi
+
+      # Everything under test lives inside the workspace, which the Alpine
+      # container mounts at the same path, so one absolute path names the binary
+      # and the fixtures both inside and outside it.
+      - name: Unpack, and point CLAUDEVS at the binary
+        env:
+          ALPINE: ${{ matrix.alpine }}
+        run: |
+          mkdir -p .smoke/unpacked
+          case "$ARCHIVE" in
+            *.tar.xz) tar -xJf ".smoke/artifacts/$ARCHIVE" -C .smoke/unpacked ;;
+            *)        echo "::error::unknown archive format: $ARCHIVE"; exit 1 ;;
+          esac
+          bin=$(find "$PWD/.smoke/unpacked" -type f -name claudevs | head -n 1)
+          if [ -z "$bin" ]; then
+            echo "::error::no claudevs binary inside $ARCHIVE"
+            exit 1
+          fi
+
+          if [ "$ALPINE" = "true" ]; then
+            wrapper="$PWD/.smoke/claudevs-in-alpine"
+            printf '#!/bin/sh\nexec docker run --rm -v "%s:%s" -w "$PWD" alpine:3.20 "%s" "$@"\n' \
+              "$PWD" "$PWD" "$bin" > "$wrapper"
+            chmod +x "$wrapper"
+            echo "CLAUDEVS=$wrapper" >> "$GITHUB_ENV"
+          else
+            echo "CLAUDEVS=$bin" >> "$GITHUB_ENV"
+          fi
+
+      - name: Reports the version being released
+        run: |
+          got=$("$CLAUDEVS" --version)
+          if [ "$got" != "claudevs $VERSION" ]; then
+            echo "::error::claudevs --version printed '$got', expected 'claudevs $VERSION'"
+            exit 1
+          fi
+          echo "$got"
+
+      # `claude` is absent from the runner images, so `doctor` reports a gap and
+      # exits 1; exit 0 is accepted so an image that gains `claude` does not
+      # fail this step. Exit 2 means claudevs could not run at all. The manifest
+      # line is the positive anchor: a binary that prints nothing and exits 0
+      # cannot produce it.
+      - name: Doctor reads the fixture plugin
+        run: |
+          set +e
+          out=$("$CLAUDEVS" doctor crates/claudevs/tests/fixtures/exec-args-plugin 2>&1)
+          got=$?
+          set -e
+          echo "$out"
+          case "$got" in
+            0|1) ;;
+            *) echo "::error::claudevs doctor exited $got, expected 0 or 1"; exit 1 ;;
+          esac
+          if ! grep -qxF -- "  ok    plugin manifest: exec-args-plugin 0.1.0" <<<"$out"; then
+            echo "::error::claudevs doctor did not print the plugin manifest line"
+            exit 1
+          fi
+
+      # Each fixture asserts its exit code and the stage line `claudevs check`
+      # prints, the same kind of check `Makefile.toml` applies to these
+      # fixtures. The wiring stage is native and needs no `git`, `claude` or
+      # toolchain, so it runs in Alpine too.
+      - name: Wiring fixtures
+        run: |
+          expect_ok() {
+            fixture="$1"; stage="$2"
+            set +e
+            out=$("$CLAUDEVS" check "crates/claudevs/tests/fixtures/$fixture" 2>&1)
+            got=$?
+            set -e
+            echo "$out"
+            if [ "$got" != "0" ]; then
+              echo "::error::claudevs check $fixture exited $got, expected 0"
+              exit 1
+            fi
+            if grep -q "^  FAIL  " <<<"$out"; then
+              echo "::error::claudevs check $fixture reported a failed stage"
+              exit 1
+            fi
+            if ! grep -qxF -- "  ok    $stage" <<<"$out"; then
+              echo "::error::claudevs check $fixture did not print '  ok    $stage'"
+              exit 1
+            fi
+          }
+          expect_fail() {
+            fixture="$1"; stage="$2"
+            set +e
+            out=$("$CLAUDEVS" check "crates/claudevs/tests/fixtures/$fixture" 2>&1)
+            got=$?
+            set -e
+            echo "$out"
+            if [ "$got" != "1" ]; then
+              echo "::error::claudevs check $fixture exited $got, expected 1"
+              exit 1
+            fi
+            if ! grep -qxF -- "  FAIL  $stage" <<<"$out"; then
+              echo "::error::claudevs check $fixture did not print '  FAIL  $stage'"
+              exit 1
+            fi
+          }
+
+          expect_ok   dead-script-plugin  wiring
+          expect_fail escape-plugin       wiring
+          expect_fail bad-matcher-plugin  wiring
+          expect_fail hooks-array-plugin  wiring
+
+      # The test stage runs `git`, which the Alpine container lacks, so the musl
+      # archives skip it. Every other runner image ships `git`. `dead-script-plugin`
+      # reports `skip  test` while exiting 0, so `ok    test` is asserted to
+      # show the stage ran.
+      - name: Test-stage fixtures
+        if: ${{ !matrix.alpine }}
+        run: |
+          expect_ok() {
+            fixture="$1"; stage="$2"
+            set +e
+            out=$("$CLAUDEVS" check "crates/claudevs/tests/fixtures/$fixture" 2>&1)
+            got=$?
+            set -e
+            echo "$out"
+            if [ "$got" != "0" ]; then
+              echo "::error::claudevs check $fixture exited $got, expected 0"
+              exit 1
+            fi
+            if grep -q "^  FAIL  " <<<"$out"; then
+              echo "::error::claudevs check $fixture reported a failed stage"
+              exit 1
+            fi
+            if ! grep -qxF -- "  ok    $stage" <<<"$out"; then
+              echo "::error::claudevs check $fixture did not print '  ok    $stage'"
+              exit 1
+            fi
+          }
+          expect_fail() {
+            fixture="$1"; stage="$2"
+            set +e
+            out=$("$CLAUDEVS" check "crates/claudevs/tests/fixtures/$fixture" 2>&1)
+            got=$?
+            set -e
+            echo "$out"
+            if [ "$got" != "1" ]; then
+              echo "::error::claudevs check $fixture exited $got, expected 1"
+              exit 1
+            fi
+            if ! grep -qxF -- "  FAIL  $stage" <<<"$out"; then
+              echo "::error::claudevs check $fixture did not print '  FAIL  $stage'"
+              exit 1
+            fi
+          }
+
+          expect_ok   minimal-plugin         test
+          expect_ok   project-branch-plugin  test
+          expect_ok   exec-args-plugin       test
+          expect_fail matcher-routing-plugin test

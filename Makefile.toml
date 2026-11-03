@@ -140,6 +140,16 @@ set -x
 airsl check plugins
 '''
 
+[tasks.plugins-install]
+category = "Plugin suite"
+description = "Offline cases for how the plugin hooks find the airsl runtime"
+# Run through cargo-make rather than by hand: the script sets HOME for each case,
+# and this repository's worktree guard refuses a hand-typed command that does.
+# Needs neither the `airsl` binary nor the network; every case runs against stubs
+# under a temporary HOME.
+command = "sh"
+args = ["scripts/test-plugins-install.sh"]
+
 [tasks.plugins-test]
 category = "Plugin suite"
 description = "airsl test over the Lua plugin scripts"

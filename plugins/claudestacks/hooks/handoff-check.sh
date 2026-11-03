@@ -10,14 +10,14 @@ DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd) || exit 0
 [ -n "$DIR" ] || exit 0
 
 # Resolve airsl without relying on PATH. Hooks are spawned by the CLI rather than a login
-# shell, so a cargo-installed binary under ~/.cargo/bin can be present but invisible.
+# shell, so an installed binary under ~/.local/bin or ~/.cargo/bin can be present but invisible.
 AIRSL=""
 if [ -n "${AIRSL_BIN:-}" ] && [ -x "${AIRSL_BIN:-}" ]; then
   AIRSL="$AIRSL_BIN"
 elif command -v airsl >/dev/null 2>&1; then
   AIRSL=airsl
 else
-  for candidate in "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
+  for candidate in "$HOME/.local/bin/airsl" "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
     if [ -x "$candidate" ]; then
       AIRSL="$candidate"
       break

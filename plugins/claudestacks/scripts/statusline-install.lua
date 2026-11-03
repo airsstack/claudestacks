@@ -68,7 +68,7 @@ end
 
 -- The exact command string written into the settings file. The airsl path is absolute because
 -- the status line runs under whatever PATH Claude Code hands it, and airsl lives in
--- ~/.cargo/bin.
+-- ~/.local/bin or ~/.cargo/bin.
 function M.command_string(base, airsl, source_dir, project)
   return airsl .. " " .. M.GRANTS .. " " .. script_path(base, source_dir, project)
 end

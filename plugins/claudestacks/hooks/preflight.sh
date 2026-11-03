@@ -26,7 +26,7 @@ if [ -n "${AIRSL_BIN:-}" ] && [ -x "${AIRSL_BIN:-}" ]; then
 elif command -v airsl >/dev/null 2>&1; then
   AIRSL=airsl
 else
-  for candidate in "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
+  for candidate in "$HOME/.local/bin/airsl" "${CARGO_HOME:-$HOME/.cargo}/bin/airsl" "$HOME/.cargo/bin/airsl"; do
     if [ -x "$candidate" ]; then
       AIRSL="$candidate"
       break
@@ -44,7 +44,7 @@ if [ -z "$AIRSL" ]; then
   if [ -n "$DIR" ]; then
     echo "  sh \"$DIR/../scripts/install-airsl.sh\""
   else
-    echo '  cargo install airsl-cli --locked'
+    echo '  curl -LsSf https://airsstack.github.io/airsl/install.sh | sh'
   fi
 fi
 

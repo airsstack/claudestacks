@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-03
 depends-on: [02]
 built-on: 89f35fe63246
@@ -179,3 +179,64 @@ copies receive it.
 - `cargo make plugins-install` passes.
 - `cargo make plugins` passes.
 - `cargo make dod` is green.
+
+## Review findings
+
+Two lines are fixed. Every other line is open. Line numbers are as each review saw them.
+
+Task 1 (reviewer: non-compliant on one requirement; blocking `scripts/test-plugins-install.sh:58`):
+- `scripts/test-plugins-install.sh:58` 🟡 fixed: `lookup_line_is_identical` matched a substring, so a commented-out, re-indented or CRLF line stayed green. Now `grep -rlxF -- "  $NEW_LINE" plugins`. With `rearm.sh`'s line commented out, `cargo make plugins-install` printed `ok   lookup_line_is_identical` before the change and `FAIL lookup_line_is_identical` / `plugins-install: FAILED` after it; restored, it printed `plugins-install: all cases passed`. Only the commented-out variant was run.
+- `Makefile.toml:147` 🟡 the comment says the worktree guard refuses running the script by hand and calls it this repository's guard. The reviewer ran `sh scripts/test-plugins-install.sh` by hand and it passed, and `protocol.md:140` calls it Claude Code's guard.
+- `scripts/test-plugins-install.sh:79` 🟡 the Task 1 found-path cases ignore `$rc`: `preflight_finds_local_bin_off_path` passes with `preflight.sh` deleted, because the absence of `STATUS:` proves nothing if the script never ran.
+- `Makefile.toml:149` 🔵 "every case runs against stubs under a temporary HOME" overclaims.
+- `scripts/test-plugins-install.sh:1` 🔵 shebang on a 0644 file; sibling `scripts/corpus-fetch.sh` is 0755.
+- `scripts/test-plugins-install.sh:6` 🔵 "Every case runs under its own temporary HOME" is false for `lookup_line_is_identical`. The plan's Files bullet says the same; see Deviations.
+- `scripts/test-plugins-install.sh:58` 🔵 `grep -r` and `mktemp` are outside POSIX 2024 (weak evidence for `mktemp`); ran under sh, dash and ksh.
+- `scripts/test-plugins-install.sh:69` 🔵 "a candidate loop of any other shape" overclaims; an eleventh file with a one-entry loop passes.
+- `scripts/test-plugins-install.sh:123` 🔵 no trap, so a signal mid-case leaks the temp dir.
+
+Task 2 (reviewer: `blocking: none`, 0🔴 10🟡 10🔵, 3🔵 against the plan):
+- `plugins/claudestacks/scripts/install-airsl.sh:81` 🟡 the shadowed check compares path strings, so one binary spelled two ways warns "Remove <the binary just installed>". Reproduced with a symlinked `PATH` entry and a `CARGO_HOME` trailing slash.
+- `plugins/claudestacks/scripts/install-airsl.sh:114` 🟡 `wget -q` printed nothing on a 404, so "see the error above" points at nothing on a wget-only machine. Flags and text are the plan's.
+- `plugins/claudestacks/scripts/install-airsl.sh:126` 🟡 an installer that exits 0 and writes nothing, with an older `airsl` on `PATH`, gives exit 0 and a warning naming a file that does not exist; following "Remove <older>" leaves no `airsl`. Whether the real installer can do this was not checked.
+- `scripts/test-plugins-install.sh:20` 🟡 only `CARGO_HOME` and `AIRSL_BIN` are unset; with `AIRSL_CLI_INSTALL_DIR` exported, `shadowed_binary_warns` goes red. Fails closed.
+- 🟡 Six behaviours no case guards, each shown by a mutation that left the lane green: `install-airsl.sh:105` (`mktemp` failure), `:106` (both traps), `:114` (wget failure), `:116` (arguments to the installer; `--force` reaching the real installer would send every install to cargo), `:129` (`installed` on the cargo route), `:157` (`--force` cargo failure).
+- `plugins/claudestacks/scripts/install-airsl.sh:18` 🔵 "resolves to the latest release" holds only without `AIRSL_VERSION`.
+- `plugins/claudestacks/scripts/install-airsl.sh:106` 🔵 a signal between `mktemp` and the traps would leave an empty directory (by reading).
+- `plugins/claudestacks/scripts/install-airsl.sh:116` 🔵 the installer inherits stdin; `sh < install-airsl.sh` with an installer that drains stdin ends at exit 0 with no report. `</dev/null` would fix it.
+- `plugins/claudestacks/scripts/install-airsl.sh:116` 🔵 a rejected `AIRSL_VERSION` fails the pointer, then the fallback builds the latest release and exits 0 (by reading).
+- `plugins/claudestacks/scripts/install-airsl.sh:127` 🔵 `HOME` unset aborts after a successful install; the old script aborted on `HOME` too.
+- `plugins/claudestacks/scripts/install-airsl.sh:129` 🔵 assumes cargo's root is `CARGO_HOME`; `CARGO_INSTALL_ROOT` and `install.root` take precedence per `cargo help install`. Effect not run.
+- `scripts/test-plugins-install.sh:6` 🔵 "with CARGO_HOME and AIRSL_BIN unset" is false for `chosen_location_skips_shadow_warning`.
+- `scripts/test-plugins-install.sh:45` 🔵 says `install-airsl.sh` calls these tools; it does not call `mkdir`, `chmod` or `cat`.
+- `scripts/test-plugins-install.sh:215` 🔵 the script's temp directory lands in the system temp, not `$h`, so a lost trap would leak there unseen.
+- `scripts/test-plugins-install.sh:394` 🔵 `preflight_fallback_names_the_pointer` is a static grep; no case executes `preflight.sh:47`. The plan says "holds", so it conforms.
+- Task 2 Change 🔵 the comment at old `:83-90` was re-wrapped, not rewritten; it is accurate.
+
+Tasks 3 and 4 (reviewer: spec compliant; 5🟡 5🔵 1❓; blocking `plugins/claudestacks-journal/README.md:16`):
+- `plugins/claudestacks-journal/README.md:16` 🟡 fixed: the first step was a repo-relative script with no clone in the section. Now the `curl` command from `preflight.sh:47`, with cargo as the source alternative. `grep -n 'install.sh\|install-airsl.sh\|cargo install airsl-cli' plugins/claudestacks-journal/README.md` prints `16:` the `curl` line then `17:` the cargo line; `grep -n 'install.sh' plugins/claudestacks/hooks/preflight.sh` prints the same command at `47:`.
+- `.github/workflows/lua.yml:126` 🟡 no toolchain step, so `cargo make` relies on rustup downloading the 1.94.1 pin implicitly, uncached. Not observed on a runner; fails loudly if auto-install is off.
+- `.github/workflows/lua.yml:153` 🟡 a failed prebuilt install can end in a pass: a served script that writes the binary then exits 1, with cargo succeeding, passes the step (reproduced with stubs). Whether the real installer can fail after writing its binary was not checked.
+- `plugins/claudestacks/README.md:71` 🟡 only repo-relative commands remain, though this README's own install section uses the marketplace. The in-session `FIX:` line gives an absolute path.
+- `plugins/claudestacks/README.md:76` 🟡 "Re-running the script installs the latest" omits that an older `airsl` on `PATH` keeps winning; the script warns, the README does not. This is the upgrade path for current cargo users.
+- `.github/workflows/lua.yml:142` 🔵 the comment understates the lane, which also covers the installer's routes.
+- `.github/workflows/lua.yml:153` 🔵 a broken pointer spends the cargo fallback's build before the step fails.
+- `plugins/claudestacks/README.md:75` 🔵 the fallback sentence omits that it needs cargo.
+- `plugins/claudestacks/README.md:77` 🔵 `--force` is mentioned but never explained.
+- `plugins/claudestacks/skills/statusline/SKILL.md:69` 🔵 122-column line.
+- 🔵 No committed check guards the `lua.yml` job, its path filters, the docs or the version bumps.
+- `plugins/claudestacks/skills/statusline/SKILL.md:69` ❓ not verified whether `${CLAUDE_PLUGIN_ROOT}` reaches the user as a literal path.
+
+The live install step has never run; no workflow has run on GitHub.
+
+## Deviations
+
+- 2026-11-03: Task 2, plan stage. The Proof says four cases pass against today's script. `force_reaches_cargo` and `cargo_failure_exits_1` did. `failed_curl_does_not_try_wget` failed because it also asserts `curl` was called, which the old script never does, and `chosen_location_skips_shadow_warning` failed because it asserts exit 0 and the old script exits 1 on the stub-only `PATH`. Each was shown able to go red for its named reason with a deliberate break, then restored. The cases keep the stronger assertions. The plan's claim, not the spec's, so no `disproves` marker.
+- 2026-11-03: Task 2. `cargo_failure_exits_1`: the first break (`|| exit 1` to `|| true`) stayed green, because the failing stub left no binary and the script still exited 1 as not resolvable. A `stub_cargo 1 installs` stub, which fails but leaves a binary, went red with `exit status 0, expected 1`. `chosen_location_skips_shadow_warning` loops over four variables and stops at the first failure, so the break showed only `AIRSL_BIN` taking effect.
+- 2026-11-03: Task 2. Decided where the spec is silent: the two cannot-install messages and the not-resolvable message go to stderr, the fallback line and the warnings to stdout. The shadowed warning's skip tests the four variables as non-empty. The fetch writes through a stdout redirect, as the published pointer script does. The coder also fetched that script to check this, which the run's no-re-proving rule does not call for.
+- 2026-11-03: Task 1. The plan's Files bullet says each case runs under a temp `HOME` and restricted `PATH`. `lookup_line_is_identical` does neither, because it only reads repository files.
+- 2026-11-03: Task 1. The plan's fallback-message wording at `preflight.sh:47` was left to Task 2, which rewrites that line.
+- 2026-11-03: Task 3. The coder did not run the live install on this machine, on the brief's instruction, because it reaches the network and the task's proof is the `grep`. The job has no `rustup show` or cache step and sets `timeout-minutes: 15`, which the plan does not name.
+- 2026-11-03: Task 4. The statusline skill points at `sh "${CLAUDE_PLUGIN_ROOT}/scripts/install-airsl.sh"`, the form that skill already uses at `:82`.
+- 2026-11-03: All tasks. The instruction to execute did not say to commit, so the commits this plan names were not made; the work is in the working tree.
+- 2026-11-03: Reports `06`, `11`, `12` and `14` were returned to the main thread and not written to the session directory, so the reviewer of Tasks 3 and 4 worked without `11` and `12`. TodoWrite was not available, so tasks were tracked in batch order. A task 3-4 reviewer issued one command that would have run the real installer; the permission classifier denied it and nothing ran.

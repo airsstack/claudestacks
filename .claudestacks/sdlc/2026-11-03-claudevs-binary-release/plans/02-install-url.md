@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-03
 built-on: 89f35fe63246
 ---
@@ -101,3 +101,30 @@ comment names the published URL.
 
 - `cargo make install-check` passes.
 - `cargo make dod` is green.
+
+## Review findings
+
+No 🔴 in either review, so no fix round ran. Every line below is open.
+
+Task 1:
+- `Makefile.toml:467` 🟡 `install-check` covers only the refusal branch. The `latest` URL, the `claudevs-cli-v$version` URL, the `v` strip and empty-as-latest have no check, so a wrong tag prefix would first show when a user pins a version. The plan's Proof does not require one.
+- `Makefile.toml:470` 🔵 the comment gives the secondary reason `plugins` sits outside the gate as its reason.
+- `install/install.sh:31` 🔵 "a machine that can run one can run the other" is false for snap curl, which dist's installer refuses. Inherited from buildl.
+- `install/install.sh:38` 🔵 `wget` has no https-only setting where `curl` has `--proto '=https'`, so a redirect to plain http would be followed. `--https-only` might not exist on BusyBox wget (not checked).
+
+Task 2:
+- `.github/workflows/ci.yml:93-115` 🔵 the pinned-toolchain download lands inside `cargo make install-check`; the job comment says only that it compiles nothing. The reviewer saw the rustup shim install the pin locally on rustup 1.29.1; not observed on a runner.
+- `.github/workflows/ci.yml:100` 🔵 checkout keeps the read-only token persisted, as the sibling jobs do.
+
+Task 3:
+- `.github/workflows/pages.yml:22-23` 🔵 the "half-replaced" claim is inherited from buildl and could not be verified.
+- 🔵 Nothing would catch a revert of the site-only copy in `pages.yml` or of the `install-pointer` job.
+
+Reviewer verdicts: batch 1 `blocking: none`, batch 2 `blocking: none`. No workflow has run on GitHub, and `pages.yml` cannot run before merge.
+
+## Deviations
+
+- 2026-11-03: `install_check_fails_on_a_broken_refusal`. With only the validation branch removed, the break run would have reached github.com, so the `curl` and `wget` lines were also stubbed to `false` for that run. All temporary edits were reverted from a pre-break copy, and the re-run passed.
+- 2026-11-03: Task 2. The job sets `timeout-minutes: 10`, which the plan does not name, and has no `rustup show` or cache step, because it compiles nothing.
+- 2026-11-03: All tasks. The instruction to execute did not say to commit, so the commits this plan names were not made; the work is in the working tree.
+- 2026-11-03: The ledger agent was not spawned because the plan text was already in the main thread when the run started. TodoWrite was not available, so tasks were tracked in the batch order.

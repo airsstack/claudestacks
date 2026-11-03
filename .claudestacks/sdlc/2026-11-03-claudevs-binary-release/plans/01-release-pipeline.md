@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-03
 built-on: 89f35fe63246
 ---
@@ -102,3 +102,33 @@ request's Release check is the lasting run.
 - `dist plan` lists `claudevs-cli` alone on six targets.
 - `generated_workflow_is_current` passes after the last edit to `dist-workspace.toml`.
 - `cargo make dod` is green.
+
+## Review findings
+
+No 🔴 in either review, so no fix round ran. Every line below is open.
+
+Task 1:
+- `.github/workflows/claudevs-cli-smoke.yml:16` 🔵 says GitHub "retires" macOS 14 images on a date already past.
+- `.github/workflows/claudevs-cli-smoke.yml:119` 🔵 "one absolute path names the binary and the fixtures" is inaccurate: fixtures are relative paths resolved through `-w "$PWD"`.
+- `.github/workflows/claudevs-cli-smoke.yml:158` 🔵 "Exit 2 means claudevs could not run at all" overstates it; the step's catch-all arm is still correct.
+- `.github/workflows/claudevs-cli-smoke.yml:232` 🔵 `expect_ok` and `expect_fail` are written out twice, so a change to one can miss the other.
+
+Task 2:
+- `dist-workspace.toml:23-25` 🟡 the comment is false for `claudevs`: the reviewer ran `dist plan --tag=claudevs-v0.1.0 --output-format=json`, which exits 0 with an empty release; only the `airsclaude` tag fails (exit 255). `tag-namespace` still stops those tags starting a release.
+- `.github/workflows/claudevs-cli-release.yml:155-158` with `dist-workspace.toml:34` 🟡 `Attest` runs on pull requests, so same-repo pull requests sign to public Sigstore and fork pull requests are expected to fail there (not observed). `github-attestations-phase = "host"` would change this, and would leave `build-local-artifacts` on the workflow-level `contents: write`.
+- `.github/workflows/claudevs-cli-release.yml:80,:301` 🔵 a tag name reaches shell in a job with write access; generated, and pushing a tag already needs write access.
+- `.github/workflows/claudevs-cli-release.yml:234` 🔵 `secrets: inherit` offers every repo secret to a workflow that references none; generated.
+- `Cargo.toml:91-93` 🔵 `[profile.dist]` is unaligned beside `[profile.release]`, and `lto` repeats the inherited value.
+- 🔵 Nothing would catch a revert of `tag-namespace`.
+
+Reviewer verdicts: batch 1 `blocking: none`, batch 2 `blocking: none`. The batch 2 reviewer also found the generated workflow byte-identical to `dist generate` 0.33.1 output in a scratch copy. No workflow has run on GitHub.
+
+## Deviations
+
+- 2026-11-03: `generated_workflow_is_current`, plan stage. The plan says changing `tag-namespace` makes `cmp` fail on the generated file. dist names the file after the namespace, so `zzz-red` wrote `.github/workflows/zzz-red-release.yml` and left `claudevs-cli-release.yml` byte-identical (`cmp` exit 0). The red was taken by comparing the old file against the renamed one (`cmp` exit 1, the tag filter at line 45 differs). The stray file was deleted, the config restored and the workflow regenerated; the final `cmp` exits 0. The spec does not make this claim, so no `disproves` marker.
+- 2026-11-03: Task 1. buildl's smoke-workspace build, test, cache and verify steps and its example check and doctor steps were dropped as buildl-specific; only the four named steps remain.
+- 2026-11-03: Task 1. `smoke_wiring_step` and `smoke_test_stage_step` stop at their first fixture on the stand-in, so the later rows were exercised only in the green runs.
+- 2026-11-03: Task 1. The reviewer's guard refused running the lifted step scripts, so the review re-ran each fixture directly against the binary and read the assertions. The coder's eight runs are the only runs of the blocks themselves.
+- 2026-11-03: Task 2. `dist plan` before `dist generate` exits 0 but prints a diff of the expected workflow, so the workflow was generated before the red `dist plan` run.
+- 2026-11-03: Both tasks. The instruction to execute did not say to commit, so the commits this plan names were not made; the work is in the working tree.
+- 2026-11-03: The ledger agent was not spawned because the plan text was already in the main thread when the run started. TodoWrite was not available, so tasks were tracked in the batch order.

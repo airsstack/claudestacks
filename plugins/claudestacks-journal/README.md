@@ -13,7 +13,8 @@ depends on the `claudestacks` plugin.
 ## Install
 
 Every hook and skill script in this plugin runs on the `airsl` binary; install it first with
-`cargo install airsl-cli --locked`, then:
+`curl -LsSf https://airsstack.github.io/airsl/install.sh | sh` (a prebuilt download, no Rust
+needed), or build it from source with `cargo install airsl-cli --locked`, then:
 
 ```
 /plugin marketplace add airsstack/claudestacks

@@ -68,13 +68,16 @@ with a user-visible effect (rule enforcement, the reply rules, SDD layout provis
 journal orientation card); `rearm.lua` is equally inert without `airsl` and is left off
 deliberately, because naming every hook would bury the ones that change what a session does.
 
-Install `airsl` with `cargo install airsl-cli --locked`, or run
-`plugins/claudestacks/scripts/install-airsl.sh` from the repo root (`scripts/install-airsl.sh` from
-inside this directory) for the same thing plus a report of where the binary landed and whether that
-directory is on PATH. Re-running either upgrades an existing install: the command is deliberately
-unpinned, and `cargo install` rebuilds only when the published version differs from the installed
-one. If `airsl` is installed but a hook still can't find it, its directory is likely off the hook's
-PATH — set `AIRSL_BIN` to the binary's full path.
+Install `airsl` by running `plugins/claudestacks/scripts/install-airsl.sh` from the repo root
+(`scripts/install-airsl.sh` from inside this directory). It first runs airsl's own prebuilt-binary
+installer (`https://airsstack.github.io/airsl/install.sh`), which needs no Rust toolchain; the
+binary lands in `~/.local/bin`. If that cannot run or does not complete, the script falls back to
+`cargo install airsl-cli --locked`, which builds from source and takes a few minutes. Either way it
+reports where the binary landed and whether that directory is on PATH. Re-running the script
+installs the latest `airsl`: neither route is pinned to a version, and the script does not skip
+when a binary is already present. `--force` applies to the cargo route only. If `airsl` is
+installed but a hook still can't find it, its directory is likely off the hook's PATH — set
+`AIRSL_BIN` to the binary's full path.
 
 ## Project snapshots
 

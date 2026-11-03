@@ -17,11 +17,13 @@ on:
       # either must re-run to prove the new gate still works.
       - ".github/workflows/lua.yml"
       - "Makefile.toml"
+      - "scripts/test-plugins-install.sh"
   pull_request:
     paths:
       - "plugins/**"
       - ".github/workflows/lua.yml"
       - "Makefile.toml"
+      - "scripts/test-plugins-install.sh"
   workflow_dispatch:
 
 # A new push to the same ref supersedes whatever is still running for it.
@@ -114,3 +116,39 @@ jobs:
       # Runs the assertions under plugins/.
       - name: cargo make plugins-test
         run: cargo make plugins-test
+
+  plugins-install:
+    name: airsl install
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Needs neither the Rust cache nor the airsl binary: the offline cases run
+    # against stubs, and the live step below installs the real one.
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Install cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make
+
+      - name: shellcheck the installer and its test
+        run: shellcheck plugins/claudestacks/scripts/install-airsl.sh scripts/test-plugins-install.sh
+
+      # Offline cases for how the hooks find airsl, run against stubs.
+      - name: cargo make plugins-install
+        run: cargo make plugins-install
+
+      # The only test of the real pointer and installer: the cases above stub
+      # both. HOME is a temporary directory so the install cannot touch the
+      # runner's shell profiles.
+      - name: Install airsl with the real installer
+        run: |
+          HOME=$(mktemp -d)
+          export HOME
+          sh plugins/claudestacks/scripts/install-airsl.sh
+          "$HOME/.local/bin/airsl" --version

@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-04
 depends-on: [03]
 built-on: bdf14ebffb48
@@ -82,3 +82,27 @@ book/src/ch06-05-selecting-and-skips.md       — modify
 - `cargo test -p book-doctests` exits 0.
 - `cargo make book-build` exits 0.
 - `cargo make dod` exits 0.
+
+## Review findings
+
+Plans 07, 08 and 09 shared one review. Checked after the fix round: `cargo test -p book-doctests` printed `32 passed`, `3 passed`, `59 passed`; `cargo make book-build` exit 0; `cargo make dod` exit 0. The fixes were not reviewed again. Each was reproduced against `target/debug/claudevs` first. Line numbers below are from the review, before the fixes.
+
+- Fixed, `ch05-01:49`: a fixture without `.gitinit` is not a git repository, so `git status` in it gave `exit: expected 0, got 128`.
+- Fixed, `ch06-00:34`: a scripted case's `t.script` runs in the plugin directory unless given `cwd`, and `leaked.txt` reached the next case.
+- Fixed, `ch06-01:197`: `output: none` still passes on plain stdout and `{"systemMessage":"hi"}`.
+- Fixed, `ch06-03:94,121`: `reply.emitted` was false with stdout and stderr both written.
+- Fixed, `ch06-05:109`: with `TMPDIR=/nonexistent/x`, a plugin with a case exits 2, and one with no cases prints `1 stage run, 0 failed, 3 skipped` and exits 0.
+- Fixed, `ch06-05:112`: `check` with invalid `hooks.json` and a hook case, or a missing fixture, prints one line and exits 2.
+- Open, risk: `ch06-00:31` and `ch06-03:84`, "starting with `test_`" drops `.lua`. `tests/test_foo.sh` gave `no case files found`, exit 2.
+- Open, risk: `ch06-02:147`, "one committed file, `file.txt`". `Cargo.toml` is committed too.
+- Open, nits: `ch05-00:36` "worked through" where the page only links; `ch06-00:5` softens the same overclaim fixed at `ch09-01:30`; `ch06-00:35` "each recipe is also a directory"; `ch06-04:134` the example asserts different text; `ch06-05:29` the paste drops the binary's leading blank line; `ch06-05:96`, also `:74` and `ch07-01:32`, call a missing case file a gap in the machine; `ch05-00:18` and `ch05-01:52` both explain `claude` being optional; `ch06-02:81-83` repeats `ch06-01:197-199`.
+
+## Deviations
+
+- 2026-11-04: The Commit lines were not run during execution, which the instruction did not ask for. The author asked for the commits afterwards, with these messages: `docs(repo): write the claudevs Getting Started chapters`, `docs(repo): write the claudevs Writing Cases chapters`.
+- 2026-11-04: Task 1 and Task 2 ran in one batch with plans 07 and 09, each in its own scratch directory. The coders ran only `cargo test -p book-doctests`; `cargo make book-build` and `cargo make dod` ran once for the batch.
+- 2026-11-04: Code over old docs. `doctor` prints paths as typed, not `…/my-plugin`. `validate` under `claude` 2.1.318 prints a long "Plugin directory checks" block, pasted unedited in `ch05-04`, which says those lines change with `claude`'s version. An uncreatable temp directory is not always a skip, as the review fix above records.
+- 2026-11-04: Added outside the sections the plan names, all from real runs: a second `doctor` run in `ch05-02`; a no-`claude` run in `ch05-04`; `claudevs --version` in `ch05-01`; `## See a native suite fail` in `ch06-04`; `--case` facts in `ch06-05`: a filter matching nothing exits 0, and `--case` does not filter native suites.
+- 2026-11-04: `cli/tutorial.md`'s "Installed package claudevs-cli v0.1.0" line was dropped, because the install commands are not run. `ch05-04` keeps one closing paragraph of links where the plan drops `## Where to go next`.
+- 2026-11-04: `ch06-00` carries a Mermaid flowchart. Failure transcripts carrying a random temp path are described in prose on `ch06-*`, and pasted unedited on `ch05-04`, with a note that the path differs per run.
+- 2026-11-04: Claims taken from the source and not run for this page: hooks spawn as `sh -c`, and "0 native suites" counts test commands a plugin declares for itself.

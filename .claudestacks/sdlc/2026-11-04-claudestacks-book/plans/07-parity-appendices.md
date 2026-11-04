@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-04
 depends-on: [03]
 built-on: bdf14ebffb48
@@ -68,3 +68,16 @@ Edit 2, the bare fence at `crates/airsclaude/docs/messages-sdk/feature-parity.md
 - `cargo test -p book-doctests` exits 0.
 - `cargo make book-build` exits 0.
 - `cargo make dod` exits 0.
+
+## Review findings
+
+Plans 07, 08 and 09 shared one review. Checked after the fix round: `cargo test -p book-doctests` printed `32 passed`, `3 passed`, `59 passed`; `cargo make book-build` exit 0; `cargo make dod` exit 0. The full list is in the review report for this run, kept only on this machine.
+
+- Clean: `diff` against the three sources adds 13, 3 and 2 lines (17 links and one fence label). Citation counts printed 198, 81, 15; table rows printed 238 and 167. All match the plan.
+- Open, risk: `appendix-00.md:13` gives `models/capabilities.rs` as an example of a file name and line number, with no line number. "Each row says where the behaviour lives" overstates: the reviewer counted 91 of 212 table rows in B and 88 of 153 in C with no `:<line>`.
+- Open, nit: `appendix-00.md:19`, "look it up in B, C or D" covers `airsclaude` only.
+
+## Deviations
+
+- 2026-11-04: The Commit line was not run during execution, which the instruction did not ask for. The author asked for the commits afterwards, with this message: `docs(repo): add the parity and divergence appendices`.
+- 2026-11-04: The coder reported that the appendices are not wired into the doctest crate, based on a case-sensitive `grep`. That was wrong: `crates/book-doctests/src/pages.rs` includes them. Removing the `text` label at `appendix-02-messages-parity.md:732` failed `pages::Appendix02MessagesParity (line 732)` with `unknown start of token: \u{2192}`. The label was restored.

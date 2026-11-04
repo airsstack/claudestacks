@@ -1,5 +1,14 @@
-//! One doctest-only item per book page. `SUMMARY.md` is the table of contents
-//! and carries no snippets, so it is the one page not wired here.
+//! One doctest-only item per book page, and one per crate README with Rust in it.
+//! `SUMMARY.md` is the table of contents and carries no snippets, so it is the one
+//! page not wired here.
+
+#[cfg(doctest)]
+#[doc = include_str!("../../airsclaude/README.md")]
+struct ReadmeAirsclaude;
+
+#[cfg(doctest)]
+#[doc = include_str!("../../claudevs/README.md")]
+struct ReadmeClaudevs;
 
 #[cfg(doctest)]
 #[doc = include_str!("../../../book/src/appendix-00.md")]

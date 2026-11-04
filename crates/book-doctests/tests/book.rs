@@ -1,4 +1,4 @@
-//! Link checks over the real repository: the book's pages and every README.
+//! Link checks over the real repository: the book's pages, every README and every skill.
 
 #![expect(clippy::unwrap_used, reason = "tests unwrap known-valid paths")]
 
@@ -31,15 +31,15 @@ fn markdown_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// `<dir>/<member>/README.md` for every member directory that has one.
-fn member_readmes(dir: &Path) -> Vec<PathBuf> {
-    let mut readmes: Vec<PathBuf> = fs::read_dir(dir)
+/// `<dir>/<member>/<name>` for every member directory that has one, sorted.
+fn member_files(dir: &Path, name: &str) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = fs::read_dir(dir)
         .unwrap()
-        .map(|entry| entry.unwrap().path().join("README.md"))
+        .map(|entry| entry.unwrap().path().join(name))
         .filter(|path| path.is_file())
         .collect();
-    readmes.sort();
-    readmes
+    files.sort();
+    files
 }
 
 fn report(findings: &[Finding]) -> String {
@@ -73,13 +73,34 @@ fn readme_links_resolve() {
     let root = repo_root();
     let src = book_src();
     let mut readmes = vec![root.join("README.md")];
-    readmes.extend(member_readmes(&root.join("crates")));
-    readmes.extend(member_readmes(&root.join("plugins")));
+    readmes.extend(member_files(&root.join("crates"), "README.md"));
+    readmes.extend(member_files(&root.join("plugins"), "README.md"));
     let findings: Vec<Finding> = readmes
         .iter()
         .flat_map(|readme| {
             let base = readme.parent().unwrap();
             scan_page(readme, base, &src, SITE_URL)
+        })
+        .collect();
+    assert!(findings.is_empty(), "\n{}", report(&findings));
+}
+
+#[test]
+fn skill_links_resolve() {
+    let root = repo_root();
+    let src = book_src();
+    let skills: Vec<PathBuf> = fs::read_dir(root.join("plugins"))
+        .unwrap()
+        .map(|plugin| plugin.unwrap().path().join("skills"))
+        .filter(|dir| dir.is_dir())
+        .flat_map(|dir| member_files(&dir, "SKILL.md"))
+        .collect();
+    assert!(!skills.is_empty(), "no skills found under plugins/");
+    let findings: Vec<Finding> = skills
+        .iter()
+        .flat_map(|skill| {
+            let base = skill.parent().unwrap();
+            scan_page(skill, base, &src, SITE_URL)
         })
         .collect();
     assert!(findings.is_empty(), "\n{}", report(&findings));

@@ -10,7 +10,6 @@
 //! Rust cannot compile is reported as a warning naming the divergence, not as
 //! an error against the plugin.
 
-mod docs_doctests;
 mod error;
 mod native;
 mod report;

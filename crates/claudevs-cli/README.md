@@ -13,28 +13,34 @@ curl -LsSf https://airsstack.github.io/claudestacks/install.sh | sh   # prebuilt
 cargo install claudevs-cli                                            # or build from source
 ```
 
-The installed binary is named `claudevs`. It needs `git` on `PATH`: it git-initialises the project
-each case runs against.
+The installed binary is named `claudevs`. It needs `git` on `PATH`: it creates a git repository as the
+default project each case runs in.
 
-## Commands
+## Use
 
-| Command | What it does |
-| --- | --- |
-| `test [PATH]` | Runs every discovered case plus the native suites declared in `claudevs.toml`. |
-| `test --installed [PATH]` | The same cases against a throwaway copy of the plugin in the shape it has once installed, so a path that resolves only in the checkout fails here. |
-| `test --case <NAME> [PATH]` | Runs only the cases whose name contains `NAME`. |
-| `check [PATH]` | The gate: delegated manifest validation, then wiring, then `test`, then `test --installed` — all four stages run and report even when an earlier one fails. |
-| `doctor [PATH]` | Names what this environment can and cannot do, one line per probe. |
-| `migrate <case.yaml>` | Mechanical conversion of a YAML case to its data-Lua form, printed to stdout. |
-| `migrate --write <case.yaml>` | The same conversion, replacing the `.yaml` file with the `.lua` file. |
+Run these from a plugin's directory, or pass the plugin's path as the last argument:
+
+```bash
+claudevs check          # the gate: validate, wiring, the cases, and the cases against the installed layout
+claudevs test           # run only the cases and native suites
+claudevs doctor         # say what this environment can and cannot do
+```
 
 `test`, `check` and `doctor` take `--json` for the machine-readable report. Exit codes: `0` when
 nothing was wrong, `1` for verdict failures or findings, `2` when claudevs itself could not run.
 
 ## Documentation
 
-The full documentation — tutorials, how-to guides, the CLI reference and explanation — lives in the
-[`claudevs` docs](https://github.com/airsstack/claudestacks/blob/main/crates/claudevs/docs/README.md).
+The book takes you from install to a passing gate.
+
+- [Installation](https://airsstack.github.io/claudestacks/ch05-01-installation.html)
+- [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html)
+  writes a first plugin and a first case, then runs the gate.
+- [Writing Cases](https://airsstack.github.io/claudestacks/ch06-00-writing-cases.html)
+- [The check Gate](https://airsstack.github.io/claudestacks/ch07-00-check-gate.html), including
+  [running it in CI](https://airsstack.github.io/claudestacks/ch07-03-ci.html).
+- [claudevs CLI Reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html)
+  lists every command, flag and exit code.
 
 ## License
 

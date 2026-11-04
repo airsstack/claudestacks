@@ -1,19 +1,18 @@
 # airsclaude
 
-Unofficial Rust client for Anthropic's official SDK surfaces. Not affiliated with Anthropic.
+Unofficial Rust SDK for Anthropic's Claude. Not affiliated with Anthropic.
 
-Two independent clients ship in this crate. They share almost no code, and which one you want depends
-on what you are building:
+The crate holds two independent clients. They share almost no code, and which one you want depends on
+what you are building:
 
 | | Messages API | Agent SDK |
 |---|---|---|
-| What it is | typed client over `POST /v1/messages` and its companion endpoints | drives the `claude` Code CLI as a subprocess over its control protocol |
+| What it is | a typed client over `POST /v1/messages` and its companion endpoints | drives the `claude` Code CLI as a subprocess over its control protocol |
 | Reach for it when | you want a model to answer, with tools and streaming under your control | you want an agent that reads files, runs commands, and manages its own loop |
-| Needs | `ANTHROPIC_API_KEY` | a `claude` binary 2.0.0+ on `PATH` — and no API key |
+| Needs | `ANTHROPIC_API_KEY` | a `claude` binary 2.0.0+ on `PATH`, and no API key |
 | Module | `airsclaude::messages`, `airsclaude::models` | `airsclaude::agent` |
 
-A third pillar, Managed Agents (`/v1/agents`, `/v1/sessions`), is **not started** — there is no code
-for it.
+A third pillar, Managed Agents (`/v1/agents`, `/v1/sessions`), has no code in the crate.
 
 ## Install
 
@@ -24,9 +23,13 @@ tokio        = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures-util = "0.3" # StreamExt, for consuming the Agent SDK's message stream
 ```
 
-`tokio` drives both quick starts below; `futures-util` is needed only by the Agent SDK one.
+`tokio` drives both examples below. `futures-util` is needed only by the Agent SDK one. The crate
+needs Rust 1.94 or newer and declares no Cargo features.
 
-## Quick start — Messages API
+## Example: Messages API
+
+A complete program that asks one question and prints the text of the reply. It reads the key from the
+environment and passes it to the client builder.
 
 ```rust,no_run
 use airsclaude::messages::ContentBlock;
@@ -55,7 +58,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Quick start — Agent SDK
+## Example: Agent SDK
+
+A complete program that hands a prompt to the `claude` binary and prints what the agent says. It
+needs no API key, because the binary uses the credentials it already holds.
 
 ```rust,no_run
 use airsclaude::agent::{ContentBlock, Message, Options, query};
@@ -82,59 +88,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-No API key in the second one. The Agent SDK never calls the HTTP API — it spawns the binary and reuses
-whatever credentials that binary already holds.
+## What the crate offers
+
+**Messages API.** `POST /v1/messages` with streaming and an accumulator; custom tools and all four
+`tool_choice` forms; prompt caching with both TTL tiers; extended thinking; structured output; image
+and PDF input with citations; token counting; the Message Batches API; and `GET /v1/models` with its
+capability payload.
+
+**Agent SDK.** A one-shot `query` and a stateful `Client`; the 45 fields of `Options`; in-process MCP
+tools written in Rust; hooks; six permission modes and a `PermissionPolicy` callback; MCP
+elicitation; programmatic subagents; session continue, resume and fork; on-disk session inspection;
+and 22 mid-session control and introspection operations.
+
+Neither client is at complete parity with the official SDKs. The parity appendices grade each feature
+against the shipped Python and TypeScript artifacts and name every gap.
 
 ## Documentation
 
-The docs follow [Diátaxis](https://diataxis.fr/): four modes, kept separate. Start at
-[`docs/README.md`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/README.md), or go straight to what you need:
+The book covers both clients, one task at a time. Start with
+[Getting Started](https://airsstack.github.io/claudestacks/ch01-00-airsclaude-getting-started.html),
+which helps you pick a client.
 
-| | Messages API | Agent SDK |
-|---|---|---|
-| Learn it | [tutorial](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/tutorial.md) | [tutorial](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/tutorial.md) |
-| Do one thing | [how-to](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/how-to.md) | [how-to](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/how-to.md) |
-| Understand it | [explanation](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/explanation.md) | [explanation](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/explanation.md) |
-| Check parity | [feature parity](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/messages-sdk/feature-parity.md) | [feature parity](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/agent-sdk/feature-parity.md) |
+- [The Messages API](https://airsstack.github.io/claudestacks/ch02-00-messages-api.html), from
+  [Your First Call](https://airsstack.github.io/claudestacks/ch02-01-first-call.html).
+- [The Agent SDK](https://airsstack.github.io/claudestacks/ch03-00-agent-sdk.html), from
+  [Your First Session](https://airsstack.github.io/claudestacks/ch03-01-first-session.html).
+- [Under the Hood](https://airsstack.github.io/claudestacks/ch04-00-airsclaude-under-the-hood.html)
+  explains how the crate is built.
+- [Messages API Parity](https://airsstack.github.io/claudestacks/appendix-02-messages-parity.html),
+  [Agent SDK Parity](https://airsstack.github.io/claudestacks/appendix-03-agent-parity.html) and
+  [Deliberate Divergences](https://airsstack.github.io/claudestacks/appendix-04-divergences.html) are
+  the reference tables.
 
-Cross-cutting: [architecture](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/architecture.md) for the pillar map and the Agent SDK's internal
-layering; [divergences](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/docs/divergences.md) for every place this crate deliberately differs from the
-official SDKs.
-
-The API reference is the rustdoc — `cargo doc -p airsclaude --no-deps --open`.
-
-## What is implemented
-
-The crate declares no Cargo features; everything below is always compiled.
-
-**Messages API** — `POST /v1/messages` with SSE streaming and a full accumulator; custom tools with
-`strict` and all four `tool_choice` forms; prompt caching with both TTL tiers and per-tier usage
-accounting; extended thinking and effort levels; JSON-Schema structured output; image and PDF input;
-citations; token counting; the Message Batches API; `GET /v1/models` with the capability-discovery
-payload.
-
-**Agent SDK** — one-shot `query` and a stateful `Client`; 45 `Options` fields lowered to the binary's
-flags and handshake; in-process MCP tools written in Rust; hooks; the full six-mode permission system
-with a `PermissionPolicy` callback; MCP elicitation; programmatic subagents; session continue, resume,
-fork and resume-at-a-message; on-disk session inspection; warm start; and 22 mid-session control and
-introspection operations.
-
-Neither is at complete parity. The two feature-parity documents say exactly where, graded against the
-shipped official artifacts rather than their documentation.
+The API reference is the rustdoc: `cargo doc --open` in a project that depends on the crate.
 
 ## Examples
 
-25 runnable programs, each in its own directory with a `README.md`:
+The repository holds 25 runnable programs, each in its own directory with a `README.md`:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... cargo run -p airsclaude --example 01_hello
 cargo run -p airsclaude --example agent_01_query
 ```
 
-- [`examples/messages/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/messages/README.md) — 11 programs, simplest first.
-- [`examples/agent/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/agent/README.md) — 14 programs, simplest first.
-
-Both how-to guides index these by the goal you arrive with.
+- [`examples/messages/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/messages/README.md) has 11 programs, simplest first.
+- [`examples/agent/`](https://github.com/airsstack/claudestacks/blob/main/crates/airsclaude/examples/agent/README.md) has 14 programs, simplest first.
 
 ## License
 

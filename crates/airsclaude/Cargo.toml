@@ -15,7 +15,7 @@ categories  = ["api-bindings", "web-programming::http-client", "asynchronous"]
 # `claude`-CLI stand-in that only the integration tests spawn. Leaving the
 # stand-in out also drops its `[[bin]]` target, so `cargo install` never puts
 # it on a caller's PATH.
-exclude     = ["CLAUDE.md", ".claude/", "src/bin/airsclaude-agent-testchild.rs"]
+exclude     = ["CLAUDE.md", ".claude/", "docs/", "src/bin/airsclaude-agent-testchild.rs"]
 
 [lints]
 workspace = true

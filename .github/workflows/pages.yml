@@ -1,8 +1,11 @@
 name: Pages
 
-# Publishes https://airsstack.github.io/claudestacks/install.sh, the pointer
-# that installs the latest claudevs release. It is copied from install/ into a
-# directory that holds nothing else, so install.sh is the only file served.
+# Publishes https://airsstack.github.io/claudestacks/: the book, built from
+# book/ with mdBook, and install.sh beside it at
+# https://airsstack.github.io/claudestacks/install.sh, the pointer that installs
+# the latest claudevs release. install.sh is copied from install/ into the
+# built book directory, so the served site is exactly that directory. A failed
+# book build stops the workflow before the deploy job runs.
 #
 # Deployed from an Actions artifact rather than a branch, so the published
 # directory is never committed and nothing but this workflow can change what is
@@ -12,6 +15,7 @@ on:
   push:
     branches: [main]
     paths:
+      - book/**
       - install/**
       - .github/workflows/pages.yml
   workflow_dispatch:
@@ -35,14 +39,20 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.4.52,mdbook-mermaid@0.16.2
+
+      - name: Build the book
+        run: mdbook build book
+
       - name: Add the install pointer
-        run: |
-          mkdir site
-          cp install/install.sh site/
+        run: cp install/install.sh book/book/
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: site
+          path: book/book
 
   deploy:
     name: Deploy

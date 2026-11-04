@@ -30,7 +30,7 @@ Rows below distinguish "missing from both" from "missing from one".
 | 🟡 | present but narrower than the official SDK |
 | ❌ | absent |
 | 🔷 | airsclaude has it; the official SDKs do not |
-| 🔶 | deliberately different — see [divergences.md](appendix-04-divergences.md) |
+| 🔶 | deliberately different — see [Appendix D](appendix-04-divergences.md) |
 
 Marks judge capability, not name identity. airsclaude is idiomatic Rust — builders, exhaustive enums,
 newtypes — so equivalent features carry Rust-shaped names.
@@ -387,13 +387,13 @@ construction and are proof thereafter, where the official SDKs pass strings and 
 
 **Stricter elicitation validation.** `mcp_server_name` is structurally required
 (`protocol/frames.rs:242`) where `sdk.mjs` reads it unvalidated. See
-[divergences.md](appendix-04-divergences.md).
+[Appendix D](appendix-04-divergences.md).
 
 ---
 
 ## Deliberate divergences
 
-Recorded in [divergences.md](appendix-04-divergences.md) rather than here, so the reasoning lives in one place.
+Recorded in [Appendix D](appendix-04-divergences.md) rather than here, so the reasoning lives in one place.
 The Agent SDK entries are: required `mcp_server_name` on elicitation, the three process-hygiene
 options, the two inert fields, and `SessionArchive::messages` returning a flat list with
 `parent_uuid` rather than a reconstructed conversation DAG.

@@ -97,8 +97,8 @@ The API's streaming documentation tells clients to handle event types they do no
 gracefully. A client that fails to decode one is wrong, not strict.
 
 So the open-ended enums decoded from a server response have an unknown arm. That covers `ContentBlock`,
-`ContentDelta`, `StreamEvent`, `StopReason` and the batch and model kind enums, among others.
-`BatchResult` and `ServerToolName` are closed and have none. Where an arm exists, it
+`ContentDelta`, `StreamEvent`, `StopReason`, `BatchResult` and the batch and model kind enums, among
+others. `Role` and `ServerToolName` are closed and have none. Where an arm exists, it
 carries the payload, not only a note that something was unrecognised. A block this release does not
 model still arrives as `ContentBlock::Unknown(Value)` with its full JSON, so you can inspect it, log
 it, or handle it before the crate learns about it. Discarding the payload would lose information the

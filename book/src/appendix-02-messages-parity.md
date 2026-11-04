@@ -2,7 +2,7 @@
 
 What `airsclaude::messages` (plus `airsclaude::models` and `airsclaude::types`) does and does not match in
 Anthropic's official base SDKs — the raw `POST /v1/messages` clients, a different product from the
-Claude Agent SDK covered in [`../agent-sdk/feature-parity.md`](appendix-03-agent-parity.md).
+Claude Agent SDK covered in [Appendix C](appendix-03-agent-parity.md).
 
 **Pinned versions**
 
@@ -29,7 +29,7 @@ That distinction is the point: comparing type surfaces against prose documentati
 |------|---------|
 | ✅ | Full parity — equivalent capability, equivalent runtime behavior |
 | ⚠️ | **Defect** — the capability is modelled but behaves incorrectly at runtime (silent data loss or hard failure) |
-| 🔶 | **Deliberately different** — the behaviour is chosen and does not match the pinned SDKs. A caller porting from Python or TypeScript will observe a difference. Used where the official SDKs disagree with each other and airsclaude had to pick one. See [`../divergences.md`](appendix-04-divergences.md). |
+| 🔶 | **Deliberately different** — the behaviour is chosen and does not match the pinned SDKs. A caller porting from Python or TypeScript will observe a difference. Used where the official SDKs disagree with each other and airsclaude had to pick one. See [Appendix D](appendix-04-divergences.md). |
 | 🟡 | Partial — core exists, narrower than official |
 | ❌ | Absent in airsclaude |
 | — | Not applicable |
@@ -49,8 +49,8 @@ feature degrades gracefully, wrong behaviour does not.
 | Prompt caching (per-block, TTL tiers, usage counters) | ✅ parity (minus top-level auto-place) |
 | JSON-schema structured output | ✅ parity (minus typed-parse helper) |
 | System prompt (string + segments + per-segment cache) | ✅ parity |
-| **Streaming accumulation** | ✅ parity on all six modelled delta kinds, including `input_json_delta` buffering for both `ToolUse` and `ServerToolUse` blocks (accumulator.rs:222-225, 303-307) — with five deliberate divergences, see [`../divergences.md`](appendix-04-divergences.md) |
-| **Forward compatibility (every server-decoded enum)** | ✅ parity — payload-retaining unknown arm on all ten |
+| **Streaming accumulation** | ✅ parity on all six modelled delta kinds, including `input_json_delta` buffering for both `ToolUse` and `ServerToolUse` blocks (accumulator.rs:222-225, 303-307) — with five deliberate divergences, see [Appendix D](appendix-04-divergences.md) |
+| **Forward compatibility (every open-ended decoded enum)** | ✅ parity — payload-retaining unknown arm on each |
 | **`thinking` / `output_config.effort`** | ✅ parity — both request params present |
 | **Response diagnostics (`container`, `stop_details`, typed `pause_turn`, usage sub-objects)** | ✅ parity (§8, §8.1, §8.3) |
 | **`message_delta` usage merge (input-side counters, `stop_details`)** | ✅ parity — overwrite-cumulative, matching Python/TypeScript (§4.4) |
@@ -74,7 +74,7 @@ surfaces listed in the ranked gaps.
 **On the beta namespace.** The official base SDK ships `beta.{agents,sessions,environments,vaults,
 memory_stores,skills,tunnels,deployments,files,user_profiles,webhooks}`. Most of that is the Managed
 Agents product, which is a separate airsclaude pillar with no code yet — see
-[`../architecture.md`](ch04-01-three-pillars.md). It is not scored here. The one beta resource that belongs
+[Three Pillars](ch04-01-three-pillars.md). It is not scored here. The one beta resource that belongs
 to *this* pillar is the Files API, which is listed as a gap above.
 
 ---
@@ -278,7 +278,7 @@ conversion is all-or-nothing: `try_from_response` fails the whole batch on the f
 instead of silently dropping it.
 
 `ContentBlockParam`'s membership is narrower than official's 17 — that is a gap, §12; the *split* into
-two unions is the divergence, [`../divergences.md`](appendix-04-divergences.md).
+two unions is the divergence, [Appendix D](appendix-04-divergences.md).
 
 ### 3.4 ✅ `Role::System`
 
@@ -439,7 +439,7 @@ malformed stream, where airsclaude reports and Python/TS corrupt.
 
 Graded 🔶 rather than ✅ because a caller porting from Python or TypeScript **will** see different
 behavior on a malformed stream: an `Error::Stream` where the official SDKs return a misaligned message.
-Recorded in [`../divergences.md`](appendix-04-divergences.md).
+Recorded in [Appendix D](appendix-04-divergences.md).
 
 Delta and stop events are a separate question, and there airsclaude follows TypeScript: an out-of-range
 index is a silent no-op (`accumulator.rs:235-237`), where Python raises `IndexError` and Go returns an
@@ -479,7 +479,7 @@ guards, because neither needed to.
 
 Two edge behaviours where the official SDKs disagree with each other, recorded so they are not
 re-argued. Both are pinned by tests in `accumulator.rs` and both appear in
-[`../divergences.md`](appendix-04-divergences.md).
+[Appendix D](appendix-04-divergences.md).
 
 **Truncated stream — no `message_stop`, no error.** airsclaude returns `Ok(partial_message)`; the caller
 sees a `Message` whose `stop_reason` is `None`. This matches **Python and Go**, and diverges from
@@ -510,7 +510,8 @@ content-block types and new SSE event types may be added within `anthropic-versi
 the streaming guide says verbatim: *"new event types may be added, and your code should handle unknown
 event types gracefully."*
 
-All ten server-decoded enums carry a payload-retaining unknown arm plus `#[non_exhaustive]`.
+Every open-ended enum decoded from a response carries a payload-retaining unknown arm plus
+`#[non_exhaustive]`. `Role` and `ServerToolName` are closed; see [Appendix D](appendix-04-divergences.md).
 
 | Scenario | Python | TypeScript | airsclaude |
 |---|---|---|---|
@@ -538,21 +539,20 @@ The stakes are not hypothetical. `server_tool_use`, `redacted_thinking`, `web_se
 `container_upload`, `fallback` and `connector_text` are all emitted on GA paths today, and a client
 without unknown arms fails the whole response on any of them.
 
-### 5.1 It applies to every server-decoded enum, not just content blocks
+### 5.1 It applies to every open-ended decoded enum, not just content blocks
 
-Every enum airsclaude decodes from a server response carries an unknown arm — except `ErrorType`, which
-already
-carried a presence-only `#[serde(other)]` unit arm — and each closed one hard-failed the enclosing
-struct on an unrecognized value. The content-block and stream-event unions were the widest exposure,
-but not the only one:
+Every open-ended enum airsclaude decodes from a server response carries an unknown arm, because a closed
+one fails the enclosing struct on an unrecognized value. The content-block and stream-event unions are
+the widest exposure, but not the only one:
 
 | Enum | Site | Exposure |
 |---|---|---|
 | **`StopReason`** | response.rs:73-91 | ✅ `pause_turn` is a typed `StopReason::PauseTurn` variant (§8.1); an untagged `Unknown(String)` arm retains the raw value for anything else, so an unrecognised stop reason never fails the enclosing `Message`. |
-| `ErrorType` | error.rs:71 | Already tolerant — a presence-only `#[serde(other)]` unit arm meant it never hard-failed. Its gap was payload retention, not decode failure. |
+| `ErrorType` | error.rs:71 | An untagged `Unknown(String)` arm retains the raw category. |
 | `BatchStatus` | batches/types.rs:140-152 | Plausible. Batch lifecycle states have grown before. |
+| `BatchResult` | batches/types.rs:197-225 | An untagged `Unknown(Value)` arm keeps the row. A value that is not an object with a string `type` still fails its row, because it is corrupt, not newer. |
 | `MessageKind` | response.rs:60 | Latent — single-valued, stable. |
-| `BatchKind` / `DeletedBatchKind` | batches/types.rs:128 / :230-237 | Latent — single-valued. |
+| `BatchKind` / `DeletedBatchKind` | batches/types.rs:128 / :256-263 | Latent — single-valued. |
 | `ModelInfoKind` | models/types.rs:33 | Latent — single-valued. |
 
 `StopReason` is the one that would otherwise fail on GA paths, since `pause_turn` is returned whenever
@@ -560,10 +560,13 @@ a server-tool loop hits its iteration limit. The rest are latent — the distinc
 
 `SystemSegmentKind` (system.rs:159) is deliberately **absent** from this table. It derives `Serialize`
 only — a request-side type the SDK sends and never decodes — so an unknown arm on it could be neither
-produced by decoding nor serialized. Ten enums are in scope, not eleven.
+produced by decoding nor serialized.
 
-**Policy:** every enum decoded from a server response carries an unknown arm, and that arm **retains the
-payload**. Applying it uniformly is cheaper than re-deciding per enum, and payload retention is what all
+`Role` and `ServerToolName` are closed and have no arm. An unrecognized `Role` fails its message, and a
+block with an unrecognized tool name lands in `ContentBlock::Unknown`.
+
+**Policy:** every open-ended enum decoded from a server response carries an unknown arm, and that arm
+**retains the payload**. Applying it uniformly is cheaper than re-deciding per enum, and payload retention is what all
 five official SDKs do — Python via `__pydantic_extra__`, TypeScript by passthrough, Go via `RawJSON()`,
 Java via `_json()`, C# via `.Json`. A presence-only arm would make airsclaude the only family member that
 discards data the server sent.
@@ -577,12 +580,11 @@ not `Copy`, so the bare-string enums lose that derive. And a **known** discrimin
 to satisfy its variant is absorbed by the fallback rather than raising an error — deliberate, and pinned
 by test.
 
-`ContentBlock` is the one asymmetry: it alone also derives `Serialize`, so its unknown arm carries
-`#[serde(skip_serializing)]` — an `Unknown` block cannot be re-serialized. Since the content-block
-It is not used on the request path — that path carries `ContentBlockParam`, which has no
-`Unknown` arm — and echoing a response-only block back is prevented at compile time by the
-`TryFrom<ContentBlock> for ContentBlockParam` conversion, which returns `UnsendableBlock` rather than
-surfacing a runtime `Error::Serde`. The other nine are `Deserialize`-only.
+`ContentBlock` is the one asymmetry: its unknown arm carries `#[serde(skip_serializing)]`, so an
+`Unknown` block cannot be re-serialized. It is not used on the request path — that path carries
+`ContentBlockParam`, which has no `Unknown` arm — and echoing a response-only block back is prevented at
+compile time by the `TryFrom<ContentBlock> for ContentBlockParam` conversion, which returns
+`UnsendableBlock` rather than surfacing a runtime `Error::Serde`.
 
 Unrecognized SSE **event names** get the same treatment — surfaced as `StreamEvent::Unknown`, never an
 error. The tolerance stops there: a payload that is not an object, or an object whose `type` matches a
@@ -761,7 +763,7 @@ but a caller porting field-access code from Python or TypeScript
 (`caps.context_management.strategies.get("clear_thinking_20251015")`). The observable data is
 equivalent — every dated key the server sends is retained, none dropped — but the access pattern
 differs, and unlike the pinned SDKs a newly dated strategy needs no airsclaude code change to be
-represented. Recorded in [`../divergences.md`](appendix-04-divergences.md).
+represented. Recorded in [Appendix D](appendix-04-divergences.md).
 
 ---
 
@@ -771,7 +773,7 @@ represented. Recorded in [`../divergences.md`](appendix-04-divergences.md).
 (:106), `list` (:119), `results` (:137), `cancel` (:161), `delete` (:174) — against the official
 `create` / `retrieve` / `list` / `results` / `cancel` / `delete` (`resources/messages/batches.d.ts:37,
 53, 69, 85, 107, 124`). `Batch`, `BatchStatus`, `RequestCounts`, `BatchList`, `BatchResultRow`,
-`BatchResult`, `DeletedMessageBatch` (batches/types.rs:45-219) match the official shapes.
+`BatchResult`, `DeletedMessageBatch` (batches/types.rs:45-250) match the official shapes.
 
 **One gap: pagination.** Official `list` takes `BatchListParams` (`batches.d.ts:69`) and returns a
 `MessageBatchesPage` the caller can walk. airsclaude' `list()` takes no arguments
@@ -822,7 +824,7 @@ by official-checklist order.
 | 9 | **Legacy Text Completions** (`client.completions`). | Deprecated upstream; not pursued. |
 
 Two things deliberately absent from this list. Deliberate differences from the official SDKs are not
-gaps — they are in [`../divergences.md`](appendix-04-divergences.md), and the body sections that establish them
+gaps — they are in [Appendix D](appendix-04-divergences.md), and the body sections that establish them
 are §3.3, §4.2, §4.3, §4.4, §4.5 and §9.1. And the `beta.*` namespace is out of scope for this
 document; most of it is a separate product, see §0.
 
@@ -833,7 +835,7 @@ document; most of it is a separate product, see §0.
 Not parity claims. These exist because Rust's type system can rule out at compile time what the
 scripting SDKs can only catch at runtime, or not at all.
 
-**Unknown values are retained, on every server-decoded enum.** Ten enums carry a payload-carrying
+**Unknown values are retained, on every open-ended decoded enum.** Each carries a payload-carrying
 unknown arm (§5.1). Python coerces an unrecognised discriminated-union variant into the *first*
 member of the union — its own test asserts this, with the inline comment `# just chooses the first
 variant` — so `.type` survives but the object is mistyped. TypeScript does not validate responses at
@@ -888,9 +890,9 @@ well as an advantage, and is graded 🔶 for that reason.
 
 ## Sources
 
-- Architecture and pillar mapping — [`../architecture.md`](ch04-01-three-pillars.md)
-- Deliberate divergences from the official SDKs — [`../divergences.md`](appendix-04-divergences.md)
-- Agent SDK parity, the other implemented pillar — [`../agent-sdk/feature-parity.md`](appendix-03-agent-parity.md)
+- Architecture and pillar mapping — [Three Pillars](ch04-01-three-pillars.md)
+- Deliberate divergences from the official SDKs — [Appendix D](appendix-04-divergences.md)
+- Agent SDK parity, the other implemented pillar — [Appendix C](appendix-03-agent-parity.md)
 - `@anthropic-ai/sdk@0.115.0` — `resources/messages/messages.d.ts`, `resources/messages/batches.d.ts`, `resources/models.d.ts`, `client.d.ts`, `resources/beta/`
 - `anthropic-sdk-python` @ `3c8bdf14bc55377262f11d6c34b893834a02b3fc` — `types/`, `lib/streaming/_messages.py`, `_models.py`, `_streaming.py` (carried over, not re-verified)
 - REST reference — `platform.claude.com/docs/en/api/messages`, `/api/models-list`, `/build-with-claude/{streaming,vision,refusals-and-fallback,handling-stop-reasons}`

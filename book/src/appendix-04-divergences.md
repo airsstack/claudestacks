@@ -108,16 +108,18 @@ the divergence.
 
 ### `Unknown` arms retain the payload
 
-Every enum decoded from a server response carries an unknown arm, and that arm carries the raw JSON
-rather than merely recording that something was unrecognised. Anthropic's versioning policy states
+Every open-ended enum decoded from a server response carries an unknown arm, and that arm carries the
+raw value rather than merely recording that something was unrecognised. `Role` is closed and fails the
+decode of a message with a role it does not name. `ServerToolName` is closed too, and a block it cannot
+decode lands in `ContentBlock::Unknown`. Anthropic's versioning policy states
 new content-block and event types may be added within `anthropic-version: 2023-06-01`, so failing the
-decode is not an option.
+decode on one of those is not an option.
 
 Retention is the part worth defending. Python retains via `__pydantic_extra__`, TypeScript by not
 validating at all, Go via `RawJSON()`. A presence-only arm would make airsclaude the only client in the
 family that throws away data the server sent.
 
-`ContentBlock::Unknown` is the one asymmetric case: it alone also derives `Serialize`, so it carries
+`ContentBlock::Unknown` is the one asymmetric case: it carries
 `#[serde(untagged, skip_serializing)]` (`src/messages/content/block.rs:69`). An unknown block can be
 inspected but not echoed back — round-tripping a block this release does not understand is worse than
 refusing.

@@ -53,11 +53,11 @@ A plugin directory goes in. Each stage turns it into a report. The `check` gate 
 `doctor` runs one probe for each thing those stages need.
 
 ```mermaid
-flowchart LR
+flowchart TD
     dir["plugin directory"]
 
     subgraph cases["case suite"]
-        direction LR
+        direction TD
         discover["case::discover"] --> load["load YAML or Lua"]
         load --> Case
         Case --> spawn["harness: spawn"]

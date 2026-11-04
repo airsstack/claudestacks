@@ -15,7 +15,7 @@ You also need the crate and an async runtime:
 
 ```toml
 [dependencies]
-airsclaude = "0.1"
+airsclaude = "0.2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

@@ -40,7 +40,7 @@ official surface, is not implemented.
 
 ```toml
 [dependencies]
-airsclaude = "0.1"
+airsclaude = "0.2"
 tokio      = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

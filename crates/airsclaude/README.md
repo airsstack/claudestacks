@@ -18,7 +18,7 @@ A third pillar, Managed Agents (`/v1/agents`, `/v1/sessions`), has no code in th
 
 ```toml
 [dependencies]
-airsclaude   = "0.1"
+airsclaude   = "0.2"
 tokio        = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures-util = "0.3" # StreamExt, for consuming the Agent SDK's message stream
 ```

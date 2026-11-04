@@ -7,7 +7,7 @@ Add the crate, an async runtime and a stream helper to the project:
 
 ```toml
 [dependencies]
-airsclaude = "0.1"
+airsclaude = "0.2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 futures-util = "0.3"
 serde_json = "1"

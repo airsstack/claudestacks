@@ -66,7 +66,7 @@ toml               = "1.1"
 pulldown-cmark     = { version = "0.13", default-features = false }
 # Internal workspace members — path for local builds, version for publish-readiness.
 # A path-only entry fails `cargo deny` (wildcards), so each carries a version.
-airsclaude         = { version = "0.1.0", path = "crates/airsclaude" }
+airsclaude         = { version = "0.2.0", path = "crates/airsclaude" }
 claudevs           = { version = "0.1.0", path = "crates/claudevs" }
 
 [workspace.lints.rust]

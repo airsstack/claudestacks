@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-04
 depends-on: [02, 12]
 built-on: bdf14ebffb48
@@ -120,3 +120,27 @@ crates/claudevs/docs/
 curl -sS -o /dev/null -w '%{http_code}\n' https://airsstack.github.io/claudestacks/
 curl -sS -o /dev/null -w '%{http_code}\n' https://airsstack.github.io/claudestacks/install.sh
 ```
+
+## Review findings
+
+Plans 12 and 13 shared one review: no blocking findings, so no fix round.
+
+Results of Task 3: `cargo make dod`, `book-build`, `deny`, `plugins` and `claudevs-check` each exit 0. `dist plan` names `claudevs-cli` only (`grep -c airsclaude` prints 0). `crates/airsclaude/README.md` is 5,579 bytes. Mermaid counts match on all 18 pages. The title-only and citation greps print nothing. Tarballs hold 0 `docs/` entries and verify.
+
+Seen red on this tree, each undone: deleted stub (`how-to.md:0: cannot read file`); stub linking to a missing page (`how-to.md:3: no page ch06-00-gone.md in the book`); unwired page (`book/src/zz-probe.md is not compiled as a doctest`); page missing from `SUMMARY.md`; broken relative link (`link target does not exist (gone.md)`); broken book URL; reference-style link definition; `compile_error!` snippet (`ch02-01-first-call.md` line 121, `62 passed; 1 failed`). The reviewer separately saw a stub with a second link and a `SUMMARY.md` entry with no file go red.
+
+All below were fixed after the run, at the author's request, and carry no second review. `cargo make dod` and `book-build` exit 0; `cargo test -p book-doctests --test book` printed `7 passed`.
+
+- Fixed, risk: 15 link labels in appendices B and C named old paths, such as `../divergences.md`. They now read "Appendix C", "Appendix D" and "Three Pillars".
+- Fixed, risk: `every_stub_exists_and_links_into_the_book` did not hold the stub's shape. It now compares a stub's whole text; a stub with an added line went red (`how-to.md: must read exactly:`).
+- Fixed, risk: a new file under `docs/` stayed green. `the_docs_trees_hold_only_the_stubs` went red on a planted `crates/claudevs/docs/new.md`.
+- Fixed, risk: reverting `"docs/"` in an `exclude` went unnoticed. `stubs_stay_out_of_the_tarballs` reads both manifests and went red with the line removed (`Cargo.toml does not exclude "docs/"`).
+- Fixed, nits: the comparison made `link_targets` unnecessary, so it and its unit test are gone and `crates/book-doctests/src/links.rs` is unchanged; that also clears the fixture and test-placement nits; the stub message now shows the exact text expected.
+- Left as it is: `crates/airsclaude/CHANGELOG.md:29` names the old paths, in a released entry. The stubs still answer there.
+
+## Deviations
+
+- 2026-11-05: The Commit lines were not run, because the instruction to execute did not ask for commits. Tasks ran in the driver, without a task-briefer or coder, because the plan was already open.
+- 2026-11-05: Each stub keeps its old heading, and its sentence reads "This content is in the claudestacks book:", followed by the link as an autolink.
+- 2026-11-05: A forbidden link form was seen red as a reference-style definition; a raw `<a href>` was not tried on the final tree.
+- 2026-11-05: Mermaid pages for the author to open under `cargo make book`: introduction, ch02-03, ch02-08, ch03-00, ch03-04, ch03-06, ch04-01, ch04-02, ch04-03, ch06-00, ch07-01, ch09-01, ch09-02, ch10-00, ch11-00, ch12-00, ch14-00, ch15-00. They were opened and reported good before this plan. Since then only prose changed on `ch04-02` and appendices B and D, and link labels on appendices B and C; no diagram did.

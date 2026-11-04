@@ -251,6 +251,55 @@ over from them brings that runner back; do not restore `macos-14`. Two more task
 `CLAUDEVS_VERSION` before any download (it needs `shellcheck`), and `cargo make plugins-install` runs
 the offline hook-lookup cases against stubs, needing neither `airsl` nor the network.
 
+## The book
+
+The rules below apply to every page of the book, so each plan that writes a chapter applies them from
+here.
+
+**Voice.** Write for someone using the software, in plain short sentences and the present tense. No
+`file:line`, status tracking, decision history or internal vocabulary. The banned vocabulary under
+`### Docs describe the software, never the work that produced it` in `crates/airsclaude/CLAUDE.md`
+applies to every page. Appendices B, C and D are the one exception: they keep their citations.
+
+**Structure.** Each chapter carries its own small, self-contained example. A fact lives in one chapter
+and the others link to it. API reference stays in rustdoc. Diagrams are Mermaid, including any ASCII
+flow diagram in a source document; file trees stay in a `text` fence.
+
+**Code wins.** Where a chapter disagrees with the code, the book follows the code, and the
+disagreement goes in the running plan's `## Deviations`.
+
+**Examples.** Examples stay in `crates/*/examples/`, linked with absolute
+`https://github.com/airsstack/claudestacks/tree/main/...` URLs.
+
+**Output.** Output is never pasted unless something produced it. Every snippet is classified by one
+test: does it reach a service, spend usage, or need an interactive Claude Code session? There are four
+classes.
+
+- **No live run:** Rust calling the API or spawning `claude`; `cargo run --example` for a live
+  example; `claude -p "hi"`; `/plugin` and `/claudestacks-*:*` commands; `cmux`. Rust is `rust,no_run`;
+  anything else is the command only. No output either way.
+- **Run:** `claude --version`, `claude plugin validate`, `claudevs`, `cargo`, `airsl`, offline Rust.
+  Run it while writing, and paste the output from that run.
+- **Exercised by its reader:** YAML and Lua cases pass `claudevs test`; `hooks.json` and `plugin.json`
+  pass `claudevs check`; `claudevs.toml` loads in the case run; JSON reports are pasted from a real
+  run.
+- **Illustration:** file trees, and payload shapes taken from the rustdoc, in a `text` fence and never
+  presented as output.
+
+A snippet that fits no class is cut or rewritten until it does.
+
+**Fences.** Every fence is labelled, and no page uses an indented code block, because the gate
+compiles unlabelled and indented code as Rust.
+
+**Relative paths.** A snippet with a relative path starts with a hidden line moving to the owning
+crate, for example
+`# std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../claudevs")).unwrap();`. Snippets
+that continue an earlier one complete themselves with hidden `#` lines, as
+`../airsl/book/src/ch06-02-scripts-and-values.md:62-64` does.
+
+**Links.** Links are inline, image or `<https://...>` autolinks. Reference-style definitions and raw
+`<a href` are refused by the gate. Relative links in a page resolve against `book/src/`.
+
 ## AI methodology — the claudestacks plugin suite
 
 The methodology ships as a Claude Code plugin suite from the in-repo marketplace

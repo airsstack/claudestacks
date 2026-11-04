@@ -1,5 +1,5 @@
 ---
-status: approved
+status: done
 created: 2026-11-04
 depends-on: [04, 05, 06, 07, 08, 09, 10]
 built-on: bdf14ebffb48
@@ -72,3 +72,17 @@ crates/claudevs-cli/README.md — modify: front door, install command kept
 
 - `cargo test -p book-doctests` exits 0.
 - `cargo make dod` exits 0.
+
+## Review findings
+
+Plans 10 and 11 shared one review, and neither of its two blocking findings was in this plan's files. `readme_links_resolve` passed; `cargo make dod` exit 0. The reviewer compiled all three README Rust examples in a throwaway crate; the `airsclaude` Agent SDK example was compiled, not run.
+
+- Fixed after the run, at the author's request, nit: nothing failed if the README examples drifted. `crates/book-doctests/src/pages.rs` now includes the `airsclaude` and `claudevs` READMEs as doctests. A `compile_error!` added to the `claudevs` example failed at `README.md:28`, and `cargo test -p book-doctests` printed `62 passed` once it was removed.
+- Open, plan drift: Task 1 says "one short example", and `crates/airsclaude/README.md` shows two, one per client. It is 139 lines, against the 95 to 97 the plan gives for scale, and 5,579 bytes.
+
+## Deviations
+
+- 2026-11-04: The Commit lines were not run, because the instruction to execute did not ask for commits. Both tasks ran in one batch with plan 10's Task 2 and Task 3. No task-briefer ran, because the plan was already open in the driver.
+- 2026-11-04: Code over old READMEs. Root: `claude plugin validate --strict` is not "manifest only"; "results vary run to run" for `claude plugin eval` had no support and was cut; missing `airsl` is not silent; `/discuss` is `/claudestacks:discuss`. `crates/claudevs`: the old example's relative `plugins/my-plugin` was not runnable, so the path now comes from `argv`. `crates/claudevs-cli`: "git-initialises the project" now says it creates a git repository as the default project each case runs in.
+- 2026-11-04: Moved to the book, not kept: the root README's Rust quick start, SDLC picture, plugin dependency diagram and feature table; `crates/claudevs`' commands table, exit-code text and wiring sections. `crates/airsclaude/README.md` dropped warm start, resume-at-a-message, effort levels and strict-tools detail, which were not verified for this page. `crates/claudevs/README.md` gained Install and License sections. `crates/claudevs-cli/README.md` has no Rust example; it shows three commands instead.
+- 2026-11-04: The comment at `crates/airsclaude/examples/messages/04_caching/main.rs` calling the README "a few hundred tokens" was not changed, since no task names it.

@@ -32,9 +32,9 @@ pin_project! {
     /// `StreamExt::next` from `futures_util` or the equivalent
     /// `std::future::poll_fn` adapter.
     ///
-    /// Yields [`Error::JsonLines`] when a line cannot be decoded.
-    /// Yields [`Error::Transport`] when the underlying body stream errors.
-    /// After any error the stream terminates.
+    /// Yields [`Error::JsonLines`] when a line cannot be decoded, then carries
+    /// on with the next line. Yields [`Error::Transport`] when the underlying
+    /// body stream errors, then terminates.
     #[must_use = "streams do nothing unless polled"]
     pub struct BatchResultStream {
         #[pin]
@@ -284,5 +284,40 @@ mod tests {
         let items = collect_stream(s).await;
         assert_eq!(items.len(), 1);
         assert!(matches!(items[0], Err(Error::JsonLines(_))));
+    }
+
+    #[tokio::test]
+    async fn corrupt_result_yields_json_lines_error() {
+        let body = body_from_statics(vec![br#"{"custom_id":"r1","result":null}"#, b"\n"]);
+        let items = collect_stream(BatchResultStream::new(body)).await;
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], Err(Error::JsonLines(_))));
+    }
+
+    #[tokio::test]
+    async fn invalid_tail_yields_json_lines_error() {
+        let body = body_from_statics(vec![b"this is not json"]);
+        let items = collect_stream(BatchResultStream::new(body)).await;
+        assert_eq!(items.len(), 1);
+        assert!(matches!(&items[0], Err(Error::JsonLines(msg)) if msg.contains("tail")));
+    }
+
+    #[tokio::test]
+    async fn stream_continues_past_undecodable_and_unknown_rows() {
+        let body = body_from_statics(vec![
+            b"this is not json\n",
+            br#"{"custom_id":"r1","result":{"type":"deferred"}}"#,
+            b"\n",
+            br#"{"custom_id":"r2","result":{"type":"canceled"}}"#,
+            b"\n",
+        ]);
+        let items = collect_stream(BatchResultStream::new(body)).await;
+        assert_eq!(items.len(), 3);
+        assert!(matches!(items[0], Err(Error::JsonLines(_))));
+        assert!(matches!(
+            items[1].as_ref().unwrap().result,
+            crate::messages::batches::types::BatchResult::Unknown(_)
+        ));
+        assert_eq!(items[2].as_ref().unwrap().custom_id.as_str(), "r2");
     }
 }

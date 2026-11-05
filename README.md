@@ -12,13 +12,14 @@ claudestacks
 └── plugins/            six Claude Code plugins              ─► /plugin marketplace
 ```
 
-Pick the part you need. Each one works without the others.
+Pick the part you need. Each one works without the others. The
+[book](https://airsstack.github.io/claudestacks/introduction.html) covers all three.
 
-| I want to… | Use |
-| --- | --- |
-| call Claude from Rust | [`airsclaude`](#airsclaude) |
-| test a Claude Code plugin I wrote | [`claudevs`](#claudevs) |
-| give Claude Code a review-gated dev workflow | [the plugin suite](#the-plugin-suite) |
+| I want to… | Use | Start in the book |
+| --- | --- | --- |
+| call Claude from Rust | [`airsclaude`](#airsclaude) | [Getting Started](https://airsstack.github.io/claudestacks/ch01-00-airsclaude-getting-started.html) |
+| test a Claude Code plugin I wrote | [`claudevs`](#claudevs) | [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html) |
+| give Claude Code a review-gated dev workflow | [the plugin suite](#the-plugin-suite) | [Getting Started](https://airsstack.github.io/claudestacks/ch10-00-plugins-getting-started.html) |
 
 ## airsclaude
 
@@ -26,52 +27,21 @@ An unofficial Rust SDK for Claude, aiming for feature parity with Anthropic's of
 TypeScript SDKs. It ships two independent clients:
 
 ```
-                       ┌─► airsclaude::messages ──HTTP──► Anthropic API     (needs ANTHROPIC_API_KEY)
+                       ┌─► airsclaude::messages ──HTTP──► Anthropic API     (needs an API key)
 your Rust program ─────┤
                        └─► airsclaude::agent ──spawns──► `claude` CLI 2.0+  (no API key; uses the CLI's login)
 ```
 
-| Client | Use it when | Covers |
-| --- | --- | --- |
-| Messages API | you want a model to answer and you control the loop | streaming, tools, prompt caching, thinking, structured output, vision, PDFs, citations, batches |
-| Agent SDK | you want an agent that reads files, runs commands and drives its own loop | `query`, stateful `Client`, in-process MCP tools, hooks, permissions, subagents, sessions |
-
-Managed Agents, the third official surface, is not implemented.
+The Messages API client suits a model that answers while you control the loop. The Agent SDK client
+suits an agent that reads files, runs commands and drives its own loop. Managed Agents, the third
+official surface, is not implemented.
 
 **Install** (Rust 1.94+):
 
 ```toml
 [dependencies]
-airsclaude = "0.1"
+airsclaude = "0.2"
 tokio      = { version = "1", features = ["macros", "rt-multi-thread"] }
-```
-
-**Quick start:**
-
-```rust
-use airsclaude::messages::ContentBlock;
-use airsclaude::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::builder()?
-        .api_key(ApiKey::new(std::env::var("ANTHROPIC_API_KEY")?)?)
-        .build()?;
-
-    let req = MessageRequest::builder()
-        .model(ModelId::claude_sonnet_5())
-        .max_tokens(MaxTokens::new(1024))
-        .add_user_text("Say hi.")
-        .build();
-
-    let msg = client.messages().create(req).await?;
-    for block in &msg.content {
-        if let ContentBlock::Text(t) = block {
-            println!("{}", t.text);
-        }
-    }
-    Ok(())
-}
 ```
 
 25 runnable examples ship with the crate:
@@ -81,8 +51,13 @@ ANTHROPIC_API_KEY=sk-ant-... cargo run -p airsclaude --example 01_hello   # Mess
 cargo run -p airsclaude --example agent_01_query                          # Agent SDK
 ```
 
-More: [crate README](crates/airsclaude/README.md) (Agent SDK quick start) ·
-[docs](crates/airsclaude/docs/README.md) (tutorials, how-tos, parity tables).
+Read on in the book: [Getting Started](https://airsstack.github.io/claudestacks/ch01-00-airsclaude-getting-started.html),
+[your first Messages API call](https://airsstack.github.io/claudestacks/ch02-01-first-call.html) and
+[your first Agent SDK session](https://airsstack.github.io/claudestacks/ch03-01-first-session.html).
+How closely it matches the official SDKs is in
+[Appendix B](https://airsstack.github.io/claudestacks/appendix-02-messages-parity.html) and
+[Appendix C](https://airsstack.github.io/claudestacks/appendix-03-agent-parity.html). The
+[crate README](crates/airsclaude/README.md) has the short version.
 
 ## claudevs
 
@@ -90,9 +65,9 @@ Deterministic tests for Claude Code plugins. It runs a plugin's hooks and script
 Code would, checks the wiring, and tries the plugin in its installed layout.
 
 ```
-claude plugin validate --strict   manifest only
-claudevs check                    manifest ─► wiring ─► hook/script tests ─► installed-layout tests
-claude plugin eval                model-driven, so results vary run to run
+claude plugin validate --strict   manifest, skills, agents and commands; runs no hook
+claudevs check                    validate ─► wiring ─► cases ─► cases in the installed layout
+claude plugin eval                runs eval cases against a plugin and scores the results
 ```
 
 **Install:**
@@ -104,19 +79,20 @@ cargo install claudevs-cli     # or build from source; installs a binary named `
 
 `claudevs` needs `git` on `PATH`: it git-initialises the project each case runs against.
 
-**Use:**
-
 | Command | What it does |
 | --- | --- |
 | `claudevs check [PATH]` | the full gate above; every stage reports even if an earlier one fails |
 | `claudevs test [PATH]` | runs the plugin's test cases (`--installed` for the installed layout) |
-| `claudevs doctor [PATH]` | lists what this machine can and cannot run |
+| `claudevs doctor [PATH]` | reports what this machine can and cannot run |
 | `claudevs migrate <case.yaml>` | converts a YAML case to Lua |
 
 Exit codes: `0` clean, `1` failures found, `2` claudevs itself could not run. Add `--json` to
 `test`, `check` or `doctor` for machine-readable output.
 
-More: [CLI README](crates/claudevs-cli/README.md) · [docs](crates/claudevs/docs/README.md).
+Read on in the book: [Getting Started](https://airsstack.github.io/claudestacks/ch05-00-claudevs-getting-started.html),
+[Running the Gate](https://airsstack.github.io/claudestacks/ch05-04-running-the-gate.html) and the
+[command reference](https://airsstack.github.io/claudestacks/appendix-01-claudevs-cli.html). The
+[CLI README](crates/claudevs-cli/README.md) has the short version.
 
 ## The plugin suite
 
@@ -125,40 +101,16 @@ repository's marketplace.
 
 | Plugin | What you get |
 | --- | --- |
-| `claudestacks` | core agents (`coder`, `reviewer`, `explorer`), an `orchestrate` driver, snapshot memory, `/discuss` |
+| `claudestacks` | core agents (`coder`, `reviewer`, `explorer`), an `orchestrate` driver, snapshot memory, `/claudestacks:discuss` |
 | `claudestacks-sdlc` | an `intent → spec → plan → execute` workflow under `.claudestacks/sdlc/`, with roadmaps, ADRs and a `status` board |
 | `claudestacks-guideline-rust` | Rust guidelines and a Definition of Done the agents check against |
 | `claudestacks-guideline-python` | Python guidelines and a Definition of Done the agents check against |
 | `claudestacks-journal` | an Obsidian-compatible journal with embedding-free recall |
 | `claudestacks-cmux` | control of the [cmux](https://cmux.com) terminal |
 
-The SDLC workflow, in one picture:
-
-```
-intent ──► design ──► plan ──► execute
-(problem)  (spec)    (tasks)   (code + review)
-
-feedback loops
-  failure evidence (a log, a bug)   ──► triage  ──► a new intent
-  a review finding in 2+ chains     ──► distill ──► a proposed config fix
-```
-
-### What each plugin needs
-
-The plugins' hooks and scripts are Lua, run by **`airsl`**, a separate binary. Install it first:
-without it the hooks switch off silently, with no error.
-
-```
-airsl (binary) ◄── hooks/scripts ── claudestacks
-               ◄──────────────────── claudestacks-sdlc
-               ◄──────────────────── claudestacks-journal ──requires──► claudestacks
-               ◄──────────────────── claudestacks-cmux ────requires──► cmux (binary)
-
-claudestacks-guideline-rust ──── no runtime needs; read by claudestacks
-claudestacks-guideline-python ── no runtime needs; read by claudestacks
-```
-
-### Install
+**Install.** Most hooks and scripts run on `airsl`, a separate binary, so install it first. If it is
+missing, the hooks that run on it do nothing, and the `claudestacks` plugin's session-start check
+puts a notice in the session saying so.
 
 ```bash
 # 1. the Lua runtime: a prebuilt binary, no Rust needed
@@ -178,11 +130,17 @@ cargo install airsl-cli --locked
 /plugin install claudestacks-cmux@claudestacks
 ```
 
-If `airsl` is installed but the hooks still cannot find it, set
-`AIRSL_BIN` to the binary's full path.
+Which plugin needs what, and how the hooks find `airsl`, is in
+[Getting Started](https://airsstack.github.io/claudestacks/ch10-00-plugins-getting-started.html).
+Each plugin then has its own chapter:
+[claudestacks](https://airsstack.github.io/claudestacks/ch11-00-claudestacks-plugin.html),
+[claudestacks-sdlc](https://airsstack.github.io/claudestacks/ch12-00-sdlc-plugin.html),
+[the guidelines](https://airsstack.github.io/claudestacks/ch13-00-guideline-plugins.html),
+[claudestacks-journal](https://airsstack.github.io/claudestacks/ch14-00-journal-plugin.html) and
+[claudestacks-cmux](https://airsstack.github.io/claudestacks/ch15-00-cmux-plugin.html).
 
 Inside this repository the marketplace is already registered by `.claude/settings.json`; enable
-plugins with `/plugin`. Each plugin's README under `plugins/<name>/` lists its full contents.
+plugins with `/plugin`.
 
 ## Working on this repository
 

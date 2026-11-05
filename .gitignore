@@ -37,5 +37,8 @@ coding-agent-workspace/
 __pycache__/
 *.pyc
 
+# The book's build output. Pages builds its own copy; nothing built is committed.
+book/book/
+
 # Written by the corpus sweep when it diverges from the committed snapshot.
 crates/claudevs/tests/corpus/expected.snap.actual

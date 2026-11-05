@@ -197,6 +197,7 @@ pub struct BatchResultRow {
 /// Outcome of a single request inside a batch.
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BatchResult {
     /// The request completed successfully; `message` holds the response.
     Succeeded {
@@ -212,6 +213,30 @@ pub enum BatchResult {
     Canceled,
     /// The request expired before the batch ended.
     Expired,
+    /// A result this SDK release could not decode, with its raw JSON: either a
+    /// `type` it does not recognize, or a known `type` whose body does not fit,
+    /// such as a `succeeded` row whose message does not decode. The row stays
+    /// readable and the rest of the results keep streaming.
+    ///
+    /// A value that is not an object with a string `type` is not a newer kind
+    /// of result, so it fails to decode instead of landing here.
+    #[serde(untagged, deserialize_with = "object_with_string_type")]
+    Unknown(serde_json::Value),
+}
+
+/// Accepts the JSON for [`BatchResult::Unknown`]: an object with a string `type`.
+fn object_with_string_type<'de, D>(deserializer: D) -> Result<serde_json::Value, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+    if value.get("type").is_some_and(serde_json::Value::is_string) {
+        Ok(value)
+    } else {
+        Err(serde::de::Error::custom(
+            "a batch result must be an object with a string `type`",
+        ))
+    }
 }
 
 /// Response body from `DELETE /v1/messages/batches/{id}`.
@@ -414,6 +439,54 @@ mod tests {
     }
 
     // ── Unknown discriminant fallback ───────────────────────────────────────
+
+    #[test]
+    fn unknown_batch_result_decodes_with_payload() {
+        let json = r#"{"custom_id":"r5","result":{"type":"deferred","until":"tomorrow"}}"#;
+        let row: BatchResultRow = serde_json::from_str(json).unwrap();
+        match row.result {
+            BatchResult::Unknown(raw) => {
+                assert_eq!(raw["type"], "deferred");
+                assert_eq!(raw["until"], "tomorrow");
+            }
+            other => panic!("expected Unknown, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn succeeded_row_whose_message_does_not_decode_keeps_its_payload() {
+        let json = r#"{"custom_id":"r6","result":{"type":"succeeded","message":{"id":"msg_01","type":"message","role":"future","model":"claude-sonnet-4-5","content":[],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}}}"#;
+        let row: BatchResultRow = serde_json::from_str(json).unwrap();
+        match row.result {
+            BatchResult::Unknown(raw) => assert_eq!(raw["message"]["role"], "future"),
+            other => panic!("expected Unknown, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn errored_row_with_no_error_keeps_its_payload() {
+        let json = r#"{"custom_id":"r7","result":{"type":"errored"}}"#;
+        let row: BatchResultRow = serde_json::from_str(json).unwrap();
+        assert!(matches!(row.result, BatchResult::Unknown(raw) if raw["type"] == "errored"));
+    }
+
+    #[test]
+    fn result_that_is_not_an_object_with_a_string_type_is_an_error() {
+        for shape in [
+            r#""x""#,
+            "null",
+            "42",
+            "true",
+            "[]",
+            "{}",
+            r#"{"type":42}"#,
+            r#"{"type":null}"#,
+        ] {
+            let json = format!(r#"{{"custom_id":"r8","result":{shape}}}"#);
+            let decoded = serde_json::from_str::<BatchResultRow>(&json);
+            assert!(decoded.is_err(), "{shape} decoded as {decoded:?}");
+        }
+    }
 
     #[test]
     fn unknown_batch_status_decodes_with_payload() {

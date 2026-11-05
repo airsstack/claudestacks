@@ -81,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     BatchResult::Errored { error } => println!("errored: {}", error.message),
                     BatchResult::Canceled => println!("canceled"),
                     BatchResult::Expired => println!("expired"),
+                    other => println!("unrecognized result: {other:?}"),
                 }
             }
             Some(Err(e)) => return Err(e.into()),

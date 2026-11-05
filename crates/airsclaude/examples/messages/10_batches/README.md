@@ -42,7 +42,7 @@ let ended = loop {
 
 **Stream the results.** `results()` returns a `BatchResultStream`
 (`Stream<Item = Result<BatchResultRow, Error>>`); each row's `result` is one of
-four outcomes:
+four outcomes, or `Unknown` for one this release cannot decode:
 
 ```rust
 let mut stream = client.messages().batches().results(&ended.id).await?;
@@ -52,6 +52,7 @@ match row.result {
     BatchResult::Errored { error }     => println!("errored: {}", error.message),
     BatchResult::Canceled              => println!("canceled"),
     BatchResult::Expired               => println!("expired"),
+    other                              => println!("unrecognized result: {other:?}"),
 }
 ```
 

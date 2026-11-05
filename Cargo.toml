@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members  = ["crates/airsclaude", "crates/claudevs", "crates/claudevs-cli"]
+members  = ["crates/airsclaude", "crates/claudevs", "crates/claudevs-cli", "crates/book-doctests"]
 
 [workspace.package]
 edition       = "2024"
@@ -61,8 +61,12 @@ ratatui            = "0.29.0"
 serde-saphyr       = { version = "2.0", default-features = false, features = ["deserialize"] }
 # claudevs.toml (declared native test suites).
 toml               = "1.1"
+# CommonMark parser (book-doctests link rules). The same parser family mdBook renders with.
+# Default features off: `html` renders to HTML and `getopts` builds its binary, neither used.
+pulldown-cmark     = { version = "0.13", default-features = false }
 # Internal workspace members — path for local builds, version for publish-readiness.
-# (airsclaude has no entry: nothing else depends on it.)
+# A path-only entry fails `cargo deny` (wildcards), so each carries a version.
+airsclaude         = { version = "0.2.0", path = "crates/airsclaude" }
 claudevs           = { version = "0.1.0", path = "crates/claudevs" }
 
 [workspace.lints.rust]

@@ -1,0 +1,23 @@
+[book]
+title = "The claudestacks Book"
+authors = ["airsstack"]
+language = "en"
+src = "src"
+
+# A chapter named in SUMMARY.md with no file behind it fails the build
+# (`Chapter file not found`) instead of being created empty.
+[build]
+create-missing = false
+
+# Turns ```mermaid blocks into diagrams. mermaid.min.js and mermaid-init.js
+# beside this file are written by `mdbook-mermaid install book`.
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[output.html]
+# Pages serves this repository as a project site under /claudestacks/, so the 404
+# page needs the prefix to load its own stylesheets.
+site-url = "/claudestacks/"
+git-repository-url = "https://github.com/airsstack/claudestacks"
+edit-url-template = "https://github.com/airsstack/claudestacks/edit/main/book/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]

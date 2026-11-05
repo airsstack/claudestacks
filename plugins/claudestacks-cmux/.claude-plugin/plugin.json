@@ -1,6 +1,6 @@
 {
   "name": "claudestacks-cmux",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native cmux terminal control for Claude Code: four lazily-loaded skills (control, workspace, browser, config) that drive the cmux CLI, grounded on cmux 0.64.17.",
   "author": {
     "name": "rstlix0x0",

@@ -113,22 +113,24 @@ is for when the author asks "what is left".
 
 `claudestacks` is the author's Claude-focused Rust stack: an SDK for Anthropic's surfaces, the
 tooling that tests Claude Code plugins, and the AI methodology that drives both. Cargo workspace,
-`resolver = "3"`, Edition 2024, three members.
+`resolver = "3"`, Edition 2024, four members. The user documentation for all of it is the book in
+`book/`, published at <https://airsstack.github.io/claudestacks/>.
 
 - `crates/airsclaude` — Claude SDK. The driving objective is **100% feature parity and behavioral
   compatibility with Anthropic's official SDKs** across three pillars: the Messages API, the Agent
   SDK (drives the `claude` Code CLI as a subprocess), and Managed Agents (server-hosted stateful
   agents). A Rust caller gets what a Python or TypeScript caller gets, with idiomatic Rust
   ergonomics. The Messages API and Agent SDK are implemented; Managed Agents is not started. Pillar
-  map and internal structure:
-  [`crates/airsclaude/docs/architecture.md`](crates/airsclaude/docs/architecture.md); docs index:
-  [`crates/airsclaude/docs/README.md`](crates/airsclaude/docs/README.md).
+  map: [`book/src/ch04-01-three-pillars.md`](book/src/ch04-01-three-pillars.md); internal structure:
+  the two chapters after it.
 - `crates/claudevs` — engine for the Claude Code plugin lifecycle CLI: case model, test harness,
   native-suite delegation. Fills the deterministic-testing gap between `claude plugin validate
   --strict` and `claude plugin eval`. Depends on `airsl` and reaches the Lua bindings through it
   (`airsl::mlua`) rather than declaring `mlua` itself, so the two can never resolve to different
   copies of the interpreter.
 - `crates/claudevs-cli` — the `claudevs` binary.
+- `crates/book-doctests` — unpublished; exists only to gate the book, compiling its pages as doctests
+  and checking its links.
 
 `airsclaude::transport` is a module of the SDK crate (`crates/airsclaude/src/transport/`), not a
 dependency. It was vendored from the `airs-transport` crate when the SDK moved to this repository.
@@ -179,7 +181,7 @@ individual steps. `.github/workflows/ci.yml` runs `cargo make dod` on push to `m
 pull request, so CI and a local run are the same command. The plugin skill stays the source of
 truth: if the two disagree, the skill is right and `Makefile.toml` needs fixing.
 
-That same workflow carries three jobs the gate deliberately excludes. `cargo make claudevs-check` runs
+That same workflow carries four jobs the gate deliberately excludes. `cargo make claudevs-check` runs
 `claudevs check` over the fixture plugin corpus in `crates/claudevs/tests/fixtures/` in both
 directions — fixtures that must pass and fixtures that must fail at a named stage — because a corpus
 of only-passing fixtures would go green the day the checkers stopped reporting. `cargo make deny`
@@ -188,6 +190,14 @@ the policy and every suppression in `deny.toml`. It is its own job — invoking 
 directly, without cargo-make — because it compiles nothing and answers to a moving advisory
 database, so it can fail on a commit that changed nothing. The third, `install-pointer`, runs
 `cargo make install-check`: it installs `shellcheck`, which no gate step has, and compiles nothing.
+The fourth, `book`, runs `mdbook build book` on the versions pinned in `ci.yml`, `pages.yml` and
+`Makefile.toml`, which change together.
+
+`cargo make book` serves the book locally and rebuilds it on every edit; `cargo make book-build` builds
+it once into `book/book/`. Two gate facts matter when adding a page. `book/book.toml` sets
+`create-missing = false`, so a `SUMMARY.md` entry with no file fails the build instead of creating an
+empty page. And `crates/book-doctests/src/pages.rs` must wire every new page, or its
+`every_page_is_compiled_as_a_doctest` test fails.
 
 The third-party corpus lanes — `cargo make corpus-fetch` and `cargo make corpus-check`, which run
 `claudevs check` over 156 plugin roots in 13 pinned repositories nobody here controls — are the
@@ -239,7 +249,8 @@ smoke-test the archives without publishing. That file is generated: change
 piece is `.github/workflows/claudevs-cli-smoke.yml`, which the release calls through
 `global-artifacts-jobs` and which `host` waits on. It runs each archive on the platform it was built
 for (the musl ones in Alpine) against the fixture plugins, and an archive that fails it is never
-published. `.github/workflows/pages.yml` publishes `install/install.sh` to
+published. `.github/workflows/pages.yml` publishes the book to
+`https://airsstack.github.io/claudestacks/`, with `install/install.sh` copied beside it as
 `https://airsstack.github.io/claudestacks/install.sh`, a pointer that fetches the latest release's
 installer; the repository's Pages source must be set to "GitHub Actions" or its deploy job fails.
 
@@ -250,6 +261,55 @@ over from them brings that runner back; do not restore `macos-14`. Two more task
 `cargo make install-check` shellchecks `install/install.sh` and proves it refuses a bad
 `CLAUDEVS_VERSION` before any download (it needs `shellcheck`), and `cargo make plugins-install` runs
 the offline hook-lookup cases against stubs, needing neither `airsl` nor the network.
+
+## The book
+
+The rules below apply to every page of the book, so each plan that writes a chapter applies them from
+here.
+
+**Voice.** Write for someone using the software, in plain short sentences and the present tense. No
+`file:line`, status tracking, decision history or internal vocabulary. The banned vocabulary under
+`### Docs describe the software, never the work that produced it` in `crates/airsclaude/CLAUDE.md`
+applies to every page. Appendices B, C and D are the one exception: they keep their citations.
+
+**Structure.** Each chapter carries its own small, self-contained example. A fact lives in one chapter
+and the others link to it. API reference stays in rustdoc. Diagrams are Mermaid, including any ASCII
+flow diagram in a source document; file trees stay in a `text` fence.
+
+**Code wins.** Where a chapter disagrees with the code, the book follows the code, and the
+disagreement goes in the running plan's `## Deviations`.
+
+**Examples.** Examples stay in `crates/*/examples/`, linked with absolute
+`https://github.com/airsstack/claudestacks/tree/main/...` URLs.
+
+**Output.** Output is never pasted unless something produced it. Every snippet is classified by one
+test: does it reach a service, spend usage, or need an interactive Claude Code session? There are four
+classes.
+
+- **No live run:** Rust calling the API or spawning `claude`; `cargo run --example` for a live
+  example; `claude -p "hi"`; `/plugin` and `/claudestacks-*:*` commands; `cmux`. Rust is `rust,no_run`;
+  anything else is the command only. No output either way.
+- **Run:** `claude --version`, `claude plugin validate`, `claudevs`, `cargo`, `airsl`, offline Rust.
+  Run it while writing, and paste the output from that run.
+- **Exercised by its reader:** YAML and Lua cases pass `claudevs test`; `hooks.json` and `plugin.json`
+  pass `claudevs check`; `claudevs.toml` loads in the case run; JSON reports are pasted from a real
+  run.
+- **Illustration:** file trees, and payload shapes taken from the rustdoc, in a `text` fence and never
+  presented as output.
+
+A snippet that fits no class is cut or rewritten until it does.
+
+**Fences.** Every fence is labelled, and no page uses an indented code block, because the gate
+compiles unlabelled and indented code as Rust.
+
+**Relative paths.** A snippet with a relative path starts with a hidden line moving to the owning
+crate, for example
+`# std::env::set_current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../claudevs")).unwrap();`. Snippets
+that continue an earlier one complete themselves with hidden `#` lines, as
+`../airsl/book/src/ch06-02-scripts-and-values.md:62-64` does.
+
+**Links.** Links are inline, image or `<https://...>` autolinks. Reference-style definitions and raw
+`<a href` are refused by the gate. Relative links in a page resolve against `book/src/`.
 
 ## AI methodology — the claudestacks plugin suite
 

@@ -75,8 +75,8 @@ Concretely (this block is the reference form, and it is ported elsewhere — kee
 is a second Lua copy, kept because `airsl` cannot `require` across `hooks/` and `scripts/`;
 `claudestacks-journal`'s
 `scripts/lib/vault.lua` `M.project_base` repeats the worktree-collapsing half without the hash.
-`snapshot-load/SKILL.md` and the plugin `README.md` describe this key in prose rather than
-restating it:
+`snapshot-load/SKILL.md` and [the claudestacks chapter](https://airsstack.github.io/claudestacks/ch11-00-claudestacks-plugin.html)
+describe this key in prose rather than restating it:
 
 ```sh
 if common_dir=$(git rev-parse --git-common-dir 2>/dev/null); then

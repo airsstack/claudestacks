@@ -1,41 +1,30 @@
 # claudestacks-cmux
 
-Native [cmux](https://cmux.com) terminal control for Claude Code, delivered as four
-lazily-loaded skills. Each skill is a thin, accurate guide over the real `cmux` CLI plus a
-small helper script; they load only when a task matches, so they cost no context otherwise.
-
-Grounded on `cmux 0.64.17`. When the installed cmux differs, the skills tell the agent to
-run `cmux --help` / `cmux capabilities` to self-correct.
+Lets Claude Code drive the [cmux](https://cmux.com) terminal. It is four skills (`cmux-control`,
+`cmux-workspace`, `cmux-browser` and `cmux-config`), each a guide over the real `cmux` command line
+with a small helper script.
 
 ## Install
 
+You need cmux on your machine; the skills run the `cmux` binary and do not include it. The helper
+scripts run on `airsl`, so install that first:
+
+```sh
+curl -LsSf https://airsstack.github.io/airsl/install.sh | sh
 ```
+
+Then, in Claude Code:
+
+```text
 /plugin marketplace add airsstack/claudestacks
 /plugin install claudestacks-cmux@claudestacks
 ```
 
-Requires a cmux install on the machine (the skills drive the `cmux` binary; they do not
-bundle it).
+## Documentation
 
-## Skills
-
-- **cmux-control** (hub) — window/workspace/pane/surface lifecycle, `send`/`read-screen`/
-  `capture-pane`/`pipe-pane`, inspection (`tree`/`top`/`identify`), and the coordination
-  signal primitives (`events`/`wait-for`/`set-status`/`set-progress`/`notify`/`set-buffer`/
-  `set-hook`). Ships `cmux-preflight.lua`, a health guard to run before automation.
-- **cmux-workspace** — caller-scoped automation, workspace groups, and multi-pane layouts.
-  Ships `cmux-layout.lua` (geometry + optional per-pane command; no agent spawning).
-- **cmux-browser** — in-cmux browser automation (navigate → wait → snapshot → act →
-  re-snapshot). Ships `cmux-snap.lua`, a snapshot-then-act wrapper.
-- **cmux-config** — `~/.config/cmux/cmux.json`, custom commands/actions, sidebars,
-  shortcuts, and the `config doctor/check/validate` family. Ships `cmux-settings.lua`, a
-  backup→edit→validate safe-edit wrapper.
-
-## Non-goals
-
-The cmux super-agent (spawning and coordinating fresh Claude instances across panes via
-`cmux claude-teams`) is a separate, future scope. This plugin documents the signal
-primitives but ships no orchestration runtime.
+What each skill covers and how cmux is laid out are described in
+[the claudestacks-cmux chapter](https://airsstack.github.io/claudestacks/ch15-00-cmux-plugin.html)
+of the book.
 
 ## License
 

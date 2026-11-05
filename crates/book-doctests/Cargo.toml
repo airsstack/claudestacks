@@ -1,0 +1,29 @@
+[package]
+name        = "book-doctests"
+description = "Compiles every page of the claudestacks book as a doctest; never published"
+version     = "0.0.0"
+
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+repository.workspace   = true
+authors.workspace      = true
+publish                = false
+
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+pulldown-cmark = { workspace = true }
+
+[dev-dependencies]
+airsclaude   = { workspace = true }
+claudevs     = { workspace = true }
+tokio        = { workspace = true, features = ["full"] }
+async-trait  = { workspace = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true }
+serde_json   = { workspace = true }
+tempfile     = { workspace = true }

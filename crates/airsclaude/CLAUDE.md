@@ -95,25 +95,15 @@ agent::process                      spawn/supervise/teardown; knows nothing abou
 binary present.
 
 `agent::Options` is the only configuration argument, fixed at spawn time and shared by the one-shot
-`query()` and `Client::connect`. Mid-session equivalents are methods on `Client`. `agent::Message` is
-exhaustive with a `Message::Other` catch-all, so a newer `claude` release emitting an unmodelled frame
-cannot fail a turn — preserve that property for any new frame enum.
+`query()` and `Client::connect`. Mid-session equivalents are methods on `Client`.
 
 ### Cross-cutting
 
-`src/types/` holds validating newtypes (`ApiKey`, `ModelId`, `MaxTokens`, `Temperature`, `ToolUseId`,
-…), each with an `Invalid*` error. Parse at construction; downstream code treats the type as proof. New
-domain values belong here, not as bare `String`/`u32` parameters.
-
-`src/prelude.rs` is the one-import path for callers and is export-only. Per the `mod.rs`-export-only
-rule, `lib.rs` and every `mod.rs` in this crate are a table of contents — module docs plus `mod`/`pub
-use`, no implementation.
+`src/prelude.rs` is the one-import path for callers and is export-only.
 
 ## Testing setup
 
-- **Unit tests** are colocated `#[cfg(test)] mod tests` in each `src/*.rs` (the unit-test mandate).
-- **`src/test_support.rs`** — `mockall` fake of the `crate::transport::Transport` contract, `cfg(test)`
-  only. Consumer-owned, not feature-gated; the crate declares no Cargo features.
+- **`src/test_support.rs`** — `mockall` fake of the `crate::transport::Transport` contract, consumer-owned.
 - **`tests/messages_*.rs`, `tests/models.rs`, `tests/transport_reqwest.rs`** — `wiremock` against a
   local HTTP server.
 - **`tests/agent_process.rs`, `tests/agent_capabilities.rs`** — drive the real
@@ -125,24 +115,57 @@ use`, no implementation.
 
 ## Docs
 
-`docs/` follows [Diátaxis](https://diataxis.fr/) — four modes kept structurally separate, indexed by
-`docs/README.md`. Per pillar: `tutorial.md`, `how-to.md`, `explanation.md`, `feature-parity.md` under
-`docs/messages-sdk/` and `docs/agent-sdk/`. Cross-cutting: `docs/architecture.md` (pillar map, the
-Agent SDK's four layers, crate conventions) and `docs/divergences.md`.
+This crate's documentation is the first part of the book at the repository root, in `book/src/` and
+published at <https://airsstack.github.io/claudestacks/>. Its pages run from
+`ch01-00-airsclaude-getting-started.md` to `ch04-03-agent-layers.md`: Chapter 2 is the Messages API,
+Chapter 3 the Agent SDK, and Chapter 4 the design behind them. The root `CLAUDE.md` holds the rules for
+writing a page.
 
-Read `docs/architecture.md` before adding a surface, and `docs/divergences.md` before "fixing"
-behaviour that looks wrong — several departures from the official SDKs are deliberate and pinned by
-test.
+Read `book/src/ch04-01-three-pillars.md` and the chapter for your client,
+`book/src/ch04-02-messages-design.md` or `book/src/ch04-03-agent-layers.md`, before adding a surface.
+Read `book/src/appendix-04-divergences.md` before "fixing" behaviour that looks wrong — several
+departures from the official SDKs are deliberate and pinned by test.
 
-The two `feature-parity.md` files are the reference quadrant: what the official Python and TypeScript
-SDKs do, what this crate does, and where they differ. They are graded against shipped artifacts
-(`sdk.d.ts`/`sdk.mjs`, the Python sdist, the `@anthropic-ai/sdk` tarball, the live binary), and each
-row carries a `file:line`. **They still lag the code between revisions.** When a doc and the source
-disagree, the source wins — and say so in the reply rather than repeating the table.
+`book/src/appendix-02-messages-parity.md` and `book/src/appendix-03-agent-parity.md` are the parity
+reference: what the official Python and TypeScript SDKs do, what this crate does, and where they differ.
+They are graded against shipped artifacts (`sdk.d.ts`/`sdk.mjs`, the Python sdist, the
+`@anthropic-ai/sdk` tarball, the live binary), and many rows carry a `file:line`, but not all. **They
+still lag the code between revisions.** When a doc and the source disagree, the source wins — and say so in the reply
+rather than repeating the table.
+
+## Conventions worth knowing before you edit
+
+**`#![forbid(unsafe_code)]`** in `src/lib.rs`. Not a lint — the crate will not compile with unsafe in
+it.
+
+**`mod.rs` and `lib.rs` are tables of contents.** Module docs, `mod` declarations, `pub use`. No
+implementation. Every implementation lives in a sibling file named after the thing it defines.
+
+**Values are parsed at construction, not validated at use.** `src/types/` holds newtypes — `ApiKey`,
+`BaseUrl`, `ModelId`, `Temperature`, `BetaHeader` — each with its own `Invalid*` error. `MaxTokens` has
+none, because every `u32` is valid. Once you hold the type, the invariant is proven. A new domain value
+belongs here, not as a bare `String` or `u32` parameter.
+
+**The workspace declares no Cargo features.** Every module compiles unconditionally, so
+`--all-features` is identical to the default build. The flag stays in the gate commands for the day
+that changes, not because it does anything today. The `mockall` transport double lives in
+`src/test_support.rs` behind `#[cfg(test)]`, not behind a feature.
+
+**Unit tests are colocated.** Each logic-bearing `src/*.rs` carries its own `#[cfg(test)] mod tests`.
+Integration tests under `tests/` complement those; they do not replace them.
+
+**Forward compatibility is a contract, not a nicety.** `agent::Message` is exhaustive but carries
+`Message::Other`, so a newer `claude` release emitting an unmodelled frame cannot fail a turn. On the
+Messages side every open-ended enum decoded from a response carries a payload-retaining `Unknown` arm
+for the same reason. Some are closed on purpose: an unrecognised `Role` fails the message's decode, and
+closed enums inside a content block, such as `ServerToolName` and `CacheControl`, land the block in
+`ContentBlock::Unknown`. Preserve this
+property in any new frame or response enum — see `book/src/appendix-04-divergences.md` for why the
+payload is retained rather than discarded.
 
 ### Docs describe the software, never the work that produced it
 
-Everything under `docs/`, every `README.md`, and every rustdoc comment is written for someone using
+Every page under `book/`, every `README.md`, and every rustdoc comment is written for someone using
 this crate. They have no view into how it gets built and no reason to want one. Development vocabulary
 in a user-facing document is noise at best; at worst the reader tries to decode it and concludes the
 crate is half-finished.
@@ -167,7 +190,7 @@ the pinned upstream versions a parity table is graded against.
 
 Present tense, not narrative. A parity table records what is true now, not what changed and when. If a
 row would read "delivered in X" it should read "present" — and if it is at parity it is simply ✅ with
-a `file:line`.
+a `file:line`. Parity updates land in the book's appendices.
 
 A gap is not a plan. Something the official SDKs do and this crate does not is a fact about the
 current state, so record it, rank it by how likely a caller is to hit it, and stop. Do not attach an
@@ -175,4 +198,4 @@ intention, an owner, an estimate, or an ordering.
 
 The same rule governs source comments: `references/doc-comment-discipline.md` in the
 `claudestacks-guideline-rust` skill bans internal planning paths, phase identifiers, workflow vocabulary,
-and AI/agent names from rustdoc and `//` comments. This is that rule extended to `docs/`.
+and AI/agent names from rustdoc and `//` comments. This is that rule extended to `book/`.

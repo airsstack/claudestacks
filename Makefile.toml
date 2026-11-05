@@ -4,6 +4,8 @@
 #   cargo make            # the full Definition-of-Done gate
 #   cargo make fmt        # rewrite formatting (the only task that mutates the tree)
 #   cargo make clippy     # a single gate step
+#   cargo make book       # serve the book locally, rebuilding on every edit
+#   cargo make book-build # build the book once into book/book/
 #   cargo make --list-all-steps
 #
 # The five gate steps mirror the canonical command set in the
@@ -519,6 +521,67 @@ for version in '1;2' ' ' '../x'; do
 done
 exit "$failed"
 '''
+
+# ---------------------------------------------------------------------------
+# Book
+# ---------------------------------------------------------------------------
+
+# `book` and `book-build` install mdBook and mdbook-mermaid on first use rather than failing
+# with a missing binary. The versions are exact, not floors: mdbook-mermaid
+# 0.17 needs mdBook 0.5, so a floor would install a pair that cannot build the
+# book. The same two versions are pinned in ci.yml's `book` job and in
+# pages.yml; change all three together. The output lands in `book/book/`,
+# which is ignored — the published copy is built by the Pages workflow.
+#
+# Each install task asks the binary on PATH for its version. cargo-make's
+# `install_crate` is not used: it reads the version from cargo's install
+# record, so it accepts a binary of another version found first on PATH. When
+# that binary is still not the pinned version after installing, the task fails
+# and names it rather than build with the wrong one.
+
+[tasks.book-mdbook]
+category = "Book"
+description = "Install mdBook 0.4.52 unless that version is the one on PATH"
+script_runner = "@shell"
+script = '''
+case "$(mdbook --version 2>/dev/null)" in
+    "mdbook v0.4.52") ;;
+    *) cargo install mdbook --version 0.4.52 --locked --force ;;
+esac
+if [ "$(mdbook --version 2>/dev/null)" != "mdbook v0.4.52" ]; then
+    echo "mdbook on PATH is $(command -v mdbook), not v0.4.52; put ~/.cargo/bin first" >&2
+    exit 1
+fi
+'''
+
+[tasks.book-mermaid]
+category = "Book"
+description = "Install mdbook-mermaid 0.16.2, which draws the book's diagrams, unless that version is the one on PATH"
+script_runner = "@shell"
+script = '''
+case "$(mdbook-mermaid --version 2>/dev/null)" in
+    "mdbook-mermaid 0.16.2") ;;
+    *) cargo install mdbook-mermaid --version 0.16.2 --locked --force ;;
+esac
+if [ "$(mdbook-mermaid --version 2>/dev/null)" != "mdbook-mermaid 0.16.2" ]; then
+    echo "mdbook-mermaid on PATH is $(command -v mdbook-mermaid), not 0.16.2; put ~/.cargo/bin first" >&2
+    exit 1
+fi
+'''
+
+[tasks.book]
+category = "Book"
+description = "Serve the book at http://localhost:3000, rebuilding on every edit"
+dependencies = ["book-mdbook", "book-mermaid"]
+command = "mdbook"
+args = ["serve", "book", "--open"]
+
+[tasks.book-build]
+category = "Book"
+description = "Build the book once into book/book/, the same build Pages publishes"
+dependencies = ["book-mdbook", "book-mermaid"]
+command = "mdbook"
+args = ["build", "book"]
 
 # ---------------------------------------------------------------------------
 # Development helpers

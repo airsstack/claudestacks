@@ -4,6 +4,18 @@ All notable changes to `airsclaude` are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crate follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-11-05
+
+### Changed
+
+- **Breaking:** `BatchResult` is `#[non_exhaustive]` and gains `Unknown(serde_json::Value)`, which keeps
+  a result this release cannot decode. An unrecognised result `type` no longer fails its row, and a
+  known `type` whose body does not fit, such as a `succeeded` row whose message does not decode, arrives
+  as `Unknown` instead of an error. A value that is not an object with a string `type` is still an error.
+  A `match` on `BatchResult` needs a wildcard arm.
+- The documentation is the [claudestacks book](https://airsstack.github.io/claudestacks/). The crate's
+  README links to it, and the package no longer carries `docs/`.
+
 ## [0.1.0] - 2026-10-15
 
 Initial release. Minimum supported Rust version: 1.94. The crate declares no Cargo features.

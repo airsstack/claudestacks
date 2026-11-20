@@ -36,8 +36,8 @@ global-artifacts-jobs = ["./claudevs-cli-smoke"]
 # breaks a release target would first fail on the release tag itself.
 pr-run-mode = "upload"
 
-# GitHub retires every macOS 14 image on November 2, 2026, and dist's default runner for
-# aarch64-apple-darwin is macos-14. macos-15 is the arm64 label. Do not copy this file
-# from a sibling repository without keeping this entry.
+# GitHub retired every macOS 14 image on November 2, 2026, and dist's default runner for
+# aarch64-apple-darwin is still macos-14. macos-15 is the arm64 label. Keep this entry
+# whenever this file is rewritten or regenerated.
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-15"

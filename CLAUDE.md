@@ -255,9 +255,9 @@ published. `.github/workflows/pages.yml` publishes the book to
 installer; the repository's Pages source must be set to "GitHub Actions" or its deploy job fails.
 
 `aarch64-apple-darwin` builds and smoke-tests on `macos-15`, set in `dist-workspace.toml`'s
-`github-custom-runners` and again in the smoke workflow. The sibling `airsl` and `buildl` repositories
-stay on dist's default `macos-14`, which GitHub retires on November 2, 2026, so copying either file
-over from them brings that runner back; do not restore `macos-14`. Two more tasks sit outside `dod`:
+`github-custom-runners` and again in the smoke workflow. dist still defaults that target to `macos-14`,
+which GitHub retired on November 2, 2026, so dropping the entry brings the dead runner back; do not
+restore `macos-14`. The sibling `airsl` and `buildl` repositories carry the same entry. Two more tasks sit outside `dod`:
 `cargo make install-check` shellchecks `install/install.sh` and proves it refuses a bad
 `CLAUDEVS_VERSION` before any download (it needs `shellcheck`), and `cargo make plugins-install` runs
 the offline hook-lookup cases against stubs, needing neither `airsl` nor the network.

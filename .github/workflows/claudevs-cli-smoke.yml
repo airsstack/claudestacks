@@ -12,10 +12,10 @@ name: Smoke
 # never touches it.
 #
 # `aarch64-apple-darwin` runs on `macos-15` here and in `dist-workspace.toml`'s
-# `github-custom-runners`, unlike the sibling `airsl` and `buildl` repositories,
-# which stay on dist's default `macos-14`. GitHub retires all macOS 14 images on
-# November 2, 2026 (actions/runner-images issue 13518), so copying their file
-# over this one would bring that runner back.
+# `github-custom-runners`, as in the sibling `airsl` and `buildl` repositories.
+# dist's default for that target is `macos-14`, and GitHub retired all macOS 14
+# images on November 2, 2026 (actions/runner-images issue 13518), so never let
+# this runner fall back to the default.
 on:
   workflow_call:
     inputs:

@@ -1,5 +1,10 @@
 # claudestacks
 
+> **Archived.** The Claude Code plugins are now agentstacks packs and claudevs lives in agentstacks:
+> https://github.com/airsstack/agentstacks. Migrating:
+> https://airsstack.github.io/agentstacks/ch03-00-migration.html. airsclaude stays
+> here until it moves to airsdk.
+
 A Claude toolkit in Rust: an SDK for calling Claude, a test runner for Claude Code plugins, and a
 Claude Code plugin suite for spec-driven development.
 

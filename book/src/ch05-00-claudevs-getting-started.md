@@ -1,5 +1,9 @@
 # Getting Started
 
+> **claudevs moved to agentstacks.** Its book is now
+> https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html. The claudevs
+> chapters here describe claudevs 0.1.1 and are no longer updated.
+
 `claudevs` tests Claude Code plugins without a model in the loop. It runs a plugin's hooks and scripts
 the way Claude Code would, checks that the plugin's files are wired together, and reports one pass or
 fail answer. This chapter takes you from nothing to a passing `claudevs check`, then breaks a hook on

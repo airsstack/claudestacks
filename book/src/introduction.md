@@ -50,6 +50,10 @@ answer every time. You describe a case in YAML or Lua, such as "this hook blocks
 `claudevs test` checks it. `claudevs check` goes further and runs the whole gate: manifest validation,
 wiring, the cases, and the cases again against the plugin as it looks once installed.
 
+> **claudevs moved to agentstacks.** Its book is now
+> https://airsstack.github.io/agentstacks/ch08-00-claudevs-getting-started.html. The claudevs
+> chapters here describe claudevs 0.1.1 and are no longer updated.
+
 Start with [claudevs Getting Started](ch05-00-claudevs-getting-started.md).
 
 ## The plugin suite
